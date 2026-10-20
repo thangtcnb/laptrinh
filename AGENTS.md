@@ -1,0 +1,3 @@
+- Dự án chạy trên Python 3.11 và Windows Server 2012.
+- Luôn tạo file `requirements.txt` khi thêm thư viện mới.
+- Code rõ ràng, đơn giản, dễ bảo trì.
