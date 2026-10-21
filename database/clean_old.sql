@@ -1,0 +1,2 @@
+DROP DATABASE IF EXISTS laptrinh_db;
+DROP DATABASE IF EXISTS qlcv_quangngai;
