@@ -1,0 +1,10 @@
+# Ignore OS or IDE temp files
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+
+# Ensure database directory and files are NOT ignored
+!database/
+!database/schema.sql
+!database/seed.sql
