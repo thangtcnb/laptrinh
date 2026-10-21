@@ -1,0 +1,204 @@
+<?php
+require_once __DIR__ . '/../config.php';
+
+// Get list of all departments
+function getDepartments($pdo) {
+    $stmt = $pdo->query("SELECT * FROM departments ORDER BY id ASC");
+    return $stmt->fetchAll();
+}
+
+// Get list of users (optionally filtered by department)
+function getUsers($pdo, $departmentId = null) {
+    if ($departmentId) {
+        $stmt = $pdo->prepare("SELECT u.*, d.name AS department_name FROM users u JOIN departments d ON u.department_id = d.id WHERE u.department_id = ? ORDER BY u.fullname ASC");
+        $stmt->execute([$departmentId]);
+    } else {
+        $stmt = $pdo->query("SELECT u.*, d.name AS department_name FROM users u JOIN departments d ON u.department_id = d.id ORDER BY d.id ASC, u.fullname ASC");
+    }
+    return $stmt->fetchAll();
+}
+
+// Get task assignees for a given task
+function getTaskAssignees($pdo, $taskId) {
+    $stmt = $pdo->prepare("
+        SELECT ta.role_type, u.id AS user_id, u.fullname, u.email, d.name AS department_name
+        FROM task_assignees ta
+        JOIN users u ON ta.user_id = u.id
+        JOIN departments d ON u.department_id = d.id
+        WHERE ta.task_id = ?
+        ORDER BY FIELD(ta.role_type, 'MAIN', 'COOP'), u.fullname ASC
+    ");
+    $stmt->execute([$taskId]);
+    return $stmt->fetchAll();
+}
+
+// Format assignees according to system requirements
+function formatAssigneesHtml($assignees) {
+    if (empty($assignees)) {
+        return '<span class="text-gray-400 italic">Chưa phân công</span>';
+    }
+
+    $mainAssignees = array_filter($assignees, function($a) { return $a['role_type'] === 'MAIN'; });
+    $coopAssignees = array_filter($assignees, function($a) { return $a['role_type'] === 'COOP'; });
+
+    if (count($assignees) === 1) {
+        $single = reset($assignees);
+        return htmlspecialchars($single['fullname']);
+    }
+
+    // >= 2 people
+    $mainNames = implode(', ', array_map(function($a) { return htmlspecialchars($a['fullname']); }, $mainAssignees));
+    $coopNames = implode(', ', array_map(function($a) { return htmlspecialchars($a['fullname']); }, $coopAssignees));
+
+    $html = '<div class="text-xs leading-relaxed">';
+    if ($mainNames !== '') {
+        $html .= '<div><span class="font-semibold text-slate-800"><i class="fa-solid fa-user-check text-indigo-600 mr-1"></i>Chính:</span> <span class="font-bold text-indigo-900">' . $mainNames . '</span></div>';
+    }
+    if ($coopNames !== '') {
+        $html .= '<div class="text-slate-600 mt-0.5"><span class="font-semibold text-slate-700"><i class="fa-solid fa-users text-sky-600 mr-1"></i>Phối hợp:</span> ' . $coopNames . '</div>';
+    }
+    $html .= '</div>';
+
+    return $html;
+}
+
+// Format department badge UI with matching color themes
+function renderDepartmentBadge($code, $name, $colorTheme, $icon) {
+    $codeEsc = htmlspecialchars($code);
+    $nameEsc = htmlspecialchars($name);
+    $iconEsc = htmlspecialchars($icon ?: 'fa-building');
+
+    switch (strtolower($colorTheme)) {
+        case 'purple':
+            $badgeClass = 'bg-purple-100 text-purple-800 border-purple-200';
+            break;
+        case 'emerald':
+        case 'green':
+            $badgeClass = 'bg-emerald-100 text-emerald-800 border-emerald-200';
+            break;
+        case 'blue':
+        default:
+            $badgeClass = 'bg-blue-100 text-blue-800 border-blue-200';
+            break;
+    }
+
+    return '<span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-semibold border ' . $badgeClass . '" title="' . $nameEsc . '">
+                <i class="fa-solid ' . $iconEsc . ' text-xs"></i>
+                <span>' . $codeEsc . '</span>
+            </span>';
+}
+
+// Render status badge
+function renderStatusBadge($status) {
+    switch ($status) {
+        case 'CHO_BGD_DUYET':
+            return '<span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium bg-amber-100 text-amber-800 border border-amber-200">
+                        <i class="fa-solid fa-clock-rotate-left"></i> Chờ BGD duyệt
+                    </span>';
+        case 'CHO_DUYET':
+            return '<span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800 border border-yellow-200">
+                        <i class="fa-solid fa-hourglass-half"></i> Chờ duyệt
+                    </span>';
+        case 'DANG_THUC_HIEN':
+            return '<span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium bg-sky-100 text-sky-800 border border-sky-200">
+                        <i class="fa-solid fa-spinner fa-spin text-xs"></i> Đang thực hiện
+                    </span>';
+        case 'HOAN_THANH':
+            return '<span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium bg-emerald-100 text-emerald-800 border border-emerald-200">
+                        <i class="fa-solid fa-circle-check"></i> Hoàn thành
+                    </span>';
+        default:
+            return '<span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-800">' . htmlspecialchars($status) . '</span>';
+    }
+}
+
+// Render priority badge
+function renderPriorityBadge($priority) {
+    switch ($priority) {
+        case 'THAP':
+            return '<span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-slate-100 text-slate-700">Thấp</span>';
+        case 'TRUNG_BINH':
+            return '<span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-50 text-blue-700 border border-blue-200">Trung bình</span>';
+        case 'CAO':
+            return '<span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-orange-100 text-orange-800 font-semibold">Cao</span>';
+        case 'KHAN_CAP':
+            return '<span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-rose-100 text-rose-800 font-bold border border-rose-300 animate-pulse">
+                        <i class="fa-solid fa-triangle-exclamation mr-1 text-rose-600"></i> Khẩn cấp
+                    </span>';
+        default:
+            return '<span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-700">' . htmlspecialchars($priority) . '</span>';
+    }
+}
+
+// Get tasks query with smart filters and pagination
+function getTasksFiltered($pdo, $filters = [], $limit = 15, $offset = 0, $currentUser = null) {
+    $where = ["1=1"];
+    $params = [];
+
+    // Filter by date range
+    if (!empty($filters['date_from'])) {
+        $where[] = "(t.start_date >= ? OR t.due_date >= ?)";
+        $params[] = $filters['date_from'];
+        $params[] = $filters['date_from'];
+    }
+    if (!empty($filters['date_to'])) {
+        $where[] = "(t.start_date <= ? OR t.due_date <= ?)";
+        $params[] = $filters['date_to'];
+        $params[] = $filters['date_to'];
+    }
+
+    // Filter by department or "📌 Công việc của tôi"
+    if (!empty($filters['dept_filter'])) {
+        if ($filters['dept_filter'] === 'MY_TASKS' && $currentUser) {
+            $where[] = "t.id IN (SELECT task_id FROM task_assignees WHERE user_id = ?)";
+            $params[] = $currentUser['id'];
+        } elseif (is_numeric($filters['dept_filter'])) {
+            $where[] = "t.department_id = ?";
+            $params[] = (int)$filters['dept_filter'];
+        }
+    }
+
+    // Filter by status
+    if (!empty($filters['status']) && $filters['status'] !== 'ALL') {
+        $where[] = "t.status = ?";
+        $params[] = $filters['status'];
+    }
+
+    $whereSql = implode(" AND ", $where);
+
+    // Count query
+    $countSql = "SELECT COUNT(DISTINCT t.id) FROM tasks t WHERE $whereSql";
+    $stmtCount = $pdo->prepare($countSql);
+    $stmtCount->execute($params);
+    $total = (int)$stmtCount->fetchColumn();
+
+    // Data query
+    $dataSql = "
+        SELECT t.*,
+               d.code AS dept_code, d.name AS dept_name, d.color_theme AS dept_color, d.icon AS dept_icon,
+               u.fullname AS creator_name
+        FROM tasks t
+        JOIN departments d ON t.department_id = d.id
+        JOIN users u ON t.created_by = u.id
+        WHERE $whereSql
+        ORDER BY t.id DESC
+        LIMIT " . (int)$limit . " OFFSET " . (int)$offset;
+
+    $stmtData = $pdo->prepare($dataSql);
+    $stmtData->execute($params);
+    $tasks = $stmtData->fetchAll();
+
+    // Populate assignees for each task
+    foreach ($tasks as &$task) {
+        $task['assignees'] = getTaskAssignees($pdo, $task['id']);
+    }
+
+    return [
+        'data' => $tasks,
+        'total' => $total,
+        'limit' => $limit,
+        'offset' => $offset,
+        'page' => floor($offset / $limit) + 1,
+        'total_pages' => max(1, ceil($total / $limit))
+    ];
+}
