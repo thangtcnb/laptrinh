@@ -89,15 +89,28 @@ $usersList = getUsers($pdo);
         <div>
             <label class="block text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-1">Phòng ban / Cá nhân</label>
             <select name="dept_filter" class="w-full px-3 py-2 border border-slate-200 rounded-xl text-xs focus:ring-2 focus:ring-indigo-500 outline-none bg-white font-medium text-slate-700">
-                <option value="">-- Tất cả đơn vị --</option>
-                <option value="MY_TASKS" <?= $filters['dept_filter'] === 'MY_TASKS' ? 'selected' : '' ?> class="font-bold text-indigo-600">
-                    📌 Công việc của tôi
-                </option>
-                <?php foreach ($departmentsList as $d): ?>
-                    <option value="<?= $d['id'] ?>" <?= $filters['dept_filter'] == $d['id'] ? 'selected' : '' ?>>
-                        [<?= htmlspecialchars($d['code']) ?>] <?= htmlspecialchars($d['name']) ?>
+                <?php if ($currentUser['role'] === 'NHAN_VIEN'): ?>
+                    <option value="MY_TASKS" <?= ($filters['dept_filter'] === 'MY_TASKS' || empty($filters['dept_filter'])) ? 'selected' : '' ?> class="font-bold text-indigo-600">
+                        📌 Công việc của tôi
                     </option>
-                <?php endforeach; ?>
+                    <?php foreach ($departmentsList as $d): ?>
+                        <?php if ($d['code'] !== 'BGD'): ?>
+                            <option value="<?= $d['id'] ?>" <?= $filters['dept_filter'] == $d['id'] ? 'selected' : '' ?>>
+                                [<?= htmlspecialchars($d['code']) ?>] <?= htmlspecialchars($d['name']) ?>
+                            </option>
+                        <?php endif; ?>
+                    <?php endforeach; ?>
+                <?php else: ?>
+                    <option value="">-- Tất cả đơn vị --</option>
+                    <option value="MY_TASKS" <?= $filters['dept_filter'] === 'MY_TASKS' ? 'selected' : '' ?> class="font-bold text-indigo-600">
+                        📌 Công việc của tôi
+                    </option>
+                    <?php foreach ($departmentsList as $d): ?>
+                        <option value="<?= $d['id'] ?>" <?= $filters['dept_filter'] == $d['id'] ? 'selected' : '' ?>>
+                            [<?= htmlspecialchars($d['code']) ?>] <?= htmlspecialchars($d['name']) ?>
+                        </option>
+                    <?php endforeach; ?>
+                <?php endif; ?>
             </select>
         </div>
 
@@ -107,7 +120,7 @@ $usersList = getUsers($pdo);
             <select name="status" class="w-full px-3 py-2 border border-slate-200 rounded-xl text-xs focus:ring-2 focus:ring-indigo-500 outline-none bg-white font-medium text-slate-700">
                 <option value="ALL">-- Tất cả trạng thái --</option>
                 <option value="CHO_BGD_DUYET" <?= $filters['status'] === 'CHO_BGD_DUYET' ? 'selected' : '' ?>>Chờ BGD duyệt</option>
-                <option value="CHO_DUYET" <?= $filters['status'] === 'CHO_DUYET' ? 'selected' : '' ?>>Chờ duyệt</option>
+                <option value="CHO_DUYET" <?= $filters['status'] === 'CHO_DUYET' ? 'selected' : '' ?>>Chờ Trưởng phòng duyệt</option>
                 <option value="DANG_THUC_HIEN" <?= $filters['status'] === 'DANG_THUC_HIEN' ? 'selected' : '' ?>>Đang thực hiện</option>
                 <option value="HOAN_THANH" <?= $filters['status'] === 'HOAN_THANH' ? 'selected' : '' ?>>Hoàn thành</option>
             </select>
@@ -399,7 +412,7 @@ $usersList = getUsers($pdo);
                 <div>
                     <label class="block text-xs font-semibold text-slate-700 mb-1">Trạng thái</label>
                     <select name="status" id="form_status" class="w-full p-2.5 border border-slate-300 rounded-xl text-xs focus:ring-2 focus:ring-indigo-500 outline-none bg-white">
-                        <option value="CHO_DUYET">Chờ duyệt</option>
+                        <option value="CHO_DUYET">Chờ Trưởng phòng duyệt</option>
                         <option value="CHO_BGD_DUYET">Chờ BGD duyệt</option>
                         <option value="DANG_THUC_HIEN">Đang thực hiện</option>
                         <option value="HOAN_THANH">Hoàn thành</option>
@@ -412,7 +425,7 @@ $usersList = getUsers($pdo);
                 </div>
             </div>
 
-            <!-- Assignees Section: 1 MAIN + Multi COOP -->
+            <!-- Assignees Section: 1 MAIN + Multi COOP (2-Level Selector) -->
             <div class="p-3.5 bg-slate-50 rounded-xl border border-slate-200 space-y-3">
                 <div class="font-bold text-xs text-slate-800 flex items-center gap-1.5">
                     <i class="fa-solid fa-users text-indigo-600"></i>
@@ -430,10 +443,23 @@ $usersList = getUsers($pdo);
                 </div>
 
                 <div>
-                    <label class="block text-[11px] font-semibold text-slate-600 mb-1">2. Người phối hợp (COOP - Giữ Ctrl/Cmd để chọn nhiều người)</label>
+                    <label class="block text-[11px] font-semibold text-slate-600 mb-1">2. Bộ chọn Người phối hợp (2 cấp: Chọn Phòng -> Chọn Nhân viên)</label>
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 mb-2">
+                        <div>
+                            <select id="form_coop_dept_filter" onchange="filterCoopUsersByDeptModal()" class="w-full p-2 border border-slate-300 rounded-lg text-xs bg-white font-medium text-slate-700">
+                                <option value="ALL">-- Cấp 1: Tất cả Phòng ban --</option>
+                                <?php foreach ($departmentsList as $d): ?>
+                                    <option value="<?= $d['id'] ?>">[<?= htmlspecialchars($d['code']) ?>] <?= htmlspecialchars($d['name']) ?></option>
+                                <?php endforeach; ?>
+                            </select>
+                        </div>
+                        <div class="text-[11px] text-slate-500 flex items-center">
+                            <span>Giữ Ctrl/Cmd để chọn nhiều Nhân viên</span>
+                        </div>
+                    </div>
                     <select name="coop_assignees[]" id="form_coop_assignees" multiple class="w-full p-2 border border-slate-300 rounded-lg text-xs bg-white h-24">
                         <?php foreach ($usersList as $u): ?>
-                            <option value="<?= $u['id'] ?>"><?= htmlspecialchars($u['fullname']) ?> (<?= htmlspecialchars($u['department_name']) ?>)</option>
+                            <option value="<?= $u['id'] ?>" data-dept-id="<?= $u['department_id'] ?>"><?= htmlspecialchars($u['fullname']) ?> (<?= htmlspecialchars($u['department_name']) ?>)</option>
                         <?php endforeach; ?>
                     </select>
                 </div>
@@ -510,6 +536,19 @@ function openTaskModal(task = null) {
 function closeTaskModal() {
     document.getElementById('taskModal').classList.add('hidden');
     document.getElementById('taskModal').classList.remove('flex');
+}
+
+function filterCoopUsersByDeptModal() {
+    const deptId = document.getElementById('form_coop_dept_filter').value;
+    const coopSelect = document.getElementById('form_coop_assignees');
+    Array.from(coopSelect.options).forEach(opt => {
+        const optDept = opt.getAttribute('data-dept-id');
+        if (deptId === 'ALL' || optDept === deptId) {
+            opt.style.display = '';
+        } else {
+            opt.style.display = 'none';
+        }
+    });
 }
 </script>
 

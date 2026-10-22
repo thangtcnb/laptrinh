@@ -19,6 +19,10 @@ $allUsersList = getUsers($pdo);
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
     <!-- Google Fonts -->
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <!-- Flatpickr CSS & JS (dd/mm/yyyy datepicker integration) -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
+    <script src="https://cdn.jsdelivr.net/npm/flatpickr/dist/l10n/vn.js"></script>
     <script>
         tailwind.config = {
             theme: {
@@ -39,6 +43,18 @@ $allUsersList = getUsers($pdo);
                 }
             }
         }
+
+        document.addEventListener('DOMContentLoaded', function() {
+            if (typeof flatpickr !== 'undefined') {
+                flatpickr.localize(flatpickr.l10ns.vn);
+                flatpickr('input[type="date"]', {
+                    dateFormat: "Y-m-d",
+                    altInput: true,
+                    altFormat: "d/m/Y",
+                    allowInput: true
+                });
+            }
+        });
     </script>
     <style>
         @media print {
@@ -75,8 +91,8 @@ $allUsersList = getUsers($pdo);
 
             <!-- Current User info & Quick Switcher -->
             <div class="flex items-center gap-3 bg-white/10 backdrop-blur-md px-3.5 py-2 rounded-xl border border-white/20">
-                <div class="text-right text-xs">
-                    <div class="font-bold text-white text-sm flex items-center justify-end gap-1.5">
+                <a href="profile.php" class="text-right text-xs hover:opacity-90 transition group" title="Xem trang cá nhân">
+                    <div class="font-bold text-white text-sm flex items-center justify-end gap-1.5 group-hover:text-blue-200">
                         <i class="fa-solid fa-user-circle text-blue-300"></i>
                         <span><?= htmlspecialchars($currentUser['fullname']) ?></span>
                     </div>
@@ -86,7 +102,7 @@ $allUsersList = getUsers($pdo);
                         </span>
                         <span> • <?= htmlspecialchars($currentUser['department_name']) ?></span>
                     </div>
-                </div>
+                </a>
 
                 <!-- Quick Switch Dropdown for Demo/Testing -->
                 <div class="relative group">
@@ -144,6 +160,11 @@ $allUsersList = getUsers($pdo);
             <a href="export.php" class="px-3.5 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap transition flex items-center gap-1.5 <?= $currentPage === 'export.php' ? 'bg-indigo-600 text-white shadow' : 'text-slate-200 hover:bg-white/10' ?>">
                 <i class="fa-solid fa-file-excel"></i>
                 <span>Xuất Báo Cáo & In Ấn</span>
+            </a>
+
+            <a href="profile.php" class="px-3.5 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap transition flex items-center gap-1.5 <?= $currentPage === 'profile.php' ? 'bg-indigo-600 text-white shadow' : 'text-slate-200 hover:bg-white/10' ?>">
+                <i class="fa-solid fa-user-gear"></i>
+                <span>Tài Khoản Cá Nhân</span>
             </a>
         </div>
     </nav>

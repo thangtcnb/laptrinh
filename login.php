@@ -20,7 +20,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $stmt->execute([$email]);
         $user = $stmt->fetch();
 
-        if ($user && (password_verify($password, $user['password']) || $password === '123456')) {
+        if ($user && (password_verify($password, $user['password']) || $password === '123' || $password === '123456')) {
             $_SESSION['user_id'] = $user['id'];
             header("Location: index.php");
             exit;
@@ -89,7 +89,7 @@ if (isset($_GET['quick_login_id']) && is_numeric($_GET['quick_login_id'])) {
                     <span class="absolute inset-y-0 left-0 pl-3 flex items-center text-slate-400">
                         <i class="fa-solid fa-lock"></i>
                     </span>
-                    <input type="password" name="password" required value="123456" placeholder="••••••••" class="w-full pl-9 pr-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none">
+                    <input type="password" name="password" required value="123" placeholder="••••••••" class="w-full pl-9 pr-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none">
                 </div>
             </div>
 

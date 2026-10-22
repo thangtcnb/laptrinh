@@ -97,7 +97,7 @@ function renderStatusBadge($status) {
                     </span>';
         case 'CHO_DUYET':
             return '<span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800 border border-yellow-200">
-                        <i class="fa-solid fa-hourglass-half"></i> Chờ duyệt
+                        <i class="fa-solid fa-hourglass-half"></i> Chờ Trưởng phòng duyệt
                     </span>';
         case 'DANG_THUC_HIEN':
             return '<span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium bg-sky-100 text-sky-800 border border-sky-200">
@@ -155,6 +155,24 @@ function getTasksFiltered($pdo, $filters = [], $limit = 15, $offset = 0, $curren
         } elseif (is_numeric($filters['dept_filter'])) {
             $where[] = "t.department_id = ?";
             $params[] = (int)$filters['dept_filter'];
+        }
+    }
+
+    // Role-based visibility restriction for Pending Approval (CHO_DUYET) tasks:
+    // If a task is CHO_DUYET (waiting for Department Head approval), it should only be visible to:
+    // - The creator or assignees of the task
+    // - Department Head / Phó phòng (TRUONG_PHONG) of that specific department
+    // - Board of Directors (BGD)
+    if ($currentUser) {
+        if ($currentUser['role'] === 'TRUONG_PHONG') {
+            $where[] = "(t.status != 'CHO_DUYET' OR t.department_id = ? OR t.created_by = ? OR t.id IN (SELECT task_id FROM task_assignees WHERE user_id = ?))";
+            $params[] = $currentUser['department_id'];
+            $params[] = $currentUser['id'];
+            $params[] = $currentUser['id'];
+        } elseif ($currentUser['role'] === 'NHAN_VIEN') {
+            $where[] = "(t.status != 'CHO_DUYET' OR t.created_by = ? OR t.id IN (SELECT task_id FROM task_assignees WHERE user_id = ?))";
+            $params[] = $currentUser['id'];
+            $params[] = $currentUser['id'];
         }
     }
 

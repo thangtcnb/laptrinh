@@ -191,9 +191,22 @@ let rowCount = 0;
 
 const usersOptionsHtml = `
     <?php foreach ($usersList as $u): ?>
-        <option value="<?= $u['id'] ?>"><?= htmlspecialchars($u['fullname']) ?> (<?= htmlspecialchars($u['department_name']) ?>)</option>
+        <option value="<?= $u['id'] ?>" data-dept-id="<?= $u['department_id'] ?>"><?= htmlspecialchars($u['fullname']) ?> (<?= htmlspecialchars($u['department_name']) ?>)</option>
     <?php endforeach; ?>
 `;
+
+function filterBatchCoopDept(rowIndex, deptId) {
+    const coopSelect = document.getElementById(`coop_select_${rowIndex}`);
+    if (!coopSelect) return;
+    Array.from(coopSelect.options).forEach(opt => {
+        const optDept = opt.getAttribute('data-dept-id');
+        if (deptId === 'ALL' || optDept === deptId) {
+            opt.style.display = '';
+        } else {
+            opt.style.display = 'none';
+        }
+    });
+}
 
 function createRowHtml(index) {
     return `
@@ -243,8 +256,14 @@ function createRowHtml(index) {
                     </select>
                 </div>
                 <div>
-                    <label class="block text-[11px] font-semibold text-slate-600 mb-1">Người phối hợp (COOP - Giữ Ctrl/Cmd để chọn nhiều)</label>
-                    <select name="tasks[${index}][coop_assignees][]" multiple class="w-full p-1.5 border border-slate-300 rounded-xl text-xs bg-white h-16">
+                    <label class="block text-[11px] font-semibold text-slate-600 mb-1">Bộ chọn Người phối hợp (2 cấp)</label>
+                    <select onchange="filterBatchCoopDept(${index}, this.value)" class="w-full p-1.5 border border-slate-300 rounded-xl text-[11px] bg-white mb-1">
+                        <option value="ALL">-- Cấp 1: Tất cả Phòng ban --</option>
+                        <?php foreach ($departmentsList as $d): ?>
+                            <option value="<?= $d['id'] ?>">[<?= htmlspecialchars($d['code']) ?>] <?= htmlspecialchars($d['name']) ?></option>
+                        <?php endforeach; ?>
+                    </select>
+                    <select name="tasks[${index}][coop_assignees][]" id="coop_select_${index}" multiple class="w-full p-1.5 border border-slate-300 rounded-xl text-xs bg-white h-16">
                         ${usersOptionsHtml}
                     </select>
                 </div>
