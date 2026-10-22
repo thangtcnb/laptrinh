@@ -9,10 +9,15 @@ unset($_SESSION['flash_success'], $_SESSION['flash_error']);
 
 // Filters parameters - Default homepage view based on user role:
 // For TRUONG_PHONG: Default to their department ID ("DANH SÁCH CÔNG VIỆC PHÒNG [TÊN PHÒNG]")
+// For BGD: Default to '' ("TẤT CẢ CÔNG VIỆC PHÂN HIỆU QUẢNG NGÃI")
 // For others: Default to 'MY_TASKS'
 $defaultDeptFilter = 'MY_TASKS';
-if (isset($currentUser['role']) && $currentUser['role'] === 'TRUONG_PHONG') {
-    $defaultDeptFilter = $currentUser['department_id'];
+if (isset($currentUser['role'])) {
+    if ($currentUser['role'] === 'TRUONG_PHONG') {
+        $defaultDeptFilter = $currentUser['department_id'];
+    } elseif ($currentUser['role'] === 'BGD') {
+        $defaultDeptFilter = '';
+    }
 }
 
 $filters = [
@@ -209,11 +214,15 @@ $usersList = getUsers($pdo);
                                 <?php endif; ?>
 
                                 <?php if (!empty($t['leader_comments'])): ?>
-                                    <div class="mt-2 bg-amber-50 border border-amber-200 rounded-lg p-2 text-xs text-amber-900 font-medium flex items-start gap-1.5 shadow-sm">
-                                        <i class="fa-solid fa-comment-dots text-amber-600 mt-0.5"></i>
-                                        <div>
-                                            <span class="font-bold text-amber-800">Ý kiến chỉ đạo:</span>
-                                            <span><?= htmlspecialchars($t['leader_comments']) ?></span>
+                                    <div class="mt-2.5 bg-amber-50/90 border-l-4 border-amber-500 rounded-r-xl p-2.5 text-xs text-amber-950 shadow-sm">
+                                        <div class="flex items-center gap-1.5 font-bold text-amber-800 text-[11px] mb-1">
+                                            <span class="inline-flex items-center gap-1 bg-amber-200/80 text-amber-900 px-2 py-0.5 rounded-full">
+                                                <i class="fa-solid fa-user-tie text-amber-700"></i>
+                                                <span>Ý KIẾN CHỈ ĐẠO</span>
+                                            </span>
+                                        </div>
+                                        <div class="pl-1 text-slate-800 leading-relaxed font-medium">
+                                            <?= htmlspecialchars($t['leader_comments']) ?>
                                         </div>
                                     </div>
                                 <?php endif; ?>
@@ -312,14 +321,12 @@ $usersList = getUsers($pdo);
                                         </button>
                                     <?php endif; ?>
 
-                                    <!-- Delete Button (Trưởng/Phó phòng KHÔNG có quyền xóa công việc của nhân viên trong phòng) -->
+                                    <!-- Delete Button: Chỉ dành cho chính cá nhân tạo công việc (khi còn ở trạng thái Chờ duyệt) hoặc Super Admin -->
                                     <?php
                                     $canShowDelete = false;
-                                    if ($isBgd || $currentUser['role'] === 'SUPER_ADMIN') {
+                                    if ($currentUser['role'] === 'SUPER_ADMIN') {
                                         $canShowDelete = true;
-                                    } elseif ($currentUser['role'] === 'TRUONG_PHONG' && $isCreator && ($t['status'] === 'CHO_DUYET' || $t['status'] === 'CHO_BGD_DUYET')) {
-                                        $canShowDelete = true;
-                                    } elseif ($currentUser['role'] === 'NHAN_VIEN' && $isCreator && $t['status'] === 'CHO_DUYET') {
+                                    } elseif ($isCreator && ($t['status'] === 'CHO_DUYET' || $t['status'] === 'CHO_BGD_DUYET')) {
                                         $canShowDelete = true;
                                     }
                                     ?>
@@ -433,6 +440,14 @@ $usersList = getUsers($pdo);
             <div class="mb-3">
                 <label class="block text-xs font-semibold text-slate-700 mb-1">Công việc:</label>
                 <div id="prog_task_title" class="p-2.5 bg-slate-50 rounded-xl text-xs font-bold text-slate-800 border border-slate-200"></div>
+            </div>
+
+            <div id="prog_leader_comments_container" class="mb-3 hidden">
+                <label class="block text-xs font-bold text-amber-800 mb-1 flex items-center gap-1">
+                    <i class="fa-solid fa-user-tie text-amber-600"></i>
+                    <span>Ý kiến chỉ đạo của Lãnh đạo:</span>
+                </label>
+                <div id="prog_leader_comments" class="p-2.5 bg-amber-50 border-l-4 border-amber-500 rounded-r-xl text-xs text-slate-800 font-medium leading-relaxed"></div>
             </div>
 
             <div class="mb-4">
@@ -581,6 +596,15 @@ function openProgressModal(task) {
     document.getElementById('prog_range').value = task.progress;
     document.getElementById('prog_val').value = task.progress;
     document.getElementById('prog_proof_link').value = task.proof_link || '';
+
+    const leaderContainer = document.getElementById('prog_leader_comments_container');
+    const leaderCommentEl = document.getElementById('prog_leader_comments');
+    if (task.leader_comments && task.leader_comments.trim() !== '') {
+        leaderCommentEl.innerText = task.leader_comments;
+        leaderContainer.classList.remove('hidden');
+    } else {
+        leaderContainer.classList.add('hidden');
+    }
 
     document.getElementById('progressModal').classList.remove('hidden');
     document.getElementById('progressModal').classList.add('flex');

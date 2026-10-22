@@ -84,12 +84,10 @@ if ($action === 'delete') {
     }
 
     $canDelete = false;
-    if ($currentUser['role'] === 'BGD' || $currentUser['role'] === 'SUPER_ADMIN') {
+    if ($currentUser['role'] === 'SUPER_ADMIN') {
         $canDelete = true;
-    } elseif ($currentUser['role'] === 'TRUONG_PHONG' && $task['created_by'] == $currentUser['id'] && ($task['status'] === 'CHO_DUYET' || $task['status'] === 'CHO_BGD_DUYET')) {
-        // Trưởng phòng chỉ được xóa công việc do chính mình tạo khi ở trạng thái Chờ duyệt
-        $canDelete = true;
-    } elseif ($currentUser['role'] === 'NHAN_VIEN' && $task['created_by'] == $currentUser['id'] && $task['status'] === 'CHO_DUYET') {
+    } elseif ($task['created_by'] == $currentUser['id'] && ($task['status'] === 'CHO_DUYET' || $task['status'] === 'CHO_BGD_DUYET')) {
+        // Cá nhân người tạo chỉ được xóa công việc do chính mình tạo khi ở trạng thái Chờ duyệt
         $canDelete = true;
     }
 
@@ -99,7 +97,7 @@ if ($action === 'delete') {
         logActivity($pdo, $currentUser['id'], 'DELETE_TASK', "Đã xóa công việc ID #$taskId: {$task['title']}");
         $_SESSION['flash_success'] = "Đã xóa công việc thành công!";
     } else {
-        $_SESSION['flash_error'] = "Trưởng/Phó phòng không có quyền xóa công việc của nhân viên!";
+        $_SESSION['flash_error'] = "Ban Giám đốc và Trưởng/Phó phòng không có quyền xóa công việc của cấp dưới/nhân viên!";
     }
     header("Location: index.php");
     exit;
