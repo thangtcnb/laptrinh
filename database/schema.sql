@@ -27,8 +27,10 @@ CREATE TABLE IF NOT EXISTS `tasks` (
     `title` VARCHAR(255) NOT NULL,
     `description` TEXT NULL,
     `leader_comments` TEXT NULL,
+    `leader_comment_user_id` INT NULL,
+    `rejection_reason` TEXT NULL,
     `department_id` INT NOT NULL,
-    `status` ENUM('CHO_BGD_DUYET', 'CHO_DUYET', 'DANG_THUC_HIEN', 'HOAN_THANH') NOT NULL DEFAULT 'CHO_DUYET',
+    `status` ENUM('CHO_BGD_DUYET', 'CHO_DUYET', 'CHO_XAC_NHAN', 'DANG_THUC_HIEN', 'HOAN_THANH', 'TU_CHOI_CHO_TP_XAC_NHAN') NOT NULL DEFAULT 'CHO_DUYET',
     `priority` ENUM('THAP', 'TRUNG_BINH', 'CAO', 'KHAN_CAP') NOT NULL DEFAULT 'TRUNG_BINH',
     `progress` INT NOT NULL DEFAULT 0,
     `proof_link` VARCHAR(500) NULL,
@@ -37,7 +39,8 @@ CREATE TABLE IF NOT EXISTS `tasks` (
     `created_by` INT NOT NULL,
     `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (`department_id`) REFERENCES `departments`(`id`) ON DELETE CASCADE,
-    FOREIGN KEY (`created_by`) REFERENCES `users`(`id`) ON DELETE CASCADE
+    FOREIGN KEY (`created_by`) REFERENCES `users`(`id`) ON DELETE CASCADE,
+    FOREIGN KEY (`leader_comment_user_id`) REFERENCES `users`(`id`) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- 4. Task Assignees table

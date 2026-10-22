@@ -99,6 +99,14 @@ function renderStatusBadge($status) {
             return '<span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800 border border-yellow-200">
                         <i class="fa-solid fa-hourglass-half"></i> Chờ Trưởng phòng duyệt
                     </span>';
+        case 'CHO_XAC_NHAN':
+            return '<span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800 border border-blue-200">
+                        <i class="fa-solid fa-envelope-open-text"></i> Chờ NV xác nhận
+                    </span>';
+        case 'TU_CHOI_CHO_TP_XAC_NHAN':
+            return '<span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium bg-rose-100 text-rose-800 border border-rose-200">
+                        <i class="fa-solid fa-circle-xmark"></i> Từ chối - Chờ TP xác nhận
+                    </span>';
         case 'DANG_THUC_HIEN':
             return '<span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium bg-sky-100 text-sky-800 border border-sky-200">
                         <i class="fa-solid fa-spinner fa-spin text-xs"></i> Đang thực hiện
@@ -128,6 +136,38 @@ function renderPriorityBadge($priority) {
         default:
             return '<span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-700">' . htmlspecialchars($priority) . '</span>';
     }
+}
+
+// Format Leader Comment with prefix depending on role
+function formatLeaderComment($t) {
+    if (empty($t['leader_comments'])) {
+        return '';
+    }
+    $comment = trim($t['leader_comments']);
+
+    if (!empty($t['lc_role'])) {
+        if ($t['lc_role'] === 'BGD') {
+            $prefix = 'BGĐ: ';
+        } elseif ($t['lc_role'] === 'TRUONG_PHONG') {
+            $prefix = ($t['lc_fullname'] ?? 'Trưởng/Phó phòng') . ': ';
+        } else {
+            $prefix = ($t['lc_fullname'] ?? 'Lãnh đạo') . ': ';
+        }
+    } else {
+        if (strpos($comment, 'BGĐ:') === 0 || preg_match('/^\[.+\]:/u', $comment)) {
+            return $comment;
+        }
+        $prefix = '';
+    }
+
+    if (!empty($prefix)) {
+        if (strpos($comment, $prefix) === 0) {
+            return $comment;
+        }
+        return $prefix . $comment;
+    }
+
+    return $comment;
 }
 
 // Helper function to record audit logs
@@ -211,10 +251,12 @@ function getTasksFiltered($pdo, $filters = [], $limit = 15, $offset = 0, $curren
     $dataSql = "
         SELECT t.*,
                d.code AS dept_code, d.name AS dept_name, d.color_theme AS dept_color, d.icon AS dept_icon,
-               u.fullname AS creator_name
+               u.fullname AS creator_name,
+               lc.fullname AS lc_fullname, lc.role AS lc_role
         FROM tasks t
         JOIN departments d ON t.department_id = d.id
         JOIN users u ON t.created_by = u.id
+        LEFT JOIN users lc ON t.leader_comment_user_id = lc.id
         WHERE $whereSql
         ORDER BY t.id DESC
         LIMIT " . (int)$limit . " OFFSET " . (int)$offset;
@@ -223,9 +265,10 @@ function getTasksFiltered($pdo, $filters = [], $limit = 15, $offset = 0, $curren
     $stmtData->execute($params);
     $tasks = $stmtData->fetchAll();
 
-    // Populate assignees for each task
+    // Populate assignees & formatted leader comment for each task
     foreach ($tasks as &$task) {
         $task['assignees'] = getTaskAssignees($pdo, $task['id']);
+        $task['formatted_leader_comment'] = formatLeaderComment($task);
     }
 
     return [

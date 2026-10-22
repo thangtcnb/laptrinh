@@ -128,13 +128,13 @@ require_once __DIR__ . '/includes/header.php';
     <?php endif; ?>
 
     <form method="POST" action="batch_register.php" id="batchForm">
-        <!-- Date Range Selection Card -->
+        <!-- Date Range & Department Selection Card -->
         <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-5 mb-6">
             <h3 class="font-bold text-slate-800 text-sm mb-3 flex items-center gap-2">
                 <i class="fa-solid fa-clock text-indigo-600"></i>
-                <span>1. Chọn Khoảng Thời Gian Tuần Thực Hiện</span>
+                <span>1. Chọn Khoảng Thời Gian Tuần & Đơn Vị Thực Hiện</span>
             </h3>
-            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 max-w-xl">
+            <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 max-w-3xl">
                 <div>
                     <label class="block text-xs font-semibold text-slate-600 mb-1">Từ ngày (Thứ Hai)</label>
                     <input type="date" name="batch_start_date" value="<?= htmlspecialchars($defaultStartDate) ?>" required class="w-full p-2.5 border border-slate-300 rounded-xl text-xs font-medium focus:ring-2 focus:ring-indigo-500 outline-none">
@@ -142,6 +142,14 @@ require_once __DIR__ . '/includes/header.php';
                 <div>
                     <label class="block text-xs font-semibold text-slate-600 mb-1">Đến ngày (Chủ Nhật)</label>
                     <input type="date" name="batch_end_date" value="<?= htmlspecialchars($defaultEndDate) ?>" required class="w-full p-2.5 border border-slate-300 rounded-xl text-xs font-medium focus:ring-2 focus:ring-indigo-500 outline-none">
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-slate-600 mb-1">Đơn vị chủ trì</label>
+                    <?php
+                    $deptArr = array_filter($departmentsList, fn($d) => $d['id'] == $currentUser['department_id']);
+                    $deptObj = reset($deptArr);
+                    ?>
+                    <input type="text" readonly value="[<?= htmlspecialchars($deptObj['code'] ?? '') ?>] <?= htmlspecialchars($deptObj['name'] ?? '') ?>" class="w-full p-2.5 border border-slate-200 bg-slate-100 text-slate-600 rounded-xl text-xs font-bold cursor-not-allowed outline-none">
                 </div>
             </div>
         </div>

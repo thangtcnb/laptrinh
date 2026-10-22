@@ -88,9 +88,9 @@ $sql = "
 
 $stmt = $pdo->prepare($sql);
 $stmt->execute($params);
-$tasks = $stmt->fetchAll();
+    $allTasksForExcel = $stmt->fetchAll();
 
-foreach ($tasks as &$t) {
+    foreach ($allTasksForExcel as &$t) {
     $t['assignees'] = getTaskAssignees($pdo, $t['id']);
 }
 
@@ -145,11 +145,13 @@ if ($exportType === 'excel') {
                 $statusMap = [
                     'CHO_DUYET' => 'Chờ Trưởng phòng duyệt',
                     'CHO_BGD_DUYET' => 'Chờ BGD duyệt',
+                    'CHO_XAC_NHAN' => 'Chờ NV xác nhận',
+                    'TU_CHOI_CHO_TP_XAC_NHAN' => 'Từ chối - Chờ TP xác nhận',
                     'DANG_THUC_HIEN' => 'Đang thực hiện',
                     'HOAN_THANH' => 'Hoàn thành'
                 ];
 
-                foreach ($tasks as $t):
+                foreach ($allTasksForExcel as $t):
                     $mains = array_filter($t['assignees'], fn($a) => $a['role_type'] === 'MAIN');
                     $coops = array_filter($t['assignees'], fn($a) => $a['role_type'] === 'COOP');
                     $mainNames = implode(', ', array_column($mains, 'fullname'));
@@ -196,17 +198,39 @@ if ($exportType === 'excel') {
     exit;
 }
 
-define('PAGE_TITLE', 'Xuất Báo Cáo & In Dữ Liệu');
+// Pagination logic for Preview Data (15 tasks per page)
+$page = max(1, (int)($_GET['page'] ?? 1));
+$limit = 15;
+$offset = ($page - 1) * $limit;
+
+// Count total matching tasks
+$countSql = "SELECT COUNT(DISTINCT t.id) FROM tasks t JOIN departments d ON t.department_id = d.id JOIN users u ON t.created_by = u.id WHERE $whereSql";
+$stmtCount = $pdo->prepare($countSql);
+$stmtCount->execute($params);
+$totalTasks = (int)$stmtCount->fetchColumn();
+$totalPages = max(1, ceil($totalTasks / $limit));
+
+// Fetch paginated preview tasks
+$paginatedSql = $sql . " LIMIT " . (int)$limit . " OFFSET " . (int)$offset;
+$stmtPaginated = $pdo->prepare($paginatedSql);
+$stmtPaginated->execute($params);
+$previewTasks = $stmtPaginated->fetchAll();
+
+foreach ($previewTasks as &$t) {
+    $t['assignees'] = getTaskAssignees($pdo, $t['id']);
+}
+
+define('PAGE_TITLE', 'Xuất Báo Cáo');
 require_once __DIR__ . '/includes/header.php';
 ?>
 
 <!-- Filter & Export Controls -->
-<div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-5 mb-6 no-print">
+<div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-5 mb-6">
     <div class="flex items-center gap-2 pb-3 border-b border-slate-100 mb-4">
         <div class="w-8 h-8 rounded-lg bg-indigo-50 flex items-center justify-center text-indigo-600">
             <i class="fa-solid fa-file-export text-sm"></i>
         </div>
-        <h3 class="font-bold text-slate-800 text-base">Tùy Chọn Xuất Báo Cáo & In Ấn</h3>
+        <h3 class="font-bold text-slate-800 text-base">Tùy Chọn Xuất Báo Cáo Dữ Liệu</h3>
     </div>
 
     <form method="GET" action="export.php" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -277,7 +301,7 @@ require_once __DIR__ . '/includes/header.php';
 
         <div class="lg:col-span-4 flex flex-wrap items-center justify-between gap-3 pt-3 border-t border-slate-100">
             <button type="submit" class="bg-slate-800 hover:bg-slate-900 text-white px-4 py-2 rounded-xl text-xs font-semibold transition flex items-center gap-1.5 shadow">
-                <i class="fa-solid fa-filter"></i>
+                <i class="fa-solid fa-magnifying-glass"></i>
                 <span>Xem trước dữ liệu</span>
             </button>
 
@@ -285,123 +309,110 @@ require_once __DIR__ . '/includes/header.php';
                 <!-- Export Excel Button -->
                 <a href="export.php?<?= http_build_query(array_merge($_GET, ['export_type' => 'excel'])) ?>" class="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-xl text-xs font-bold transition flex items-center gap-1.5 shadow-md shadow-emerald-100">
                     <i class="fa-solid fa-file-excel"></i>
-                    <span>Xuất file Excel (.xlsx)</span>
+                    <span>Xuất file Excel</span>
                 </a>
-
-                <!-- Print PDF Button -->
-                <button onclick="window.print()" class="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-xl text-xs font-bold transition flex items-center gap-1.5 shadow-md shadow-indigo-100">
-                    <i class="fa-solid fa-print"></i>
-                    <span>In / Xuất PDF</span>
-                </button>
             </div>
         </div>
     </form>
 </div>
 
-<!-- OFFICIAL REPORT PRINT PREVIEW VIEW -->
-<div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-8">
-
-    <!-- Official Header for Print -->
-    <div class="grid grid-cols-2 text-center text-xs uppercase font-bold text-slate-800 mb-6 pb-4 border-b-2 border-slate-900">
+<!-- PREVIEW DATA TABLE VIEW (PAGINATED 15 TASKS / PAGE) -->
+<div class="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+    <div class="p-4 sm:p-5 border-b border-slate-200 flex items-center justify-between gap-3 bg-slate-50">
         <div>
-            <div>TRƯỜNG ĐẠI HỌC TÀI CHÍNH - MARKETING</div>
-            <div class="font-extrabold text-indigo-900 text-sm mt-0.5">PHÂN HIỆU TẠI TỈNH QUẢNG NGÃI</div>
-            <div class="text-[10px] font-normal tracking-normal text-slate-500 mt-1">***</div>
+            <h2 class="text-base font-bold text-slate-900 flex items-center gap-2">
+                <i class="fa-solid fa-table text-indigo-600"></i>
+                <span>XEM TRƯỚC DỮ LIỆU BÁO CÁO</span>
+            </h2>
+            <p class="text-xs text-slate-500 mt-0.5">Hiển thị <span class="font-bold text-indigo-600"><?= count($previewTasks) ?></span> / <span class="font-bold text-indigo-600"><?= $totalTasks ?></span> công việc (Trang <?= $page ?>/<?= $totalPages ?>)</p>
         </div>
-        <div>
-            <div>CỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM</div>
-            <div class="font-bold text-slate-900 mt-0.5">Độc lập - Tự do - Hạnh phúc</div>
-            <div class="text-[10px] font-normal tracking-normal text-slate-500 mt-1">Quảng Ngãi, ngày <?= date('d') ?> tháng <?= date('m') ?> năm <?= date('Y') ?></div>
+        <div class="text-xs text-slate-500 font-medium">
+            Phân trang 15 công việc / trang
         </div>
     </div>
 
-    <!-- Title -->
-    <div class="text-center my-6">
-        <h1 class="text-xl font-extrabold text-slate-900 uppercase tracking-wide">
-            BÁO CÁO KẾT QUẢ VÀ TIẾN ĐỘ THỰC HIỆN CÔNG VIỆC
-        </h1>
-        <p class="text-xs text-slate-600 font-medium italic mt-1">
-            Giai đoạn: Từ ngày <?= date('d/m/Y', strtotime($dateFrom)) ?> đến ngày <?= date('d/m/Y', strtotime($dateTo)) ?>
-        </p>
-    </div>
-
-    <!-- Data Table -->
-    <div class="overflow-x-auto mb-8">
-        <table class="w-full text-left border-collapse border border-slate-900 text-xs">
+    <div class="overflow-x-auto">
+        <table class="w-full text-left border-collapse text-xs">
             <thead>
-                <tr class="bg-slate-100 font-bold uppercase text-slate-900 text-center">
-                    <th class="p-2 border border-slate-900 w-10">STT</th>
-                    <th class="p-2 border border-slate-900">TÊN CÔNG VIỆC / NỘI DUNG</th>
-                    <th class="p-2 border border-slate-900 w-28">ĐƠN VỊ CHỦ TRÌ</th>
-                    <th class="p-2 border border-slate-900 w-44">NGƯỜI THỰC HIỆN</th>
-                    <th class="p-2 border border-slate-900 w-24">TRẠNG THÁI</th>
-                    <th class="p-2 border border-slate-900 w-24">TIẾN ĐỘ</th>
-                    <th class="p-2 border border-slate-900 w-24">HẠN CHÓT</th>
+                <tr class="bg-slate-900 text-white font-bold uppercase tracking-wider text-[11px] border-b border-slate-800">
+                    <th scope="col" class="py-3.5 px-3 text-center border-r border-slate-800 w-12">STT</th>
+                    <th scope="col" class="py-3.5 px-4 border-r border-slate-800 min-w-[240px]">TÊN CÔNG VIỆC / NỘI DUNG</th>
+                    <th scope="col" class="py-3.5 px-3 border-r border-slate-800 w-32 text-center">ĐƠN VỊ CHỦ TRÌ</th>
+                    <th scope="col" class="py-3.5 px-4 border-r border-slate-800 min-w-[180px]">NGƯỜI THỰC HIỆN</th>
+                    <th scope="col" class="py-3.5 px-3 border-r border-slate-800 w-32 text-center">TRẠNG THÁI</th>
+                    <th scope="col" class="py-3.5 px-3 border-r border-slate-800 w-24 text-center">TIẾN ĐỘ</th>
+                    <th scope="col" class="py-3.5 px-3 text-center w-28">HẠN CHÓT</th>
                 </tr>
             </thead>
-            <tbody>
-                <?php if (count($tasks) > 0): ?>
+            <tbody class="divide-y divide-slate-200">
+                <?php if (count($previewTasks) > 0): ?>
                     <?php
-                    $idx = 1;
-                    foreach ($tasks as $t):
+                    $stt = $offset + 1;
+                    foreach ($previewTasks as $t):
                     ?>
-                        <tr>
-                            <td class="p-2 border border-slate-900 text-center font-bold"><?= $idx++ ?></td>
-                            <td class="p-2 border border-slate-900">
-                                <div class="font-bold text-slate-900"><?= htmlspecialchars($t['title']) ?></div>
+                        <tr class="hover:bg-slate-50/80 transition">
+                            <td class="py-3.5 px-3 text-center font-bold text-slate-500 border-r border-slate-100">
+                                #<?= $stt++ ?>
+                            </td>
+                            <td class="py-3.5 px-4 border-r border-slate-100">
+                                <div class="font-bold text-slate-900 text-sm leading-snug">
+                                    <?= htmlspecialchars($t['title']) ?>
+                                </div>
                                 <?php if (!empty($t['description'])): ?>
-                                    <div class="text-[11px] text-slate-600 italic mt-0.5"><?= htmlspecialchars($t['description']) ?></div>
-                                <?php endif; ?>
-                                <?php if (!empty($t['proof_link'])): ?>
-                                    <div class="text-[10px] text-emerald-800 mt-1 font-mono">
-                                        Drive: <?= htmlspecialchars($t['proof_link']) ?>
+                                    <div class="text-slate-500 text-xs mt-1 line-clamp-2">
+                                        <?= htmlspecialchars($t['description']) ?>
                                     </div>
                                 <?php endif; ?>
                             </td>
-                            <td class="p-2 border border-slate-900 text-center font-semibold">
-                                <?= htmlspecialchars($t['dept_code']) ?>
+                            <td class="py-3.5 px-3 text-center border-r border-slate-100 font-semibold">
+                                <?= renderDepartmentBadge($t['dept_code'], $t['dept_name'], $t['dept_color'], $t['dept_icon']) ?>
                             </td>
-                            <td class="p-2 border border-slate-900">
+                            <td class="py-3.5 px-4 border-r border-slate-100">
                                 <?= formatAssigneesHtml($t['assignees']) ?>
                             </td>
-                            <td class="p-2 border border-slate-900 text-center font-semibold">
-                                <?= htmlspecialchars($t['status']) ?>
+                            <td class="py-3.5 px-3 text-center border-r border-slate-100">
+                                <?= renderStatusBadge($t['status']) ?>
                             </td>
-                            <td class="p-2 border border-slate-900 text-center font-bold">
+                            <td class="py-3.5 px-3 text-center border-r border-slate-100 font-bold text-indigo-700">
                                 <?= (int)$t['progress'] ?>%
                             </td>
-                            <td class="p-2 border border-slate-900 text-center">
-                                <?= $t['due_date'] ? date('d/m/Y', strtotime($t['due_date'])) : '' ?>
+                            <td class="py-3.5 px-3 text-center font-medium">
+                                <?= $t['due_date'] ? date('d/m/Y', strtotime($t['due_date'])) : '---' ?>
                             </td>
                         </tr>
                     <?php endforeach; ?>
                 <?php else: ?>
                     <tr>
-                        <td colspan="7" class="p-6 text-center text-slate-500 italic">Không có dữ liệu công việc trong giai đoạn báo cáo này.</td>
+                        <td colspan="7" class="py-12 text-center text-slate-400">
+                            <i class="fa-solid fa-inbox text-4xl mb-2 text-slate-300"></i>
+                            <p class="font-medium">Không tìm thấy dữ liệu công việc nào cho điều kiện lọc đã chọn.</p>
+                        </td>
                     </tr>
                 <?php endif; ?>
             </tbody>
         </table>
     </div>
 
-    <!-- Official Signatures Block for Print -->
-    <div class="grid grid-cols-3 text-center text-xs font-bold text-slate-900 pt-6">
-        <div>
-            <div>NGƯỜI LẬP BÁO CÁO</div>
-            <div class="text-[11px] font-normal italic text-slate-500 mt-0.5">(Ký và ghi rõ họ tên)</div>
-            <div class="mt-16 font-bold"><?= htmlspecialchars($currentUser['fullname']) ?></div>
+    <!-- Pagination Controls -->
+    <?php if ($totalPages > 1): ?>
+        <div class="p-4 bg-slate-50 border-t border-slate-200 flex items-center justify-between">
+            <div class="text-xs text-slate-500">
+                Hiển thị <?= count($previewTasks) ?> / <?= $totalTasks ?> công việc
+            </div>
+            <div class="flex items-center space-x-1">
+                <?php for ($p = 1; $p <= $totalPages; $p++): ?>
+                    <?php
+                    $q = $_GET;
+                    $q['page'] = $p;
+                    $url = 'export.php?' . http_build_query($q);
+                    ?>
+                    <a href="<?= $url ?>" class="px-3 py-1.5 rounded-lg text-xs font-semibold transition <?= $p === $page ? 'bg-indigo-600 text-white shadow' : 'bg-white hover:bg-slate-200 text-slate-700 border border-slate-200' ?>">
+                        <?= $p ?>
+                    </a>
+                <?php endfor; ?>
+            </div>
         </div>
-        <div>
-            <div>TRƯỞNG PHÒNG / ĐƠN VỊ</div>
-            <div class="text-[11px] font-normal italic text-slate-500 mt-0.5">(Ký và ghi rõ họ tên)</div>
-            <div class="mt-16 font-bold">Phạm Hoài Nam</div>
-        </div>
-        <div>
-            <div>BAN GIÁM ĐỐC PHÂN HIỆU</div>
-            <div class="text-[11px] font-normal italic text-slate-500 mt-0.5">(Ký duyệt)</div>
-            <div class="mt-16 font-bold">Bùi Thị Yến Linh</div>
-        </div>
-    </div>
+    <?php endif; ?>
 </div>
 
 <?php require_once __DIR__ . '/includes/footer.php'; ?>

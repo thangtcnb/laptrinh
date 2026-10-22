@@ -50,7 +50,52 @@ $totalPages = $result['total_pages'];
 // Data for dropdowns
 $departmentsList = getDepartments($pdo);
 $usersList = getUsers($pdo);
+
+// Check if current logged-in user (Nhân viên) has pending assigned tasks (CHO_XAC_NHAN)
+$pendingAssignedTasks = [];
+if ($currentUser['role'] === 'NHAN_VIEN') {
+    $stmtPending = $pdo->prepare("
+        SELECT t.*, d.name AS dept_name, u.fullname AS assigner_name
+        FROM tasks t
+        JOIN departments d ON t.department_id = d.id
+        JOIN users u ON t.created_by = u.id
+        JOIN task_assignees ta ON t.id = ta.task_id
+        WHERE ta.user_id = ? AND t.status = 'CHO_XAC_NHAN'
+        ORDER BY t.id DESC
+    ");
+    $stmtPending->execute([$currentUser['id']]);
+    $pendingAssignedTasks = $stmtPending->fetchAll();
+}
 ?>
+
+<!-- WORKFLOW NOTIFICATION BANNER / MODAL FOR NEWLY ASSIGNED TASKS (NHÂN VIÊN) -->
+<?php if (count($pendingAssignedTasks) > 0): ?>
+    <div class="mb-6 bg-gradient-to-r from-amber-500 via-orange-500 to-indigo-600 rounded-2xl p-5 text-white shadow-xl relative overflow-hidden border border-amber-300 animate-pulse-subtle">
+        <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
+            <div class="flex items-start gap-3">
+                <div class="w-12 h-12 rounded-xl bg-white/20 backdrop-blur-md flex items-center justify-center shrink-0 text-amber-100">
+                    <i class="fa-solid fa-bell text-2xl animate-bounce"></i>
+                </div>
+                <div>
+                    <span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-white/20 text-xs font-bold uppercase tracking-wider text-amber-100 mb-1">
+                        <i class="fa-solid fa-envelope-open-text"></i> THÔNG BÁO CÔNG VIỆC MỚI ĐƯỢC GIAO
+                    </span>
+                    <h3 class="text-base md:text-lg font-bold text-white">
+                        Bạn có <span class="underline underline-offset-4 decoration-2 decoration-amber-300 font-extrabold text-amber-200"><?= count($pendingAssignedTasks) ?> công việc mới</span> đang chờ phản hồi tiếp nhận!
+                    </h3>
+                    <p class="text-xs text-amber-100 mt-0.5">Vui lòng xem chi tiết nội dung và chọn Đồng ý tiếp nhận hoặc Từ chối kèm lý do.</p>
+                </div>
+            </div>
+
+            <div>
+                <button onclick="openPendingTaskModal()" class="bg-white text-indigo-900 hover:bg-amber-50 font-bold px-5 py-2.5 rounded-xl text-xs shadow-lg transition flex items-center gap-2 transform hover:scale-105">
+                    <i class="fa-solid fa-clipboard-check text-indigo-600 text-sm"></i>
+                    <span>Xem & Xác nhận ngay</span>
+                </button>
+            </div>
+        </div>
+    </div>
+<?php endif; ?>
 
 <!-- Flash Alerts -->
 <?php if ($flashSuccess): ?>
@@ -213,7 +258,18 @@ $usersList = getUsers($pdo);
                                     </div>
                                 <?php endif; ?>
 
-                                <?php if (!empty($t['leader_comments'])): ?>
+                                <?php if (!empty($t['rejection_reason'])): ?>
+                                    <div class="mt-2 bg-rose-50 border-l-4 border-rose-500 rounded-r-xl p-2 text-xs text-rose-950">
+                                        <div class="font-bold text-rose-800 text-[11px] mb-0.5">
+                                            <i class="fa-solid fa-triangle-exclamation text-rose-600 mr-1"></i>LÝ DO TỪ CHỐI:
+                                        </div>
+                                        <div class="text-rose-900 font-medium">
+                                            <?= htmlspecialchars($t['rejection_reason']) ?>
+                                        </div>
+                                    </div>
+                                <?php endif; ?>
+
+                                <?php if (!empty($t['formatted_leader_comment']) || !empty($t['leader_comments'])): ?>
                                     <div class="mt-2.5 bg-amber-50/90 border-l-4 border-amber-500 rounded-r-xl p-2.5 text-xs text-amber-950 shadow-sm">
                                         <div class="flex items-center gap-1.5 font-bold text-amber-800 text-[11px] mb-1">
                                             <span class="inline-flex items-center gap-1 bg-amber-200/80 text-amber-900 px-2 py-0.5 rounded-full">
@@ -222,7 +278,7 @@ $usersList = getUsers($pdo);
                                             </span>
                                         </div>
                                         <div class="pl-1 text-slate-800 leading-relaxed font-medium">
-                                            <?= htmlspecialchars($t['leader_comments']) ?>
+                                            <?= htmlspecialchars($t['formatted_leader_comment'] ?: $t['leader_comments']) ?>
                                         </div>
                                     </div>
                                 <?php endif; ?>
@@ -299,8 +355,11 @@ $usersList = getUsers($pdo);
                                     $isBgd = ($currentUser['role'] === 'BGD');
                                     ?>
 
-                                    <!-- Progress & Proof Update Button -->
-                                    <?php if ($isAssignee || $isCreator || $isLeaderOfDept || $isBgd): ?>
+                                    <!-- Progress & Proof Update Button (Trưởng phòng không hiển thị nút này theo yêu cầu) -->
+                                    <?php
+                                    $canUpdateProgress = ($isAssignee || $isCreator || $isBgd) && ($currentUser['role'] !== 'TRUONG_PHONG');
+                                    ?>
+                                    <?php if ($canUpdateProgress): ?>
                                         <button onclick='openProgressModal(<?= json_encode($t) ?>)' class="p-1.5 bg-indigo-50 hover:bg-indigo-600 text-indigo-600 hover:text-white rounded-lg transition" title="Cập nhật tiến độ & minh chứng">
                                             <i class="fa-solid fa-sliders text-xs"></i>
                                         </button>
@@ -372,6 +431,72 @@ $usersList = getUsers($pdo);
         </div>
     <?php endif; ?>
 </div>
+
+<!-- ==================== MODAL: WORKFLOW CONFIRMATION FOR ASSIGNED TASKS ==================== -->
+<?php if (count($pendingAssignedTasks) > 0): ?>
+<div id="pendingTaskModal" class="fixed inset-0 bg-slate-900/70 backdrop-blur-md hidden items-center justify-center p-4 z-50">
+    <div class="bg-white rounded-2xl shadow-2xl max-w-2xl w-full p-6 border border-slate-200 transform transition-all max-h-[90vh] overflow-y-auto">
+        <div class="flex items-center justify-between pb-3 border-b border-slate-100 mb-4">
+            <h3 class="font-bold text-slate-900 text-base flex items-center gap-2">
+                <i class="fa-solid fa-bell text-amber-500 text-lg"></i>
+                <span>Xác Nhận Tiếp Nhận Công Việc Được Giao</span>
+            </h3>
+            <button onclick="closePendingTaskModal()" class="text-slate-400 hover:text-slate-600"><i class="fa-solid fa-xmark text-lg"></i></button>
+        </div>
+
+        <div class="space-y-6">
+            <?php foreach ($pendingAssignedTasks as $pt): ?>
+                <div class="bg-slate-50 border border-slate-200 rounded-2xl p-4 shadow-sm">
+                    <div class="flex items-center justify-between gap-2 mb-2">
+                        <span class="text-[11px] font-bold text-indigo-700 bg-indigo-50 border border-indigo-200 px-2.5 py-0.5 rounded-full">
+                            Mã công việc #<?= $pt['id'] ?>
+                        </span>
+                        <span class="text-xs text-slate-500 font-medium">
+                            <i class="fa-solid fa-user-tie text-slate-400 mr-1"></i>Người giao: <strong class="text-slate-700"><?= htmlspecialchars($pt['assigner_name']) ?></strong>
+                        </span>
+                    </div>
+
+                    <h4 class="font-bold text-slate-900 text-sm mb-1"><?= htmlspecialchars($pt['title']) ?></h4>
+                    <?php if (!empty($pt['description'])): ?>
+                        <p class="text-xs text-slate-600 mb-3 bg-white p-2.5 rounded-xl border border-slate-200 leading-relaxed"><?= htmlspecialchars($pt['description']) ?></p>
+                    <?php endif; ?>
+
+                    <div class="flex items-center gap-4 text-xs text-slate-500 font-medium mb-4">
+                        <div><i class="fa-regular fa-calendar-check text-slate-400 mr-1"></i>Hạn chót: <strong class="text-slate-800"><?= $pt['due_date'] ? date('d/m/Y', strtotime($pt['due_date'])) : 'Không quy định' ?></strong></div>
+                    </div>
+
+                    <!-- Action form for this task -->
+                    <form method="POST" action="task_actions.php" class="space-y-3 pt-3 border-t border-slate-200">
+                        <input type="hidden" name="action" value="respond_assigned_task">
+                        <input type="hidden" name="task_id" value="<?= $pt['id'] ?>">
+
+                        <div id="reject_reason_box_<?= $pt['id'] ?>" class="hidden">
+                            <label class="block text-xs font-bold text-rose-700 mb-1">Nhập Lý do từ chối (Bắt buộc) <span class="text-rose-500">*</span></label>
+                            <textarea name="rejection_reason" id="reject_input_<?= $pt['id'] ?>" rows="2" placeholder="Vui lòng nêu rõ lý do từ chối công việc này..." class="w-full p-2.5 border border-rose-300 rounded-xl text-xs focus:ring-2 focus:ring-rose-500 outline-none font-medium"></textarea>
+                        </div>
+
+                        <div class="flex items-center justify-end gap-2" id="action_buttons_<?= $pt['id'] ?>">
+                            <button type="button" onclick="showRejectReason(<?= $pt['id'] ?>)" class="px-4 py-2 bg-rose-50 hover:bg-rose-600 text-rose-700 hover:text-white border border-rose-200 rounded-xl text-xs font-bold transition flex items-center gap-1.5">
+                                <i class="fa-solid fa-xmark"></i>
+                                <span>Từ chối</span>
+                            </button>
+                            <button type="submit" name="response" value="ACCEPT" class="px-5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold shadow transition flex items-center gap-1.5">
+                                <i class="fa-solid fa-check"></i>
+                                <span>Đồng ý</span>
+                            </button>
+                        </div>
+
+                        <div id="reject_submit_buttons_<?= $pt['id'] ?>" class="hidden flex items-center justify-end gap-2">
+                            <button type="button" onclick="hideRejectReason(<?= $pt['id'] ?>)" class="px-3 py-1.5 bg-slate-100 text-slate-600 text-xs font-semibold rounded-xl">Hủy</button>
+                            <button type="submit" name="response" value="REJECT" onclick="return validateRejection(<?= $pt['id'] ?>)" class="px-4 py-1.5 bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold rounded-xl shadow">Xác nhận Từ chối</button>
+                        </div>
+                    </form>
+                </div>
+            <?php endforeach; ?>
+        </div>
+    </div>
+</div>
+<?php endif; ?>
 
 <!-- ==================== MODAL: LEADER DIRECTIVE COMMENT & APPROVAL ==================== -->
 <div id="leaderCommentModal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm hidden items-center justify-center p-4 z-50">
@@ -506,11 +631,20 @@ $usersList = getUsers($pdo);
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                     <label class="block text-xs font-semibold text-slate-700 mb-1">Đơn vị chủ trì</label>
-                    <select name="department_id" id="form_department_id" class="w-full p-2.5 border border-slate-300 rounded-xl text-xs focus:ring-2 focus:ring-indigo-500 outline-none bg-white">
-                        <?php foreach ($departmentsList as $d): ?>
-                            <option value="<?= $d['id'] ?>">[<?= htmlspecialchars($d['code']) ?>] <?= htmlspecialchars($d['name']) ?></option>
-                        <?php endforeach; ?>
-                    </select>
+                    <?php if (in_array($currentUser['role'], ['TRUONG_PHONG', 'NHAN_VIEN'])): ?>
+                        <?php
+                        $userDept = array_filter($departmentsList, fn($d) => $d['id'] == $currentUser['department_id']);
+                        $userDeptObj = reset($userDept);
+                        ?>
+                        <input type="hidden" name="department_id" id="form_department_id" value="<?= $currentUser['department_id'] ?>">
+                        <input type="text" readonly value="[<?= htmlspecialchars($userDeptObj['code'] ?? '') ?>] <?= htmlspecialchars($userDeptObj['name'] ?? '') ?>" class="w-full p-2.5 border border-slate-200 bg-slate-100 text-slate-600 rounded-xl text-xs font-bold cursor-not-allowed outline-none">
+                    <?php else: ?>
+                        <select name="department_id" id="form_department_id" class="w-full p-2.5 border border-slate-300 rounded-xl text-xs focus:ring-2 focus:ring-indigo-500 outline-none bg-white">
+                            <?php foreach ($departmentsList as $d): ?>
+                                <option value="<?= $d['id'] ?>">[<?= htmlspecialchars($d['code']) ?>] <?= htmlspecialchars($d['name']) ?></option>
+                            <?php endforeach; ?>
+                        </select>
+                    <?php endif; ?>
                 </div>
 
                 <div>
@@ -590,6 +724,43 @@ $usersList = getUsers($pdo);
 </div>
 
 <script>
+function openPendingTaskModal() {
+    const modal = document.getElementById('pendingTaskModal');
+    if (modal) {
+        modal.classList.remove('hidden');
+        modal.classList.add('flex');
+    }
+}
+
+function closePendingTaskModal() {
+    const modal = document.getElementById('pendingTaskModal');
+    if (modal) {
+        modal.classList.add('hidden');
+        modal.classList.remove('flex');
+    }
+}
+
+function showRejectReason(taskId) {
+    document.getElementById(`reject_reason_box_${taskId}`).classList.remove('hidden');
+    document.getElementById(`action_buttons_${taskId}`).classList.add('hidden');
+    document.getElementById(`reject_submit_buttons_${taskId}`).classList.remove('hidden');
+}
+
+function hideRejectReason(taskId) {
+    document.getElementById(`reject_reason_box_${taskId}`).classList.add('hidden');
+    document.getElementById(`action_buttons_${taskId}`).classList.remove('hidden');
+    document.getElementById(`reject_submit_buttons_${taskId}`).classList.add('hidden');
+}
+
+function validateRejection(taskId) {
+    const val = document.getElementById(`reject_input_${taskId}`).value.trim();
+    if (!val) {
+        alert('Vui lòng nhập lý do từ chối công việc!');
+        return false;
+    }
+    return true;
+}
+
 function openProgressModal(task) {
     document.getElementById('prog_task_id').value = task.id;
     document.getElementById('prog_task_title').innerText = task.title;
@@ -599,8 +770,9 @@ function openProgressModal(task) {
 
     const leaderContainer = document.getElementById('prog_leader_comments_container');
     const leaderCommentEl = document.getElementById('prog_leader_comments');
-    if (task.leader_comments && task.leader_comments.trim() !== '') {
-        leaderCommentEl.innerText = task.leader_comments;
+    const displayComment = task.formatted_leader_comment || task.leader_comments;
+    if (displayComment && displayComment.trim() !== '') {
+        leaderCommentEl.innerText = displayComment;
         leaderContainer.classList.remove('hidden');
     } else {
         leaderContainer.classList.add('hidden');

@@ -58,8 +58,8 @@ if ($action === 'save_leader_comment' || $action === 'approve') {
     }
 
     if ($canApprove) {
-        $stmtUpdate = $pdo->prepare("UPDATE tasks SET status = ?, leader_comments = ? WHERE id = ?");
-        $stmtUpdate->execute([$newStatus, $leaderComment ?: null, $taskId]);
+        $stmtUpdate = $pdo->prepare("UPDATE tasks SET status = ?, leader_comments = ?, leader_comment_user_id = ? WHERE id = ?");
+        $stmtUpdate->execute([$newStatus, $leaderComment ?: null, $currentUser['id'], $taskId]);
         $_SESSION['flash_success'] = "Đã lưu ý kiến chỉ đạo và cập nhật phê duyệt!";
     } else {
         $_SESSION['flash_error'] = "Bạn chỉ có quyền cho ý kiến/duyệt các công việc thuộc phòng ban của mình!";
@@ -173,6 +173,12 @@ if ($action === 'save_task') {
     if ($mainAssignee > 0) {
         $stmtMain = $pdo->prepare("INSERT INTO task_assignees (task_id, user_id, role_type) VALUES (?, ?, 'MAIN') ON DUPLICATE KEY UPDATE role_type = 'MAIN'");
         $stmtMain->execute([$taskId, $mainAssignee]);
+
+        // Workflow Notification: When Trưởng phòng assigns a new task to a Nhân viên
+        if ($currentUser['role'] === 'TRUONG_PHONG' && $mainAssignee !== $currentUser['id']) {
+            $stmtSetPending = $pdo->prepare("UPDATE tasks SET status = 'CHO_XAC_NHAN' WHERE id = ?");
+            $stmtSetPending->execute([$taskId]);
+        }
     }
 
     // Insert COOP assignees
@@ -187,6 +193,48 @@ if ($action === 'save_task') {
     }
 
     $_SESSION['flash_success'] = "Đã lưu công việc thành công!";
+    header("Location: index.php");
+    exit;
+}
+
+// 5. RESPOND TO ASSIGNED TASK (ACCEPT / REJECT) BY NHAN VIEN
+if ($action === 'respond_assigned_task') {
+    $taskId = (int)($_POST['task_id'] ?? 0);
+    $response = $_POST['response'] ?? '';
+    $rejectionReason = trim($_POST['rejection_reason'] ?? '');
+
+    // Check task existence & assignment
+    $stmtCheck = $pdo->prepare("
+        SELECT t.* FROM tasks t
+        JOIN task_assignees ta ON t.id = ta.task_id
+        WHERE t.id = ? AND ta.user_id = ?
+    ");
+    $stmtCheck->execute([$taskId, $currentUser['id']]);
+    $task = $stmtCheck->fetch();
+
+    if (!$task) {
+        $_SESSION['flash_error'] = "Không tìm thấy công việc được giao!";
+        header("Location: index.php");
+        exit;
+    }
+
+    if ($response === 'ACCEPT') {
+        $stmtUpdate = $pdo->prepare("UPDATE tasks SET status = 'DANG_THUC_HIEN', rejection_reason = NULL WHERE id = ?");
+        $stmtUpdate->execute([$taskId]);
+        logActivity($pdo, $currentUser['id'], 'ACCEPT_TASK', "Đã đồng ý nhận công việc ID #$taskId: {$task['title']}");
+        $_SESSION['flash_success'] = "Bạn đã đồng ý tiếp nhận công việc! Công việc đã được chuyển sang danh sách 'Công việc của tôi'.";
+    } elseif ($response === 'REJECT') {
+        if (empty($rejectionReason)) {
+            $_SESSION['flash_error'] = "Vui lòng nhập lý do từ chối công việc!";
+            header("Location: index.php");
+            exit;
+        }
+        $stmtUpdate = $pdo->prepare("UPDATE tasks SET status = 'TU_CHOI_CHO_TP_XAC_NHAN', rejection_reason = ? WHERE id = ?");
+        $stmtUpdate->execute([$rejectionReason, $taskId]);
+        logActivity($pdo, $currentUser['id'], 'REJECT_TASK', "Đã từ chối công việc ID #$taskId: {$task['title']}. Lý do: $rejectionReason");
+        $_SESSION['flash_success'] = "Đã gửi phản hồi từ chối công việc tới Trưởng phòng xem xét xử lý.";
+    }
+
     header("Location: index.php");
     exit;
 }
