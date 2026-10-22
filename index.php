@@ -63,7 +63,7 @@ $usersList = getUsers($pdo);
         <div class="flex items-center gap-2">
             <a href="batch_register.php" class="bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 px-3.5 py-2 rounded-xl text-xs font-semibold transition flex items-center gap-1.5 shadow-sm">
                 <i class="fa-solid fa-calendar-plus"></i>
-                <span>Đăng ký tuần hàng loạt</span>
+                <span>Đăng kí công việc</span>
             </a>
             <button onclick="openTaskModal()" class="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-xl text-xs font-semibold transition flex items-center gap-1.5 shadow-md shadow-indigo-100">
                 <i class="fa-solid fa-plus"></i>
@@ -150,7 +150,6 @@ $usersList = getUsers($pdo);
                     <th scope="col" class="py-3.5 px-4 border-r border-slate-800 min-w-[240px]">TÊN CÔNG VIỆC / NỘI DUNG</th>
                     <th scope="col" class="py-3.5 px-3 border-r border-slate-800 w-36 text-center">ĐƠN VỊ CHỦ TRÌ</th>
                     <th scope="col" class="py-3.5 px-4 border-r border-slate-800 min-w-[180px]">NGƯỜI THỰC HIỆN</th>
-                    <th scope="col" class="py-3.5 px-3 border-r border-slate-800 w-28 text-center">ƯU TIÊN</th>
                     <th scope="col" class="py-3.5 px-3 border-r border-slate-800 w-32 text-center">TRẠNG THÁI</th>
                     <th scope="col" class="py-3.5 px-4 border-r border-slate-800 w-44">TIẾN ĐỘ & MINH CHỨNG</th>
                     <th scope="col" class="py-3.5 px-3 border-r border-slate-800 w-28 text-center">HẠN CHÓT</th>
@@ -191,12 +190,7 @@ $usersList = getUsers($pdo);
                                 <?= formatAssigneesHtml($t['assignees']) ?>
                             </td>
 
-                            <!-- 5. ƯU TIÊN -->
-                            <td class="py-3.5 px-3 text-center border-r border-slate-100">
-                                <?= renderPriorityBadge($t['priority']) ?>
-                            </td>
-
-                            <!-- 6. TRẠNG THÁI -->
+                            <!-- 5. TRẠNG THÁI -->
                             <td class="py-3.5 px-3 text-center border-r border-slate-100">
                                 <?= renderStatusBadge($t['status']) ?>
                             </td>
@@ -275,7 +269,7 @@ $usersList = getUsers($pdo);
                     <?php endforeach; ?>
                 <?php else: ?>
                     <tr>
-                        <td colspan="9" class="py-12 text-center text-slate-400">
+                        <td colspan="8" class="py-12 text-center text-slate-400">
                             <i class="fa-solid fa-inbox text-4xl mb-2 text-slate-300"></i>
                             <p class="font-medium">Không tìm thấy công việc nào phù hợp với bộ lọc.</p>
                         </td>

@@ -260,7 +260,6 @@ $usersList = getUsers($pdo);
                     <th class="p-2 border border-slate-900">TÊN CÔNG VIỆC / NỘI DUNG</th>
                     <th class="p-2 border border-slate-900 w-28">ĐƠN VỊ CHỦ TRÌ</th>
                     <th class="p-2 border border-slate-900 w-44">NGƯỜI THỰC HIỆN</th>
-                    <th class="p-2 border border-slate-900 w-20">ƯU TIÊN</th>
                     <th class="p-2 border border-slate-900 w-24">TRẠNG THÁI</th>
                     <th class="p-2 border border-slate-900 w-24">TIẾN ĐỘ</th>
                     <th class="p-2 border border-slate-900 w-24">HẠN CHÓT</th>
@@ -291,9 +290,6 @@ $usersList = getUsers($pdo);
                             <td class="p-2 border border-slate-900">
                                 <?= formatAssigneesHtml($t['assignees']) ?>
                             </td>
-                            <td class="p-2 border border-slate-900 text-center font-medium">
-                                <?= htmlspecialchars($t['priority']) ?>
-                            </td>
                             <td class="p-2 border border-slate-900 text-center font-semibold">
                                 <?= htmlspecialchars($t['status']) ?>
                             </td>
@@ -307,7 +303,7 @@ $usersList = getUsers($pdo);
                     <?php endforeach; ?>
                 <?php else: ?>
                     <tr>
-                        <td colspan="8" class="p-6 text-center text-slate-500 italic">Không có dữ liệu công việc trong giai đoạn báo cáo này.</td>
+                        <td colspan="7" class="p-6 text-center text-slate-500 italic">Không có dữ liệu công việc trong giai đoạn báo cáo này.</td>
                     </tr>
                 <?php endif; ?>
             </tbody>
@@ -324,12 +320,12 @@ $usersList = getUsers($pdo);
         <div>
             <div>TRƯỞNG PHÒNG / ĐƠN VỊ</div>
             <div class="text-[11px] font-normal italic text-slate-500 mt-0.5">(Ký và ghi rõ họ tên)</div>
-            <div class="mt-16 font-bold">ThS. Phạm Ngọc Thắng</div>
+            <div class="mt-16 font-bold">Phạm Hoài Nam</div>
         </div>
         <div>
             <div>BAN GIÁM ĐỐC PHÂN HIỆU</div>
             <div class="text-[11px] font-normal italic text-slate-500 mt-0.5">(Ký duyệt)</div>
-            <div class="mt-16 font-bold">TS. Nguyễn Văn A</div>
+            <div class="mt-16 font-bold">Bùi Thị Yến Linh</div>
         </div>
     </div>
 </div>

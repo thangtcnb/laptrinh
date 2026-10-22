@@ -1,6 +1,16 @@
 <?php
-define('PAGE_TITLE', 'Đăng Ký Công Việc Theo Tuần');
-require_once __DIR__ . '/includes/header.php';
+if (session_status() === PHP_SESSION_NONE) {
+    ob_start();
+    session_start();
+}
+
+define('PAGE_TITLE', 'Đăng Ký Công Việc');
+require_once __DIR__ . '/config.php';
+require_once __DIR__ . '/includes/auth.php';
+require_once __DIR__ . '/includes/functions.php';
+
+requireLogin();
+$currentUser = getCurrentUser($pdo);
 
 // Calculate default Monday to Sunday of current week
 $defaultStartDate = date('Y-m-d', strtotime('monday this week'));
@@ -9,7 +19,9 @@ $defaultEndDate = date('Y-m-d', strtotime('sunday this week'));
 $departmentsList = getDepartments($pdo);
 $usersList = getUsers($pdo);
 
-// Handle POST batch registration
+$errorMsg = '';
+
+// Handle POST batch registration BEFORE header.php output to avoid 'Headers already sent'
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $batchStartDate = $_POST['batch_start_date'] ?? $defaultStartDate;
     $batchEndDate = $_POST['batch_end_date'] ?? $defaultEndDate;
@@ -73,7 +85,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $pdo->commit();
 
         if ($insertedCount > 0) {
-            $_SESSION['flash_success'] = "Đã đăng ký thành công " . $insertedCount . " công việc theo tuần!";
+            $_SESSION['flash_success'] = "Đã đăng ký thành công " . $insertedCount . " công việc!";
             header("Location: index.php");
             exit;
         } else {
@@ -84,9 +96,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $errorMsg = "Lỗi khi lưu dữ liệu: " . $e->getMessage();
     }
 }
+
+// Now include header.php after all redirect checks
+require_once __DIR__ . '/includes/header.php';
 ?>
 
-<div class="max-w-6xl mx-auto">
+<div class="w-full">
     <!-- Header banner -->
     <div class="bg-gradient-to-r from-blue-900 to-indigo-900 rounded-2xl p-6 text-white shadow-lg mb-6 flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
@@ -191,7 +206,6 @@ function createRowHtml(index) {
                     <span class="font-bold text-xs text-slate-800">Dòng công việc #${index + 1}</span>
                 </div>
 
-                <!-- Delete Row Button with required styling: bg-rose-50 hover:bg-rose-600 text-rose-600 -->
                 <button type="button" onclick="removeRow(${index})" class="bg-rose-50 hover:bg-rose-600 text-rose-600 hover:text-white px-2.5 py-1 rounded-xl text-xs font-semibold transition flex items-center gap-1 border border-rose-200" title="Xóa dòng này">
                     <i class="fa-solid fa-trash"></i>
                     <span>Xóa dòng</span>
@@ -205,22 +219,14 @@ function createRowHtml(index) {
                     <input type="text" name="tasks[${index}][title]" required placeholder="Nhập tên công việc..." class="w-full p-2 border border-slate-300 rounded-xl text-xs focus:ring-2 focus:ring-indigo-500 outline-none bg-white font-medium">
                 </div>
 
-                <!-- Description (3 cols) -->
-                <div class="md:col-span-3">
+                <!-- Description (5 cols) -->
+                <div class="md:col-span-5">
                     <label class="block text-[11px] font-semibold text-slate-600 mb-1">Ghi chú / Mô tả</label>
                     <input type="text" name="tasks[${index}][description]" placeholder="Ghi chú chi tiết..." class="w-full p-2 border border-slate-300 rounded-xl text-xs focus:ring-2 focus:ring-indigo-500 outline-none bg-white">
                 </div>
 
-                <!-- Priority (2 cols) -->
-                <div class="md:col-span-2">
-                    <label class="block text-[11px] font-semibold text-slate-600 mb-1">Mức ưu tiên</label>
-                    <select name="tasks[${index}][priority]" class="w-full p-2 border border-slate-300 rounded-xl text-xs focus:ring-2 focus:ring-indigo-500 outline-none bg-white font-medium">
-                        <option value="THAP">Thấp</option>
-                        <option value="TRUNG_BINH" selected>Trung bình</option>
-                        <option value="CAO">Cao</option>
-                        <option value="KHAN_CAP">Khẩn cấp</option>
-                    </select>
-                </div>
+                <!-- Priority (hidden input TRUNG_BINH for DB compatibility) -->
+                <input type="hidden" name="tasks[${index}][priority]" value="TRUNG_BINH">
 
                 <!-- Due date (2 cols) -->
                 <div class="md:col-span-2">
@@ -274,7 +280,7 @@ function removeRow(index) {
     }
 }
 
-// Initialize 3 default rows as requested
+// Initialize 3 default rows
 document.addEventListener('DOMContentLoaded', () => {
     for (let i = 0; i < 3; i++) {
         addRow();
