@@ -4,7 +4,15 @@ require_once __DIR__ . '/functions.php';
 
 requireLogin();
 $currentUser = getCurrentUser($pdo);
-$allUsersList = getUsers($pdo);
+
+$roleLabel = $currentUser['role'];
+if ($roleLabel === 'TRUONG_PHONG') {
+    $roleLabel = 'Trưởng phòng';
+} elseif ($roleLabel === 'NHAN_VIEN') {
+    $roleLabel = 'Nhân viên';
+} elseif ($roleLabel === 'BGD') {
+    $roleLabel = 'Ban Giám đốc';
+}
 ?>
 <!DOCTYPE html>
 <html lang="vi">
@@ -89,47 +97,24 @@ $allUsersList = getUsers($pdo);
                 </div>
             </div>
 
-            <!-- Current User info & Quick Switcher -->
+            <!-- Current User Info Frame -->
             <div class="flex items-center gap-3 bg-white/10 backdrop-blur-md px-3.5 py-2 rounded-xl border border-white/20">
-                <a href="profile.php" class="text-right text-xs hover:opacity-90 transition group" title="Xem trang cá nhân">
-                    <div class="font-bold text-white text-sm flex items-center justify-end gap-1.5 group-hover:text-blue-200">
-                        <i class="fa-solid fa-user-circle text-blue-300"></i>
-                        <span><?= htmlspecialchars($currentUser['fullname']) ?></span>
-                    </div>
-                    <div class="text-blue-200 font-medium">
-                        <span class="inline-block px-1.5 py-0.5 rounded text-[11px] font-semibold bg-white/20 text-white">
-                            <?= htmlspecialchars($currentUser['role']) ?>
-                        </span>
-                        <span> • <?= htmlspecialchars($currentUser['department_name']) ?></span>
-                    </div>
-                </a>
-
-                <!-- Quick Switch Dropdown for Demo/Testing -->
-                <div class="relative group">
-                    <button class="bg-indigo-600 hover:bg-indigo-500 text-white px-2.5 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1 shadow transition cursor-pointer" title="Chuyển tài khoản demo">
-                        <i class="fa-solid fa-repeat"></i>
-                        <span class="hidden sm:inline">Đổi tài khoản</span>
-                        <i class="fa-solid fa-chevron-down text-[10px]"></i>
-                    </button>
-                    <!-- Dropdown menu -->
-                    <div class="absolute right-0 top-full mt-2 w-64 bg-white text-slate-800 rounded-xl shadow-2xl border border-slate-200 py-2 hidden group-hover:block z-50">
-                        <div class="px-3 py-1.5 border-b border-slate-100 text-[11px] font-bold text-slate-400 uppercase tracking-wider">
-                            Chuyển nhanh tài khoản demo
-                        </div>
-                        <?php foreach ($allUsersList as $u): ?>
-                            <a href="?switch_user_id=<?= $u['id'] ?>" class="block px-3 py-2 text-xs hover:bg-indigo-50 transition <?= $u['id'] == $currentUser['id'] ? 'bg-indigo-100/70 font-bold border-l-4 border-indigo-600' : '' ?>">
-                                <div class="font-medium text-slate-800"><?= htmlspecialchars($u['fullname']) ?></div>
-                                <div class="text-[11px] text-slate-500">
-                                    <span class="font-semibold text-indigo-600"><?= $u['role'] ?></span> - <?= htmlspecialchars($u['department_name']) ?>
-                                </div>
-                            </a>
-                        <?php endforeach; ?>
-                    </div>
+                <div class="flex items-center gap-2 text-xs">
+                    <span class="px-2 py-0.5 rounded text-xs font-bold bg-amber-500 text-white shadow-sm">
+                        <?= htmlspecialchars($roleLabel) ?>
+                    </span>
+                    <span class="font-bold text-white text-sm">
+                        <?= htmlspecialchars($currentUser['fullname']) ?>
+                    </span>
+                    <span class="text-blue-200 font-medium">
+                        • <?= htmlspecialchars($currentUser['department_name']) ?>
+                    </span>
                 </div>
 
                 <!-- Logout Button -->
-                <a href="logout.php" class="bg-rose-600 hover:bg-rose-500 text-white px-2.5 py-1.5 rounded-lg text-xs font-semibold transition flex items-center gap-1" title="Đăng xuất">
+                <a href="logout.php" class="bg-rose-600 hover:bg-rose-700 text-white px-3 py-1.5 rounded-lg text-xs font-semibold transition flex items-center gap-1.5 shadow" title="Đăng xuất">
                     <i class="fa-solid fa-right-from-bracket"></i>
+                    <span>Đăng xuất</span>
                 </a>
             </div>
 
@@ -162,10 +147,6 @@ $allUsersList = getUsers($pdo);
                 <span>Xuất Báo Cáo & In Ấn</span>
             </a>
 
-            <a href="profile.php" class="px-3.5 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap transition flex items-center gap-1.5 <?= $currentPage === 'profile.php' ? 'bg-indigo-600 text-white shadow' : 'text-slate-200 hover:bg-white/10' ?>">
-                <i class="fa-solid fa-user-gear"></i>
-                <span>Tài Khoản Cá Nhân</span>
-            </a>
         </div>
     </nav>
 </header>

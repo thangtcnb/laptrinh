@@ -150,7 +150,8 @@ function getTasksFiltered($pdo, $filters = [], $limit = 15, $offset = 0, $curren
     // Filter by department or "📌 Công việc của tôi"
     if (!empty($filters['dept_filter'])) {
         if ($filters['dept_filter'] === 'MY_TASKS' && $currentUser) {
-            $where[] = "t.id IN (SELECT task_id FROM task_assignees WHERE user_id = ?)";
+            $where[] = "(t.created_by = ? OR t.id IN (SELECT task_id FROM task_assignees WHERE user_id = ?))";
+            $params[] = $currentUser['id'];
             $params[] = $currentUser['id'];
         } elseif (is_numeric($filters['dept_filter'])) {
             $where[] = "t.department_id = ?";

@@ -7,11 +7,11 @@ $flashSuccess = $_SESSION['flash_success'] ?? null;
 $flashError = $_SESSION['flash_error'] ?? null;
 unset($_SESSION['flash_success'], $_SESSION['flash_error']);
 
-// Filters parameters
+// Filters parameters - default dept_filter to MY_TASKS if not explicitly set
 $filters = [
     'date_from' => $_GET['date_from'] ?? '',
     'date_to' => $_GET['date_to'] ?? '',
-    'dept_filter' => $_GET['dept_filter'] ?? '',
+    'dept_filter' => $_GET['dept_filter'] ?? 'MY_TASKS',
     'status' => $_GET['status'] ?? ''
 ];
 
@@ -89,28 +89,15 @@ $usersList = getUsers($pdo);
         <div>
             <label class="block text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-1">Phòng ban / Cá nhân</label>
             <select name="dept_filter" class="w-full px-3 py-2 border border-slate-200 rounded-xl text-xs focus:ring-2 focus:ring-indigo-500 outline-none bg-white font-medium text-slate-700">
-                <?php if ($currentUser['role'] === 'NHAN_VIEN'): ?>
-                    <option value="MY_TASKS" <?= ($filters['dept_filter'] === 'MY_TASKS' || empty($filters['dept_filter'])) ? 'selected' : '' ?> class="font-bold text-indigo-600">
-                        📌 Công việc của tôi
+                <option value="MY_TASKS" <?= $filters['dept_filter'] === 'MY_TASKS' ? 'selected' : '' ?> class="font-bold text-indigo-600">
+                    📌 CÔNG VIỆC CỦA TÔI
+                </option>
+                <option value="" <?= $filters['dept_filter'] === '' ? 'selected' : '' ?>>-- Tất cả đơn vị Phân hiệu --</option>
+                <?php foreach ($departmentsList as $d): ?>
+                    <option value="<?= $d['id'] ?>" <?= $filters['dept_filter'] == $d['id'] ? 'selected' : '' ?>>
+                        [<?= htmlspecialchars($d['code']) ?>] <?= htmlspecialchars($d['name']) ?>
                     </option>
-                    <?php foreach ($departmentsList as $d): ?>
-                        <?php if ($d['code'] !== 'BGD'): ?>
-                            <option value="<?= $d['id'] ?>" <?= $filters['dept_filter'] == $d['id'] ? 'selected' : '' ?>>
-                                [<?= htmlspecialchars($d['code']) ?>] <?= htmlspecialchars($d['name']) ?>
-                            </option>
-                        <?php endif; ?>
-                    <?php endforeach; ?>
-                <?php else: ?>
-                    <option value="">-- Tất cả đơn vị --</option>
-                    <option value="MY_TASKS" <?= $filters['dept_filter'] === 'MY_TASKS' ? 'selected' : '' ?> class="font-bold text-indigo-600">
-                        📌 Công việc của tôi
-                    </option>
-                    <?php foreach ($departmentsList as $d): ?>
-                        <option value="<?= $d['id'] ?>" <?= $filters['dept_filter'] == $d['id'] ? 'selected' : '' ?>>
-                            [<?= htmlspecialchars($d['code']) ?>] <?= htmlspecialchars($d['name']) ?>
-                        </option>
-                    <?php endforeach; ?>
-                <?php endif; ?>
+                <?php endforeach; ?>
             </select>
         </div>
 
@@ -146,7 +133,19 @@ $usersList = getUsers($pdo);
         <div>
             <h2 class="text-base font-bold text-slate-900 flex items-center gap-2">
                 <i class="fa-solid fa-list-check text-indigo-600"></i>
-                <span>DANH SÁCH CÔNG VIỆC PHÂN HIỆU QUẢNG NGÃI</span>
+                <span>
+                    <?php
+                    if ($filters['dept_filter'] === 'MY_TASKS') {
+                        echo 'CÔNG VIỆC CỦA TÔI';
+                    } elseif (!empty($filters['dept_filter']) && is_numeric($filters['dept_filter'])) {
+                        $matchedDept = array_filter($departmentsList, fn($d) => $d['id'] == $filters['dept_filter']);
+                        $deptObj = reset($matchedDept);
+                        echo 'DANH SÁCH CÔNG VIỆC - ' . mb_strtoupper($deptObj['name'] ?? '', 'UTF-8');
+                    } else {
+                        echo 'DANH SÁCH CÔNG VIỆC PHÂN HIỆU QUẢNG NGÃI';
+                    }
+                    ?>
+                </span>
             </h2>
             <p class="text-xs text-slate-500 mt-0.5">Tổng số: <span class="font-bold text-indigo-600"><?= $totalTasks ?></span> công việc</p>
         </div>
@@ -189,6 +188,16 @@ $usersList = getUsers($pdo);
                                 <?php if (!empty($t['description'])): ?>
                                     <div class="text-slate-500 text-xs mt-1 line-clamp-2">
                                         <?= htmlspecialchars($t['description']) ?>
+                                    </div>
+                                <?php endif; ?>
+
+                                <?php if (!empty($t['leader_comments'])): ?>
+                                    <div class="mt-2 bg-amber-50 border border-amber-200 rounded-lg p-2 text-xs text-amber-900 font-medium flex items-start gap-1.5 shadow-sm">
+                                        <i class="fa-solid fa-comment-dots text-amber-600 mt-0.5"></i>
+                                        <div>
+                                            <span class="font-bold text-amber-800">Ý kiến chỉ đạo:</span>
+                                            <span><?= htmlspecialchars($t['leader_comments']) ?></span>
+                                        </div>
                                     </div>
                                 <?php endif; ?>
                             </td>
@@ -249,29 +258,45 @@ $usersList = getUsers($pdo);
                             <!-- THAO TÁC / ACTIONS -->
                             <td class="py-3.5 px-3 text-center no-print">
                                 <div class="flex items-center justify-center gap-1">
-                                    <!-- Progress Update Button -->
-                                    <button onclick='openProgressModal(<?= json_encode($t) ?>)' class="p-1.5 bg-indigo-50 hover:bg-indigo-600 text-indigo-600 hover:text-white rounded-lg transition" title="Cập nhật tiến độ & minh chứng">
-                                        <i class="fa-solid fa-sliders text-xs"></i>
-                                    </button>
+                                    <?php
+                                    $isAssignee = false;
+                                    if (isset($t['assignees']) && is_array($t['assignees'])) {
+                                        foreach ($t['assignees'] as $a) {
+                                            if ($a['user_id'] == $currentUser['id']) {
+                                                $isAssignee = true;
+                                                break;
+                                            }
+                                        }
+                                    }
+                                    $isCreator = ($t['created_by'] == $currentUser['id']);
+                                    $isLeaderOfDept = ($currentUser['role'] === 'TRUONG_PHONG' && $t['department_id'] == $currentUser['department_id']);
+                                    $isBgd = ($currentUser['role'] === 'BGD');
+                                    ?>
 
-                                    <!-- Approval Button (BGD / TRUONG_PHONG) -->
-                                    <?php if ($currentUser['role'] === 'BGD' && $t['status'] === 'CHO_BGD_DUYET'): ?>
-                                        <a href="task_actions.php?action=approve&task_id=<?= $t['id'] ?>&status=DANG_THUC_HIEN" class="p-1.5 bg-emerald-50 hover:bg-emerald-600 text-emerald-600 hover:text-white rounded-lg transition" title="Duyệt công việc (BGD)">
-                                            <i class="fa-solid fa-check text-xs"></i>
-                                        </a>
-                                    <?php elseif ($currentUser['role'] === 'TRUONG_PHONG' && $t['status'] === 'CHO_DUYET' && $t['department_id'] == $currentUser['department_id']): ?>
-                                        <a href="task_actions.php?action=approve&task_id=<?= $t['id'] ?>&status=DANG_THUC_HIEN" class="p-1.5 bg-emerald-50 hover:bg-emerald-600 text-emerald-600 hover:text-white rounded-lg transition" title="Trưởng phòng duyệt công việc">
-                                            <i class="fa-solid fa-check text-xs"></i>
-                                        </a>
+                                    <!-- Progress & Proof Update Button -->
+                                    <?php if ($isAssignee || $isCreator || $isLeaderOfDept || $isBgd): ?>
+                                        <button onclick='openProgressModal(<?= json_encode($t) ?>)' class="p-1.5 bg-indigo-50 hover:bg-indigo-600 text-indigo-600 hover:text-white rounded-lg transition" title="Cập nhật tiến độ & minh chứng">
+                                            <i class="fa-solid fa-sliders text-xs"></i>
+                                        </button>
                                     <?php endif; ?>
 
-                                    <!-- Edit Button -->
-                                    <button onclick='openTaskModal(<?= json_encode($t) ?>)' class="p-1.5 bg-amber-50 hover:bg-amber-600 text-amber-600 hover:text-white rounded-lg transition" title="Chỉnh sửa">
-                                        <i class="fa-solid fa-pen-to-square text-xs"></i>
-                                    </button>
+                                    <!-- Approval & Directive Comment Button for Leaders (Trưởng phòng & BGD) -->
+                                    <?php if ($isLeaderOfDept || $isBgd): ?>
+                                        <button onclick='openLeaderModal(<?= json_encode($t) ?>)' class="px-2 py-1 bg-emerald-50 hover:bg-emerald-600 text-emerald-700 hover:text-white border border-emerald-200 rounded-lg text-[11px] font-bold transition flex items-center gap-1 shadow-sm" title="Duyệt / Cho ý kiến chỉ đạo">
+                                            <i class="fa-solid fa-clipboard-check text-xs"></i>
+                                            <span>Duyệt / Ý kiến</span>
+                                        </button>
+                                    <?php endif; ?>
 
-                                    <!-- Delete Button (BGD & TRUONG_PHONG) -->
-                                    <?php if ($currentUser['role'] === 'BGD' || ($currentUser['role'] === 'TRUONG_PHONG' && $t['department_id'] == $currentUser['department_id'])): ?>
+                                    <!-- Edit Button (For Nhân viên on CHO_DUYET tasks created by themselves) -->
+                                    <?php if ($currentUser['role'] === 'NHAN_VIEN' && $isCreator && $t['status'] === 'CHO_DUYET'): ?>
+                                        <button onclick='openTaskModal(<?= json_encode($t) ?>)' class="p-1.5 bg-amber-50 hover:bg-amber-600 text-amber-600 hover:text-white rounded-lg transition" title="Chỉnh sửa nội dung">
+                                            <i class="fa-solid fa-pen-to-square text-xs"></i>
+                                        </button>
+                                    <?php endif; ?>
+
+                                    <!-- Delete Button -->
+                                    <?php if ($isBgd || $isLeaderOfDept || ($currentUser['role'] === 'NHAN_VIEN' && $isCreator && $t['status'] === 'CHO_DUYET')): ?>
                                         <a href="task_actions.php?action=delete&task_id=<?= $t['id'] ?>" onclick="return confirm('Bạn có chắc chắn muốn xóa công việc này không?');" class="p-1.5 bg-rose-50 hover:bg-rose-600 text-rose-600 hover:text-white rounded-lg transition" title="Xóa">
                                             <i class="fa-solid fa-trash text-xs"></i>
                                         </a>
@@ -312,6 +337,55 @@ $usersList = getUsers($pdo);
             </div>
         </div>
     <?php endif; ?>
+</div>
+
+<!-- ==================== MODAL: LEADER DIRECTIVE COMMENT & APPROVAL ==================== -->
+<div id="leaderCommentModal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm hidden items-center justify-center p-4 z-50">
+    <div class="bg-white rounded-2xl shadow-2xl max-w-lg w-full p-6 border border-slate-200 transform transition-all">
+        <div class="flex items-center justify-between pb-3 border-b border-slate-100 mb-4">
+            <h3 class="font-bold text-slate-900 text-base flex items-center gap-2">
+                <i class="fa-solid fa-clipboard-check text-emerald-600"></i>
+                <span>Phê Duyệt & Cho Ý Kiến Chỉ Đạo</span>
+            </h3>
+            <button onclick="closeLeaderModal()" class="text-slate-400 hover:text-slate-600"><i class="fa-solid fa-xmark text-lg"></i></button>
+        </div>
+
+        <form method="POST" action="task_actions.php">
+            <input type="hidden" name="action" value="save_leader_comment">
+            <input type="hidden" name="task_id" id="leader_task_id">
+
+            <div class="mb-3">
+                <label class="block text-xs font-semibold text-slate-700 mb-1">Công việc:</label>
+                <div id="leader_task_title" class="p-2.5 bg-slate-50 rounded-xl text-xs font-bold text-slate-800 border border-slate-200"></div>
+            </div>
+
+            <div class="mb-4">
+                <label class="block text-xs font-semibold text-slate-700 mb-1">Cập nhật Trạng thái Phê duyệt</label>
+                <select name="status" id="leader_status" class="w-full p-2.5 border border-slate-300 rounded-xl text-xs font-semibold focus:ring-2 focus:ring-indigo-500 outline-none bg-white">
+                    <option value="DANG_THUC_HIEN">Đã duyệt - Đang thực hiện</option>
+                    <option value="HOAN_THANH">Hoàn thành</option>
+                    <option value="CHO_BGD_DUYET">Trình BGD duyệt</option>
+                    <option value="CHO_DUYET">Yêu cầu chỉnh sửa / Chờ duyệt</option>
+                </select>
+            </div>
+
+            <div class="mb-5">
+                <label class="block text-xs font-semibold text-slate-700 mb-1 flex items-center gap-1.5">
+                    <i class="fa-solid fa-comment-dots text-amber-600"></i>
+                    <span>Ý kiến chỉ đạo của Lãnh đạo</span>
+                </label>
+                <textarea name="leader_comments" id="leader_comments" rows="4" placeholder="Nhập ý kiến chỉ đạo, hướng dẫn thực hiện cho nhân viên..." class="w-full p-2.5 border border-slate-300 rounded-xl text-xs focus:ring-2 focus:ring-indigo-500 outline-none font-medium"></textarea>
+            </div>
+
+            <div class="flex justify-end gap-2 pt-3 border-t border-slate-100">
+                <button type="button" onclick="closeLeaderModal()" class="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold rounded-xl">Hủy</button>
+                <button type="submit" class="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl shadow flex items-center gap-1">
+                    <i class="fa-solid fa-floppy-disk"></i>
+                    <span>Lưu ý kiến & Phê duyệt</span>
+                </button>
+            </div>
+        </form>
+    </div>
 </div>
 
 <!-- ==================== MODAL: PROGRESS & PROOF UPDATE ==================== -->
@@ -488,6 +562,21 @@ function openProgressModal(task) {
 function closeProgressModal() {
     document.getElementById('progressModal').classList.add('hidden');
     document.getElementById('progressModal').classList.remove('flex');
+}
+
+function openLeaderModal(task) {
+    document.getElementById('leader_task_id').value = task.id;
+    document.getElementById('leader_task_title').innerText = task.title;
+    document.getElementById('leader_status').value = task.status;
+    document.getElementById('leader_comments').value = task.leader_comments || '';
+
+    document.getElementById('leaderCommentModal').classList.remove('hidden');
+    document.getElementById('leaderCommentModal').classList.add('flex');
+}
+
+function closeLeaderModal() {
+    document.getElementById('leaderCommentModal').classList.add('hidden');
+    document.getElementById('leaderCommentModal').classList.remove('flex');
 }
 
 function openTaskModal(task = null) {

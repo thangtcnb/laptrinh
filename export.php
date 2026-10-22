@@ -9,9 +9,34 @@ $currentUser = getCurrentUser($pdo);
 
 $dateFrom = $_GET['date_from'] ?? date('Y-m-01');
 $dateTo = $_GET['date_to'] ?? date('Y-m-t');
-$scope = $_GET['scope'] ?? 'ALL'; // ALL, DEPT_id, USER_id
+$requestedScope = $_GET['scope'] ?? 'ALL';
 $status = $_GET['status'] ?? 'ALL';
 $exportType = $_GET['export_type'] ?? '';
+
+// Enforce Role-Based Scope Permissions
+$departmentsList = getDepartments($pdo);
+$usersList = getUsers($pdo);
+
+if ($currentUser['role'] === 'NHAN_VIEN') {
+    $scope = 'USER_' . $currentUser['id'];
+} elseif ($currentUser['role'] === 'TRUONG_PHONG') {
+    $deptId = $currentUser['department_id'];
+    $allowedUserIds = array_column(getUsers($pdo, $deptId), 'id');
+
+    if (strpos($requestedScope, 'USER_') === 0) {
+        $uId = (int)str_replace('USER_', '', $requestedScope);
+        if (in_array($uId, $allowedUserIds)) {
+            $scope = 'USER_' . $uId;
+        } else {
+            $scope = 'DEPT_' . $deptId;
+        }
+    } else {
+        $scope = 'DEPT_' . $deptId;
+    }
+} else {
+    // BGD: full access
+    $scope = $requestedScope;
+}
 
 // Build Query
 $where = ["1=1"];
@@ -64,11 +89,14 @@ foreach ($tasks as &$t) {
     $t['assignees'] = getTaskAssignees($pdo, $t['id']);
 }
 
-// ---------------- Handle Excel (.xlsx / .csv) Download ----------------
+// ---------------- Handle Excel (.xls) Download ----------------
 if ($exportType === 'excel') {
-    $filename = "Bao_Cao_Cong_Viec_UFM_Quang_Ngai_" . date('Ymd_His') . ".xlsx";
+    while (ob_get_level()) {
+        ob_end_clean();
+    }
 
-    // Set headers for Excel XML / HTML download compatible with Excel
+    $filename = "Bao_Cao_Cong_Viec_UFM_Quang_Ngai_" . date('Ymd_His') . ".xls";
+
     header("Content-Type: application/vnd.ms-excel; charset=UTF-8");
     header("Content-Disposition: attachment; filename=\"$filename\"");
     header("Pragma: no-cache");
@@ -81,8 +109,8 @@ if ($exportType === 'excel') {
         <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
         <style>
             table { border-collapse: collapse; width: 100%; font-family: Arial, sans-serif; font-size: 12px; }
-            th { background-color: #1e3a8a; color: #ffffff; font-weight: bold; padding: 8px; border: 1px solid #000; text-align: center; }
-            td { padding: 6px; border: 1px solid #ccc; vertical-align: top; }
+            th { background-color: #1e3a8a; color: #ffffff; font-weight: bold; padding: 10px; border: 1px solid #000; text-align: center; }
+            td { padding: 8px; border: 1px solid #ccc; vertical-align: top; }
             .header-title { font-size: 16px; font-weight: bold; text-align: center; color: #1e3a8a; }
             .sub-title { font-size: 13px; font-weight: bold; text-align: center; }
         </style>
@@ -100,38 +128,59 @@ if ($exportType === 'excel') {
         <table>
             <thead>
                 <tr>
-                    <th>STT</th>
-                    <th>Tên công việc / Nội dung</th>
-                    <th>Đơn vị chủ trì</th>
-                    <th>Người phụ trách chính</th>
-                    <th>Người phối hợp</th>
-                    <th>Ưu tiên</th>
-                    <th>Trạng thái</th>
-                    <th>Tiến độ (%)</th>
-                    <th>Link Minh chứng Drive</th>
-                    <th>Hạn chót</th>
+                    <th style="width: 25%;">1. Người phụ trách (Chính & Phối hợp)</th>
+                    <th style="width: 30%;">2. Tên công việc (Nội dung)</th>
+                    <th style="width: 15%;">3. Thời gian thực hiện</th>
+                    <th style="width: 15%;">4. Trạng thái</th>
+                    <th style="width: 15%;">5. Minh chứng (Link Google Drive)</th>
                 </tr>
             </thead>
             <tbody>
                 <?php
-                $i = 1;
+                $statusMap = [
+                    'CHO_DUYET' => 'Chờ Trưởng phòng duyệt',
+                    'CHO_BGD_DUYET' => 'Chờ BGD duyệt',
+                    'DANG_THUC_HIEN' => 'Đang thực hiện',
+                    'HOAN_THANH' => 'Hoàn thành'
+                ];
+
                 foreach ($tasks as $t):
                     $mains = array_filter($t['assignees'], fn($a) => $a['role_type'] === 'MAIN');
                     $coops = array_filter($t['assignees'], fn($a) => $a['role_type'] === 'COOP');
-                    $mainStr = implode(', ', array_column($mains, 'fullname'));
-                    $coopStr = implode(', ', array_column($coops, 'fullname'));
+                    $mainNames = implode(', ', array_column($mains, 'fullname'));
+                    $coopNames = implode(', ', array_column($coops, 'fullname'));
+
+                    $assigneeText = $mainNames;
+                    if (!empty($coopNames)) {
+                        $assigneeText .= " (Phối hợp: " . $coopNames . ")";
+                    }
+                    if (empty($assigneeText)) {
+                        $assigneeText = "Chưa phân công";
+                    }
+
+                    $startDateFmt = !empty($t['start_date']) ? date('d/m/Y', strtotime($t['start_date'])) : '';
+                    $dueDateFmt = !empty($t['due_date']) ? date('d/m/Y', strtotime($t['due_date'])) : '';
+                    if (!empty($startDateFmt) && !empty($dueDateFmt)) {
+                        $timeStr = $startDateFmt . ' - ' . $dueDateFmt;
+                    } elseif (!empty($dueDateFmt)) {
+                        $timeStr = $dueDateFmt;
+                    } else {
+                        $timeStr = '---';
+                    }
+
+                    $statusText = $statusMap[$t['status']] ?? $t['status'];
                 ?>
                     <tr>
-                        <td style="text-align: center;"><?= $i++ ?></td>
-                        <td><?= htmlspecialchars($t['title']) ?></td>
-                        <td><?= htmlspecialchars($t['dept_name']) ?></td>
-                        <td><?= htmlspecialchars($mainStr) ?></td>
-                        <td><?= htmlspecialchars($coopStr) ?></td>
-                        <td style="text-align: center;"><?= htmlspecialchars($t['priority']) ?></td>
-                        <td style="text-align: center;"><?= htmlspecialchars($t['status']) ?></td>
-                        <td style="text-align: center;"><?= (int)$t['progress'] ?>%</td>
+                        <td><?= htmlspecialchars($assigneeText) ?></td>
+                        <td>
+                            <strong><?= htmlspecialchars($t['title']) ?></strong>
+                            <?php if (!empty($t['description'])): ?>
+                                <br/><span style="color: #555; font-size: 11px;"><?= htmlspecialchars($t['description']) ?></span>
+                            <?php endif; ?>
+                        </td>
+                        <td style="text-align: center;"><?= htmlspecialchars($timeStr) ?></td>
+                        <td style="text-align: center;"><?= htmlspecialchars($statusText) ?></td>
                         <td><?= htmlspecialchars($t['proof_link'] ?? '') ?></td>
-                        <td style="text-align: center;"><?= $t['due_date'] ? date('d/m/Y', strtotime($t['due_date'])) : '' ?></td>
                     </tr>
                 <?php endforeach; ?>
             </tbody>
@@ -144,9 +193,6 @@ if ($exportType === 'excel') {
 
 define('PAGE_TITLE', 'Xuất Báo Cáo & In Dữ Liệu');
 require_once __DIR__ . '/includes/header.php';
-
-$departmentsList = getDepartments($pdo);
-$usersList = getUsers($pdo);
 ?>
 
 <!-- Filter & Export Controls -->
@@ -172,21 +218,44 @@ $usersList = getUsers($pdo);
         <div>
             <label class="block text-xs font-semibold text-slate-600 mb-1">Đối tượng xuất báo cáo</label>
             <select name="scope" class="w-full p-2.5 border border-slate-300 rounded-xl text-xs outline-none focus:ring-2 focus:ring-indigo-500 bg-white font-medium">
-                <option value="ALL" <?= $scope === 'ALL' ? 'selected' : '' ?>>-- Toàn Phân hiệu Quảng Ngãi --</option>
-                <optgroup label="Theo Phòng ban">
-                    <?php foreach ($departmentsList as $d): ?>
-                        <option value="DEPT_<?= $d['id'] ?>" <?= $scope === 'DEPT_' . $d['id'] ? 'selected' : '' ?>>
-                            Phòng/Ban: <?= htmlspecialchars($d['name']) ?>
-                        </option>
-                    <?php endforeach; ?>
-                </optgroup>
-                <optgroup label="Theo Cá nhân">
-                    <?php foreach ($usersList as $u): ?>
-                        <option value="USER_<?= $u['id'] ?>" <?= $scope === 'USER_' . $u['id'] ? 'selected' : '' ?>>
-                            Cá nhân: <?= htmlspecialchars($u['fullname']) ?> (<?= htmlspecialchars($u['department_name']) ?>)
-                        </option>
-                    <?php endforeach; ?>
-                </optgroup>
+                <?php if ($currentUser['role'] === 'NHAN_VIEN'): ?>
+                    <option value="USER_<?= $currentUser['id'] ?>" selected>
+                        📌 Cá nhân tôi: <?= htmlspecialchars($currentUser['fullname']) ?>
+                    </option>
+                <?php elseif ($currentUser['role'] === 'TRUONG_PHONG'): ?>
+                    <?php
+                    $myDeptId = $currentUser['department_id'];
+                    $deptObjArr = array_filter($departmentsList, fn($d) => $d['id'] == $myDeptId);
+                    $myDept = reset($deptObjArr);
+                    $deptUsers = array_filter($usersList, fn($u) => $u['department_id'] == $myDeptId);
+                    ?>
+                    <option value="DEPT_<?= $myDeptId ?>" <?= $scope === 'DEPT_' . $myDeptId ? 'selected' : '' ?>>
+                        🏢 Toàn phòng: <?= htmlspecialchars($myDept['name'] ?? '') ?>
+                    </option>
+                    <optgroup label="Cá nhân thuộc phòng">
+                        <?php foreach ($deptUsers as $u): ?>
+                            <option value="USER_<?= $u['id'] ?>" <?= $scope === 'USER_' . $u['id'] ? 'selected' : '' ?>>
+                                Cá nhân: <?= htmlspecialchars($u['fullname']) ?>
+                            </option>
+                        <?php endforeach; ?>
+                    </optgroup>
+                <?php else: ?>
+                    <option value="ALL" <?= $scope === 'ALL' ? 'selected' : '' ?>>-- Toàn Phân hiệu Quảng Ngãi --</option>
+                    <optgroup label="Theo Phòng ban">
+                        <?php foreach ($departmentsList as $d): ?>
+                            <option value="DEPT_<?= $d['id'] ?>" <?= $scope === 'DEPT_' . $d['id'] ? 'selected' : '' ?>>
+                                Phòng/Ban: <?= htmlspecialchars($d['name']) ?>
+                            </option>
+                        <?php endforeach; ?>
+                    </optgroup>
+                    <optgroup label="Theo Cá nhân">
+                        <?php foreach ($usersList as $u): ?>
+                            <option value="USER_<?= $u['id'] ?>" <?= $scope === 'USER_' . $u['id'] ? 'selected' : '' ?>>
+                                Cá nhân: <?= htmlspecialchars($u['fullname']) ?> (<?= htmlspecialchars($u['department_name']) ?>)
+                            </option>
+                        <?php endforeach; ?>
+                    </optgroup>
+                <?php endif; ?>
             </select>
         </div>
 

@@ -26,6 +26,7 @@ CREATE TABLE IF NOT EXISTS `tasks` (
     `id` INT AUTO_INCREMENT PRIMARY KEY,
     `title` VARCHAR(255) NOT NULL,
     `description` TEXT NULL,
+    `leader_comments` TEXT NULL,
     `department_id` INT NOT NULL,
     `status` ENUM('CHO_BGD_DUYET', 'CHO_DUYET', 'DANG_THUC_HIEN', 'HOAN_THANH') NOT NULL DEFAULT 'CHO_DUYET',
     `priority` ENUM('THAP', 'TRUNG_BINH', 'CAO', 'KHAN_CAP') NOT NULL DEFAULT 'TRUNG_BINH',
