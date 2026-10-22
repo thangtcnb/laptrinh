@@ -30,17 +30,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 }
 
-// Quick login handler
-if (isset($_GET['quick_login_id']) && is_numeric($_GET['quick_login_id'])) {
-    $qId = (int)$_GET['quick_login_id'];
-    $stmt = $pdo->prepare("SELECT id FROM users WHERE id = ?");
-    $stmt->execute([$qId]);
-    if ($stmt->fetch()) {
-        $_SESSION['user_id'] = $qId;
-        header("Location: index.php");
-        exit;
-    }
-}
 ?>
 <!DOCTYPE html>
 <html lang="vi">
@@ -79,7 +68,7 @@ if (isset($_GET['quick_login_id']) && is_numeric($_GET['quick_login_id'])) {
                     <span class="absolute inset-y-0 left-0 pl-3 flex items-center text-slate-400">
                         <i class="fa-solid fa-envelope"></i>
                     </span>
-                    <input type="email" name="email" required placeholder="example@ufm.edu.vn" value="thangpn@ufm.edu.vn" class="w-full pl-9 pr-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none">
+                    <input type="email" name="email" required placeholder="example@ufm.edu.vn" value="" class="w-full pl-9 pr-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none">
                 </div>
             </div>
 
@@ -89,7 +78,7 @@ if (isset($_GET['quick_login_id']) && is_numeric($_GET['quick_login_id'])) {
                     <span class="absolute inset-y-0 left-0 pl-3 flex items-center text-slate-400">
                         <i class="fa-solid fa-lock"></i>
                     </span>
-                    <input type="password" name="password" required value="123" placeholder="••••••••" class="w-full pl-9 pr-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none">
+                    <input type="password" name="password" required value="" placeholder="Mật khẩu (mặc định 123)" class="w-full pl-9 pr-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none">
                 </div>
             </div>
 
@@ -98,38 +87,6 @@ if (isset($_GET['quick_login_id']) && is_numeric($_GET['quick_login_id'])) {
                 <span>Đăng nhập</span>
             </button>
         </form>
-
-        <div class="mt-6 pt-4 border-t border-slate-100">
-            <div class="text-xs text-center text-slate-400 font-semibold mb-3 uppercase tracking-wider">
-                Đăng nhập nhanh cho kiểm thử (Demo)
-            </div>
-
-            <div class="grid grid-cols-1 gap-2">
-                <a href="login.php?quick_login_id=1" class="p-2.5 bg-purple-50 hover:bg-purple-100 border border-purple-200 rounded-lg flex items-center justify-between text-xs transition">
-                    <div>
-                        <div class="font-bold text-purple-900">1. Bùi Thị Yến Linh</div>
-                        <div class="text-purple-700">Ban Giám đốc (BGD)</div>
-                    </div>
-                    <span class="px-2 py-1 bg-purple-600 text-white rounded text-[10px] font-bold">BGD</span>
-                </a>
-
-                <a href="login.php?quick_login_id=11" class="p-2.5 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 rounded-lg flex items-center justify-between text-xs transition">
-                    <div>
-                        <div class="font-bold text-emerald-900">2. Phạm Hoài Nam</div>
-                        <div class="text-emerald-700">Trưởng Phòng Đào tạo (DTT)</div>
-                    </div>
-                    <span class="px-2 py-1 bg-emerald-600 text-white rounded text-[10px] font-bold">Trưởng Phòng</span>
-                </a>
-
-                <a href="login.php?quick_login_id=6" class="p-2.5 bg-blue-50 hover:bg-blue-100 border border-blue-200 rounded-lg flex items-center justify-between text-xs transition">
-                    <div>
-                        <div class="font-bold text-blue-900">3. Huỳnh Thị Anh Tùng</div>
-                        <div class="text-blue-700">Nhân viên Phòng Hành chính - Tài vụ (HCTV)</div>
-                    </div>
-                    <span class="px-2 py-1 bg-blue-600 text-white rounded text-[10px] font-bold">Nhân Viên</span>
-                </a>
-            </div>
-        </div>
     </div>
 </div>
 

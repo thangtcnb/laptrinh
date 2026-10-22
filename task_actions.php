@@ -33,19 +33,38 @@ if ($action === 'update_progress') {
     exit;
 }
 
-// 2. APPROVE TASK (RBAC)
-if ($action === 'approve') {
-    $taskId = (int)($_GET['task_id'] ?? 0);
-    $newStatus = $_GET['status'] ?? 'DANG_THUC_HIEN';
+// 2. APPROVE / LEADER DIRECTIVE COMMENTS (RBAC)
+if ($action === 'save_leader_comment' || $action === 'approve') {
+    $taskId = (int)($_REQUEST['task_id'] ?? 0);
+    $newStatus = $_REQUEST['status'] ?? 'DANG_THUC_HIEN';
+    $leaderComment = trim($_REQUEST['leader_comments'] ?? '');
 
-    if (!in_array($newStatus, ['DANG_THUC_HIEN', 'HOAN_THANH', 'CHO_DUYET'])) {
-        $newStatus = 'DANG_THUC_HIEN';
+    // Check task info
+    $stmt = $pdo->prepare("SELECT department_id FROM tasks WHERE id = ?");
+    $stmt->execute([$taskId]);
+    $task = $stmt->fetch();
+
+    if (!$task) {
+        $_SESSION['flash_error'] = "Không tìm thấy công việc!";
+        header("Location: index.php");
+        exit;
     }
 
-    $stmtUpdate = $pdo->prepare("UPDATE tasks SET status = ? WHERE id = ?");
-    $stmtUpdate->execute([$newStatus, $taskId]);
+    $canApprove = false;
+    if ($currentUser['role'] === 'BGD') {
+        $canApprove = true;
+    } elseif ($currentUser['role'] === 'TRUONG_PHONG' && $task['department_id'] == $currentUser['department_id']) {
+        $canApprove = true;
+    }
 
-    $_SESSION['flash_success'] = "Đã phê duyệt công việc thành công!";
+    if ($canApprove) {
+        $stmtUpdate = $pdo->prepare("UPDATE tasks SET status = ?, leader_comments = ? WHERE id = ?");
+        $stmtUpdate->execute([$newStatus, $leaderComment ?: null, $taskId]);
+        $_SESSION['flash_success'] = "Đã lưu ý kiến chỉ đạo và cập nhật phê duyệt!";
+    } else {
+        $_SESSION['flash_error'] = "Bạn chỉ có quyền cho ý kiến/duyệt các công việc thuộc phòng ban của mình!";
+    }
+
     header("Location: index.php");
     exit;
 }
@@ -54,8 +73,26 @@ if ($action === 'approve') {
 if ($action === 'delete') {
     $taskId = (int)($_GET['task_id'] ?? 0);
 
-    // Permission check
-    if ($currentUser['role'] === 'BGD' || $currentUser['role'] === 'TRUONG_PHONG') {
+    $stmt = $pdo->prepare("SELECT created_by, status, department_id FROM tasks WHERE id = ?");
+    $stmt->execute([$taskId]);
+    $task = $stmt->fetch();
+
+    if (!$task) {
+        $_SESSION['flash_error'] = "Không tìm thấy công việc!";
+        header("Location: index.php");
+        exit;
+    }
+
+    $canDelete = false;
+    if ($currentUser['role'] === 'BGD') {
+        $canDelete = true;
+    } elseif ($currentUser['role'] === 'TRUONG_PHONG' && $task['department_id'] == $currentUser['department_id']) {
+        $canDelete = true;
+    } elseif ($currentUser['role'] === 'NHAN_VIEN' && $task['created_by'] == $currentUser['id'] && $task['status'] === 'CHO_DUYET') {
+        $canDelete = true;
+    }
+
+    if ($canDelete) {
         $stmtDelete = $pdo->prepare("DELETE FROM tasks WHERE id = ?");
         $stmtDelete->execute([$taskId]);
         $_SESSION['flash_success'] = "Đã xóa công việc thành công!";
@@ -86,6 +123,32 @@ if ($action === 'save_task') {
     }
 
     if ($taskId > 0) {
+        // Edit existing task permission check
+        $stmtExisting = $pdo->prepare("SELECT created_by, status FROM tasks WHERE id = ?");
+        $stmtExisting->execute([$taskId]);
+        $existingTask = $stmtExisting->fetch();
+
+        if (!$existingTask) {
+            $_SESSION['flash_error'] = "Không tìm thấy công việc!";
+            header("Location: index.php");
+            exit;
+        }
+
+        // Nhân viên only edits tasks created by themselves in CHO_DUYET status
+        if ($currentUser['role'] === 'NHAN_VIEN') {
+            if ($existingTask['created_by'] != $currentUser['id'] || $existingTask['status'] !== 'CHO_DUYET') {
+                $_SESSION['flash_error'] = "Nhân viên chỉ được phép chỉnh sửa công việc do mình đăng ký ở trạng thái Chờ duyệt!";
+                header("Location: index.php");
+                exit;
+            }
+        } elseif ($currentUser['role'] === 'TRUONG_PHONG' || $currentUser['role'] === 'BGD') {
+            if ($existingTask['created_by'] != $currentUser['id']) {
+                $_SESSION['flash_error'] = "Trưởng phòng/BGD không chỉnh sửa trực tiếp nội dung công việc của nhân viên, hãy sử dụng chức năng 'Duyệt / Cho ý kiến'.";
+                header("Location: index.php");
+                exit;
+            }
+        }
+
         // Edit existing task
         $stmt = $pdo->prepare("
             UPDATE tasks
