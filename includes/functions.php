@@ -169,6 +169,12 @@ function getTasksFiltered($pdo, $filters = [], $limit = 15, $offset = 0, $curren
         }
     }
 
+    // Internal BGD Security Restriction:
+    // Tasks registered/hosted by BGD (department_id = 1 or created by BGD) can ONLY be seen by BGD or SUPER_ADMIN users.
+    if (!$currentUser || !in_array($currentUser['role'], ['BGD', 'SUPER_ADMIN'])) {
+        $where[] = "(t.department_id != 1 AND t.created_by NOT IN (SELECT id FROM users WHERE role = 'BGD'))";
+    }
+
     // Role-based visibility restriction for Pending Approval (CHO_DUYET) tasks:
     // If a task is CHO_DUYET (waiting for Department Head approval), it should only be visible to:
     // - The creator or assignees of the task

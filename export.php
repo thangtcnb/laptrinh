@@ -42,6 +42,11 @@ if ($currentUser['role'] === 'NHAN_VIEN') {
 $where = ["1=1"];
 $params = [];
 
+// Internal BGD Security Restriction for Export
+if (!$currentUser || !in_array($currentUser['role'], ['BGD', 'SUPER_ADMIN'])) {
+    $where[] = "(t.department_id != 1 AND t.created_by NOT IN (SELECT id FROM users WHERE role = 'BGD'))";
+}
+
 if (!empty($dateFrom)) {
     $where[] = "(t.start_date >= ? OR t.due_date >= ?)";
     $params[] = $dateFrom;
