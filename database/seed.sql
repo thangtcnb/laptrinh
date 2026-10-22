@@ -6,35 +6,35 @@ INSERT INTO `departments` (`id`, `code`, `name`, `color_theme`, `icon`) VALUES
 (2, 'DTT', 'Phòng Đào tạo - KH & QLSV', 'emerald', 'fa-graduation-cap'),
 (3, 'HCTV', 'Phòng Hành chính – Tài vụ', 'blue', 'fa-briefcase');
 
--- 2. Insert Users (Password: 123456 hashed with bcrypt)
+-- 2. Insert Users (Password: 123 hashed with bcrypt)
 INSERT INTO `users` (`id`, `fullname`, `email`, `password`, `role`, `department_id`) VALUES
 -- BAN GIÁM ĐỐC
-(1, 'Bùi Thị Yến Linh', 'yenlinhbt@ufm.edu.vn', '$2y$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', 'BGD', 1),
-(2, 'Lê Xuân Lãm', 'lexuanlam@ufm.edu.vn', '$2y$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', 'BGD', 1),
+(1, 'Bùi Thị Yến Linh', 'yenlinhbt@ufm.edu.vn', '$2y$10$nqS0vtSgJqksgXn8g2LeK.j9Nt40MF5zfx.x18ToNBMhSKYBBKqJC', 'BGD', 1),
+(2, 'Lê Xuân Lãm', 'lexuanlam@ufm.edu.vn', '$2y$10$nqS0vtSgJqksgXn8g2LeK.j9Nt40MF5zfx.x18ToNBMhSKYBBKqJC', 'BGD', 1),
 
 -- PHÒNG HÀNH CHÍNH – TÀI VỤ
-(3, 'Trần Thị Bích Liên', 'tranthibichlien@ufm.edu.vn', '$2y$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', 'TRUONG_PHONG', 3),
-(4, 'Nguyễn Thị Phương Thảo', 'nguyenthiphuongthao@ufm.edu.vn', '$2y$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', 'TRUONG_PHONG', 3),
-(5, 'Trần Thị Tâm', 'tranthitam@ufm.edu.vn', '$2y$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', 'NHAN_VIEN', 3),
-(6, 'Huỳnh Thị Anh Tùng', 'huynhthianhtung@ufm.edu.vn', '$2y$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', 'NHAN_VIEN', 3),
-(7, 'Nguyễn Thị Kim Dung', 'nguyenthikimdung@ufm.edu.vn', '$2y$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', 'NHAN_VIEN', 3),
-(8, 'Phạm Ngọc Thắng', 'phamngocthang@ufm.edu.vn', '$2y$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', 'NHAN_VIEN', 3),
-(9, 'Đinh Thanh Hà', 'dinhthanhha@ufm.edu.vn', '$2y$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', 'NHAN_VIEN', 3),
-(10, 'Bùi Trần Quyết Thắng', 'tranthang@ufm.edu.vn', '$2y$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', 'NHAN_VIEN', 3),
+(3, 'Trần Thị Bích Liên', 'tranthibichlien@ufm.edu.vn', '$2y$10$nqS0vtSgJqksgXn8g2LeK.j9Nt40MF5zfx.x18ToNBMhSKYBBKqJC', 'TRUONG_PHONG', 3),
+(4, 'Nguyễn Thị Phương Thảo', 'nguyenthiphuongthao@ufm.edu.vn', '$2y$10$nqS0vtSgJqksgXn8g2LeK.j9Nt40MF5zfx.x18ToNBMhSKYBBKqJC', 'TRUONG_PHONG', 3),
+(5, 'Trần Thị Tâm', 'tranthitam@ufm.edu.vn', '$2y$10$nqS0vtSgJqksgXn8g2LeK.j9Nt40MF5zfx.x18ToNBMhSKYBBKqJC', 'NHAN_VIEN', 3),
+(6, 'Huỳnh Thị Anh Tùng', 'huynhthianhtung@ufm.edu.vn', '$2y$10$nqS0vtSgJqksgXn8g2LeK.j9Nt40MF5zfx.x18ToNBMhSKYBBKqJC', 'NHAN_VIEN', 3),
+(7, 'Nguyễn Thị Kim Dung', 'nguyenthikimdung@ufm.edu.vn', '$2y$10$nqS0vtSgJqksgXn8g2LeK.j9Nt40MF5zfx.x18ToNBMhSKYBBKqJC', 'NHAN_VIEN', 3),
+(8, 'Phạm Ngọc Thắng', 'phamngocthang@ufm.edu.vn', '$2y$10$nqS0vtSgJqksgXn8g2LeK.j9Nt40MF5zfx.x18ToNBMhSKYBBKqJC', 'NHAN_VIEN', 3),
+(9, 'Đinh Thanh Hà', 'dinhthanhha@ufm.edu.vn', '$2y$10$nqS0vtSgJqksgXn8g2LeK.j9Nt40MF5zfx.x18ToNBMhSKYBBKqJC', 'NHAN_VIEN', 3),
+(10, 'Bùi Trần Quyết Thắng', 'tranthang@ufm.edu.vn', '$2y$10$nqS0vtSgJqksgXn8g2LeK.j9Nt40MF5zfx.x18ToNBMhSKYBBKqJC', 'NHAN_VIEN', 3),
 
 -- PHÒNG ĐÀO TẠO - KHOA HỌC VÀ QUẢN LÝ SINH VIÊN
-(11, 'Phạm Hoài Nam', 'phamhoainam@ufm.edu.vn', '$2y$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', 'TRUONG_PHONG', 2),
-(12, 'Huỳnh Ngọc Nghiêm', 'huynhngocnghiem@ufm.edu.vn', '$2y$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', 'TRUONG_PHONG', 2),
-(13, 'Trần Quang Hải', 'tranquanghai@ufm.edu.vn', '$2y$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', 'TRUONG_PHONG', 2),
-(14, 'Phạm Thị Thu Hảo', 'phamthuhao@ufm.edu.vn', '$2y$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', 'NHAN_VIEN', 2),
-(15, 'Tạ Thị Quỳnh Ngọc', 'tathiquynhngoc@ufm.edu.vn', '$2y$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', 'NHAN_VIEN', 2),
-(16, 'Huỳnh Thị Thanh Ri', 'huynhthithanhri@ufm.edu.vn', '$2y$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', 'NHAN_VIEN', 2),
-(17, 'Võ Văn Thảo', 'vovanthao@ufm.edu.vn', '$2y$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', 'NHAN_VIEN', 2),
-(18, 'Nguyễn Thị Thu Thủy', 'nguyenthithuthuy@ufm.edu.vn', '$2y$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', 'NHAN_VIEN', 2),
-(19, 'Diệp Quỳnh Trâm', 'diepquynhtram@ufm.edu.vn', '$2y$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', 'NHAN_VIEN', 2),
-(20, 'Lê Thị Tuyết Dung', 'tuyetdung.le@ufm.edu.vn', '$2y$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', 'NHAN_VIEN', 2),
-(21, 'Nguyễn Thị Quỳnh Duyên', 'nguyenquynhduyen@ufm.edu.vn', '$2y$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', 'NHAN_VIEN', 2),
-(22, 'Đặng Duy Thanh Hương', 'dangduythanhhuong@ufm.edu.vn', '$2y$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', 'NHAN_VIEN', 2);
+(11, 'Phạm Hoài Nam', 'phamhoainam@ufm.edu.vn', '$2y$10$nqS0vtSgJqksgXn8g2LeK.j9Nt40MF5zfx.x18ToNBMhSKYBBKqJC', 'TRUONG_PHONG', 2),
+(12, 'Huỳnh Ngọc Nghiêm', 'huynhngocnghiem@ufm.edu.vn', '$2y$10$nqS0vtSgJqksgXn8g2LeK.j9Nt40MF5zfx.x18ToNBMhSKYBBKqJC', 'TRUONG_PHONG', 2),
+(13, 'Trần Quang Hải', 'tranquanghai@ufm.edu.vn', '$2y$10$nqS0vtSgJqksgXn8g2LeK.j9Nt40MF5zfx.x18ToNBMhSKYBBKqJC', 'TRUONG_PHONG', 2),
+(14, 'Phạm Thị Thu Hảo', 'phamthuhao@ufm.edu.vn', '$2y$10$nqS0vtSgJqksgXn8g2LeK.j9Nt40MF5zfx.x18ToNBMhSKYBBKqJC', 'NHAN_VIEN', 2),
+(15, 'Tạ Thị Quỳnh Ngọc', 'tathiquynhngoc@ufm.edu.vn', '$2y$10$nqS0vtSgJqksgXn8g2LeK.j9Nt40MF5zfx.x18ToNBMhSKYBBKqJC', 'NHAN_VIEN', 2),
+(16, 'Huỳnh Thị Thanh Ri', 'huynhthithanhri@ufm.edu.vn', '$2y$10$nqS0vtSgJqksgXn8g2LeK.j9Nt40MF5zfx.x18ToNBMhSKYBBKqJC', 'NHAN_VIEN', 2),
+(17, 'Võ Văn Thảo', 'vovanthao@ufm.edu.vn', '$2y$10$nqS0vtSgJqksgXn8g2LeK.j9Nt40MF5zfx.x18ToNBMhSKYBBKqJC', 'NHAN_VIEN', 2),
+(18, 'Nguyễn Thị Thu Thủy', 'nguyenthithuthuy@ufm.edu.vn', '$2y$10$nqS0vtSgJqksgXn8g2LeK.j9Nt40MF5zfx.x18ToNBMhSKYBBKqJC', 'NHAN_VIEN', 2),
+(19, 'Diệp Quỳnh Trâm', 'diepquynhtram@ufm.edu.vn', '$2y$10$nqS0vtSgJqksgXn8g2LeK.j9Nt40MF5zfx.x18ToNBMhSKYBBKqJC', 'NHAN_VIEN', 2),
+(20, 'Lê Thị Tuyết Dung', 'tuyetdung.le@ufm.edu.vn', '$2y$10$nqS0vtSgJqksgXn8g2LeK.j9Nt40MF5zfx.x18ToNBMhSKYBBKqJC', 'NHAN_VIEN', 2),
+(21, 'Nguyễn Thị Quỳnh Duyên', 'nguyenquynhduyen@ufm.edu.vn', '$2y$10$nqS0vtSgJqksgXn8g2LeK.j9Nt40MF5zfx.x18ToNBMhSKYBBKqJC', 'NHAN_VIEN', 2),
+(22, 'Đặng Duy Thanh Hương', 'dangduythanhhuong@ufm.edu.vn', '$2y$10$nqS0vtSgJqksgXn8g2LeK.j9Nt40MF5zfx.x18ToNBMhSKYBBKqJC', 'NHAN_VIEN', 2);
 
 -- 3. Insert Tasks
 INSERT INTO `tasks` (`id`, `title`, `description`, `department_id`, `status`, `priority`, `progress`, `proof_link`, `start_date`, `due_date`, `created_by`, `created_at`) VALUES
