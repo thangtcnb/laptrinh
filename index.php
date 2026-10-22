@@ -7,13 +7,30 @@ $flashSuccess = $_SESSION['flash_success'] ?? null;
 $flashError = $_SESSION['flash_error'] ?? null;
 unset($_SESSION['flash_success'], $_SESSION['flash_error']);
 
-// Filters parameters - default dept_filter to MY_TASKS if not explicitly set
+// Filters parameters - Default homepage view based on user role:
+// For TRUONG_PHONG: Default to their department ID ("DANH SÁCH CÔNG VIỆC PHÒNG [TÊN PHÒNG]")
+// For others: Default to 'MY_TASKS'
+$defaultDeptFilter = 'MY_TASKS';
+if (isset($currentUser['role']) && $currentUser['role'] === 'TRUONG_PHONG') {
+    $defaultDeptFilter = $currentUser['department_id'];
+}
+
 $filters = [
     'date_from' => $_GET['date_from'] ?? '',
     'date_to' => $_GET['date_to'] ?? '',
-    'dept_filter' => $_GET['dept_filter'] ?? 'MY_TASKS',
+    'dept_filter' => $_GET['dept_filter'] ?? $defaultDeptFilter,
     'status' => $_GET['status'] ?? ''
 ];
+
+// Backend Date Filter Validation: "Từ ngày" must be <= "Đến ngày"
+if (!empty($filters['date_from']) && !empty($filters['date_to'])) {
+    if (strtotime($filters['date_from']) > strtotime($filters['date_to'])) {
+        $flashError = 'Lỗi lọc dữ liệu: Ngày bắt đầu (Từ ngày) phải nhỏ hơn hoặc bằng Ngày kết thúc (Đến ngày)!';
+        // Reset dates so invalid query is not executed
+        $filters['date_from'] = '';
+        $filters['date_to'] = '';
+    }
+}
 
 $page = max(1, (int)($_GET['page'] ?? 1));
 $limit = 15;
@@ -72,7 +89,7 @@ $usersList = getUsers($pdo);
         </div>
     </div>
 
-    <form method="GET" action="index.php" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
+    <form method="GET" action="index.php" onsubmit="return validateDateFilter(this)" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
         <!-- Date From -->
         <div>
             <label class="block text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-1">Từ ngày</label>
@@ -295,8 +312,18 @@ $usersList = getUsers($pdo);
                                         </button>
                                     <?php endif; ?>
 
-                                    <!-- Delete Button -->
-                                    <?php if ($isBgd || $isLeaderOfDept || ($currentUser['role'] === 'NHAN_VIEN' && $isCreator && $t['status'] === 'CHO_DUYET')): ?>
+                                    <!-- Delete Button (Trưởng/Phó phòng KHÔNG có quyền xóa công việc của nhân viên trong phòng) -->
+                                    <?php
+                                    $canShowDelete = false;
+                                    if ($isBgd || $currentUser['role'] === 'SUPER_ADMIN') {
+                                        $canShowDelete = true;
+                                    } elseif ($currentUser['role'] === 'TRUONG_PHONG' && $isCreator && ($t['status'] === 'CHO_DUYET' || $t['status'] === 'CHO_BGD_DUYET')) {
+                                        $canShowDelete = true;
+                                    } elseif ($currentUser['role'] === 'NHAN_VIEN' && $isCreator && $t['status'] === 'CHO_DUYET') {
+                                        $canShowDelete = true;
+                                    }
+                                    ?>
+                                    <?php if ($canShowDelete): ?>
                                         <a href="task_actions.php?action=delete&task_id=<?= $t['id'] ?>" onclick="return confirm('Bạn có chắc chắn muốn xóa công việc này không?');" class="p-1.5 bg-rose-50 hover:bg-rose-600 text-rose-600 hover:text-white rounded-lg transition" title="Xóa">
                                             <i class="fa-solid fa-trash text-xs"></i>
                                         </a>
@@ -638,6 +665,17 @@ function filterCoopUsersByDeptModal() {
             opt.style.display = 'none';
         }
     });
+}
+
+function validateDateFilter(form) {
+    const dateFrom = form.date_from ? form.date_from.value : '';
+    const dateTo = form.date_to ? form.date_to.value : '';
+
+    if (dateFrom && dateTo && dateFrom > dateTo) {
+        alert('Cảnh báo: Ô "Từ ngày" phải nhỏ hơn hoặc bằng ô "Đến ngày"!\nVui lòng chọn lại khoảng thời gian hợp lệ.');
+        return false;
+    }
+    return true;
 }
 </script>
 

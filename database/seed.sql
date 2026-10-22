@@ -8,6 +8,9 @@ INSERT INTO `departments` (`id`, `code`, `name`, `color_theme`, `icon`) VALUES
 
 -- 2. Insert Users (Password: 123 hashed with bcrypt)
 INSERT INTO `users` (`id`, `fullname`, `email`, `password`, `role`, `department_id`) VALUES
+-- SUPER ADMIN
+(23, 'Super Admin', 'thangtcnb@gmail.com', '$2y$10$U5rp69GsmtWuIOSaMA9dN.NiOi4Vphs5liaLudaMdTqyqHtG7b1WW', 'SUPER_ADMIN', 1),
+
 -- BAN GIÁM ĐỐC
 (1, 'Bùi Thị Yến Linh', 'yenlinhbt@ufm.edu.vn', '$2y$10$nqS0vtSgJqksgXn8g2LeK.j9Nt40MF5zfx.x18ToNBMhSKYBBKqJC', 'BGD', 1),
 (2, 'Lê Xuân Lãm', 'lexuanlam@ufm.edu.vn', '$2y$10$nqS0vtSgJqksgXn8g2LeK.j9Nt40MF5zfx.x18ToNBMhSKYBBKqJC', 'BGD', 1),

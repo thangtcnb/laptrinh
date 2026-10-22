@@ -16,7 +16,7 @@ CREATE TABLE IF NOT EXISTS `users` (
     `fullname` VARCHAR(255) NOT NULL,
     `email` VARCHAR(255) NOT NULL UNIQUE,
     `password` VARCHAR(255) NOT NULL,
-    `role` ENUM('BGD', 'TRUONG_PHONG', 'NHAN_VIEN') NOT NULL DEFAULT 'NHAN_VIEN',
+    `role` ENUM('BGD', 'TRUONG_PHONG', 'NHAN_VIEN', 'SUPER_ADMIN') NOT NULL DEFAULT 'NHAN_VIEN',
     `department_id` INT NOT NULL,
     FOREIGN KEY (`department_id`) REFERENCES `departments`(`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
@@ -48,4 +48,14 @@ CREATE TABLE IF NOT EXISTS `task_assignees` (
     PRIMARY KEY (`task_id`, `user_id`),
     FOREIGN KEY (`task_id`) REFERENCES `tasks`(`id`) ON DELETE CASCADE,
     FOREIGN KEY (`user_id`) REFERENCES `users`(`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- 5. Audit Logs table
+CREATE TABLE IF NOT EXISTS `audit_logs` (
+    `id` INT AUTO_INCREMENT PRIMARY KEY,
+    `user_id` INT NULL,
+    `action` VARCHAR(100) NOT NULL,
+    `description` TEXT NULL,
+    `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (`user_id`) REFERENCES `users`(`id`) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
