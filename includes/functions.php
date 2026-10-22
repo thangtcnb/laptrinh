@@ -130,6 +130,16 @@ function renderPriorityBadge($priority) {
     }
 }
 
+// Helper function to record audit logs
+function logActivity($pdo, $userId, $action, $description = null) {
+    try {
+        $stmt = $pdo->prepare("INSERT INTO audit_logs (user_id, action, description) VALUES (?, ?, ?)");
+        $stmt->execute([$userId, $action, $description]);
+    } catch (\PDOException $e) {
+        // ignore log error
+    }
+}
+
 // Get tasks query with smart filters and pagination
 function getTasksFiltered($pdo, $filters = [], $limit = 15, $offset = 0, $currentUser = null) {
     $where = ["1=1"];

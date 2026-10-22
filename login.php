@@ -43,7 +43,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 </head>
 <body class="bg-gradient-to-br from-slate-900 via-indigo-950 to-blue-900 min-h-screen flex items-center justify-center p-4">
 
-<div class="max-w-md w-full bg-white rounded-2xl shadow-2xl overflow-hidden border border-slate-200">
+<div class="max-w-lg w-full bg-white rounded-2xl shadow-2xl overflow-hidden border border-slate-200 my-6">
     <div class="bg-gradient-to-r from-blue-900 to-indigo-900 p-6 text-center text-white relative">
         <div class="w-16 h-16 bg-white/10 rounded-full flex items-center justify-center mx-auto mb-3 backdrop-blur-md border border-white/20">
             <i class="fa-solid fa-graduation-cap text-3xl text-blue-200"></i>
@@ -68,7 +68,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     <span class="absolute inset-y-0 left-0 pl-3 flex items-center text-slate-400">
                         <i class="fa-solid fa-envelope"></i>
                     </span>
-                    <input type="email" name="email" required placeholder="example@ufm.edu.vn" value="" class="w-full pl-9 pr-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none">
+                    <input type="email" id="loginEmail" name="email" required placeholder="example@ufm.edu.vn" value="" class="w-full pl-9 pr-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none">
                 </div>
             </div>
 
@@ -78,7 +78,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     <span class="absolute inset-y-0 left-0 pl-3 flex items-center text-slate-400">
                         <i class="fa-solid fa-lock"></i>
                     </span>
-                    <input type="password" name="password" required value="" placeholder="Mật khẩu (mặc định 123)" class="w-full pl-9 pr-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none">
+                    <input type="password" id="loginPassword" name="password" required value="" placeholder="Mật khẩu (mặc định 123)" class="w-full pl-9 pr-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none">
                 </div>
             </div>
 
@@ -87,8 +87,56 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 <span>Đăng nhập</span>
             </button>
         </form>
+
+        <!-- Demo Test Users Block (Demo Test Users) -->
+        <div class="mt-6 pt-5 border-t border-slate-200">
+            <div class="flex items-center justify-between mb-3">
+                <span class="text-xs font-bold text-slate-700 uppercase tracking-wider flex items-center gap-1.5">
+                    <i class="fa-solid fa-users-viewfinder text-indigo-600"></i>
+                    <span>Tài khoản thử nghiệm (Demo)</span>
+                </span>
+                <span class="text-[11px] bg-indigo-50 text-indigo-700 px-2 py-0.5 rounded-full font-bold">Mật khẩu: 123</span>
+            </div>
+
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
+                <!-- 1. Ban Giám đốc -->
+                <button type="button" onclick="fillLogin('yenlinhbt@ufm.edu.vn', '123')" class="text-left p-2.5 rounded-xl border border-slate-200 bg-slate-50 hover:bg-indigo-50 hover:border-indigo-300 transition group">
+                    <div class="font-bold text-slate-800 group-hover:text-indigo-900">1. Ban Giám đốc</div>
+                    <div class="text-slate-600 text-[11px] font-semibold">Bùi Thị Yến Linh</div>
+                    <div class="text-slate-400 text-[10px] truncate">yenlinhbt@ufm.edu.vn</div>
+                </button>
+
+                <!-- 2. Trưởng phòng -->
+                <button type="button" onclick="fillLogin('phamhoainam@ufm.edu.vn', '123')" class="text-left p-2.5 rounded-xl border border-slate-200 bg-slate-50 hover:bg-indigo-50 hover:border-indigo-300 transition group">
+                    <div class="font-bold text-slate-800 group-hover:text-indigo-900">2. Trưởng phòng DTT</div>
+                    <div class="text-slate-600 text-[11px] font-semibold">Phạm Hoài Nam</div>
+                    <div class="text-slate-400 text-[10px] truncate">phamhoainam@ufm.edu.vn</div>
+                </button>
+
+                <!-- 3. Nhân viên Phòng DTT -->
+                <button type="button" onclick="fillLogin('nguyenthithuthuy@ufm.edu.vn', '123')" class="text-left p-2.5 rounded-xl border border-slate-200 bg-slate-50 hover:bg-indigo-50 hover:border-indigo-300 transition group">
+                    <div class="font-bold text-slate-800 group-hover:text-indigo-900">3. Nhân viên Phòng DTT</div>
+                    <div class="text-slate-600 text-[11px] font-semibold">Nguyễn Thị Thu Thủy</div>
+                    <div class="text-slate-400 text-[10px] truncate">nguyenthithuthuy@ufm.edu.vn</div>
+                </button>
+
+                <!-- 4. Nhân viên Phòng HCTV -->
+                <button type="button" onclick="fillLogin('huynhthianhtung@ufm.edu.vn', '123')" class="text-left p-2.5 rounded-xl border border-slate-200 bg-slate-50 hover:bg-indigo-50 hover:border-indigo-300 transition group">
+                    <div class="font-bold text-slate-800 group-hover:text-indigo-900">4. Nhân viên Phòng HCTV</div>
+                    <div class="text-slate-600 text-[11px] font-semibold">Huỳnh Thị Anh Tùng</div>
+                    <div class="text-slate-400 text-[10px] truncate">huynhthianhtung@ufm.edu.vn</div>
+                </button>
+            </div>
+        </div>
     </div>
 </div>
+
+<script>
+function fillLogin(email, password) {
+    document.getElementById('loginEmail').value = email;
+    document.getElementById('loginPassword').value = password;
+}
+</script>
 
 </body>
 </html>

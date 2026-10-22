@@ -12,6 +12,8 @@ if ($roleLabel === 'TRUONG_PHONG') {
     $roleLabel = 'Nhân viên';
 } elseif ($roleLabel === 'BGD') {
     $roleLabel = 'Ban Giám đốc';
+} elseif ($roleLabel === 'SUPER_ADMIN') {
+    $roleLabel = 'Super Admin';
 }
 ?>
 <!DOCTYPE html>
@@ -100,6 +102,7 @@ if ($roleLabel === 'TRUONG_PHONG') {
             <!-- Current User Info Frame -->
             <div class="flex items-center gap-3 bg-white/10 backdrop-blur-md px-3.5 py-2 rounded-xl border border-white/20">
                 <div class="flex items-center gap-2 text-xs">
+                    <!-- [Badge Role] [Full Name] • [Department Name] -->
                     <span class="px-2 py-0.5 rounded text-xs font-bold bg-amber-500 text-white shadow-sm">
                         <?= htmlspecialchars($roleLabel) ?>
                     </span>
@@ -111,11 +114,19 @@ if ($roleLabel === 'TRUONG_PHONG') {
                     </span>
                 </div>
 
-                <!-- Logout Button -->
-                <a href="logout.php" class="bg-rose-600 hover:bg-rose-700 text-white px-3 py-1.5 rounded-lg text-xs font-semibold transition flex items-center gap-1.5 shadow" title="Đăng xuất">
-                    <i class="fa-solid fa-right-from-bracket"></i>
-                    <span>Đăng xuất</span>
-                </a>
+                <div class="flex items-center gap-1.5 border-l border-white/20 pl-2">
+                    <!-- Change Password Button (NGAY TRƯỚC nút Đăng xuất) -->
+                    <a href="profile.php" class="bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-1.5 rounded-lg text-xs font-semibold transition flex items-center gap-1.5 shadow" title="Đổi mật khẩu">
+                        <i class="fa-solid fa-key"></i>
+                        <span>Đổi mật khẩu</span>
+                    </a>
+
+                    <!-- Logout Button -->
+                    <a href="logout.php" class="bg-rose-600 hover:bg-rose-700 text-white px-3 py-1.5 rounded-lg text-xs font-semibold transition flex items-center gap-1.5 shadow" title="Đăng xuất">
+                        <i class="fa-solid fa-right-from-bracket"></i>
+                        <span>Đăng xuất</span>
+                    </a>
+                </div>
             </div>
 
         </div>
@@ -146,6 +157,13 @@ if ($roleLabel === 'TRUONG_PHONG') {
                 <i class="fa-solid fa-file-excel"></i>
                 <span>Xuất Báo Cáo & In Ấn</span>
             </a>
+
+            <?php if (isset($currentUser['role']) && $currentUser['role'] === 'SUPER_ADMIN'): ?>
+                <a href="admin.php" class="px-3.5 py-1.5 rounded-lg text-xs font-bold whitespace-nowrap transition flex items-center gap-1.5 <?= $currentPage === 'admin.php' ? 'bg-amber-500 text-white shadow' : 'bg-amber-500/80 hover:bg-amber-500 text-white' ?>">
+                    <i class="fa-solid fa-user-shield"></i>
+                    <span>Quản Trị Hệ Thống (Super Admin)</span>
+                </a>
+            <?php endif; ?>
 
         </div>
     </nav>
