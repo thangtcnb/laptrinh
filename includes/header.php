@@ -12,6 +12,7 @@ $allUsersList = getUsers($pdo);
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title><?= defined('PAGE_TITLE') ? PAGE_TITLE . ' - ' . APP_NAME : APP_NAME ?></title>
+    <link rel="icon" type="image/svg+xml" href="favicon.svg">
     <!-- Tailwind CSS CDN -->
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- FontAwesome 6 CDN -->
@@ -50,7 +51,7 @@ $allUsersList = getUsers($pdo);
 
 <!-- Top Header / Banner -->
 <header class="bg-gradient-to-r from-blue-900 via-indigo-900 to-slate-900 text-white shadow-lg no-print border-b border-indigo-700">
-    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3.5">
+    <div class="w-full px-4 sm:px-6 lg:px-8 py-3.5">
         <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
 
             <!-- Branding -->
@@ -121,10 +122,15 @@ $allUsersList = getUsers($pdo);
 
     <!-- Navigation Bar -->
     <nav class="bg-blue-950/80 border-t border-indigo-800/60 px-4 sm:px-6 lg:px-8">
-        <div class="max-w-7xl mx-auto flex items-center space-x-1 sm:space-x-4 py-2 overflow-x-auto">
+        <div class="w-full flex items-center space-x-1 sm:space-x-4 py-2 overflow-x-auto">
             <?php
             $currentPage = basename($_SERVER['PHP_SELF']);
             ?>
+            <a href="index.php" class="px-3.5 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap transition flex items-center gap-1.5 <?= $currentPage === 'index.php' ? 'bg-indigo-600 text-white shadow' : 'text-slate-200 hover:bg-white/10' ?>">
+                <i class="fa-solid fa-house"></i>
+                <span>Trang Chủ</span>
+            </a>
+
             <a href="index.php" class="px-3.5 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap transition flex items-center gap-1.5 <?= $currentPage === 'index.php' ? 'bg-indigo-600 text-white shadow' : 'text-slate-200 hover:bg-white/10' ?>">
                 <i class="fa-solid fa-table-list"></i>
                 <span>Bảng Danh Sách Công Việc</span>
@@ -143,4 +149,4 @@ $allUsersList = getUsers($pdo);
     </nav>
 </header>
 
-<main class="flex-grow max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6">
+<main class="flex-grow w-full px-4 sm:px-6 lg:px-8 py-6">

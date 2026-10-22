@@ -48,6 +48,7 @@ if (isset($_GET['quick_login_id']) && is_numeric($_GET['quick_login_id'])) {
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Đăng nhập - Hệ thống Quản lý Công việc UFM Quảng Ngãi</title>
+    <link rel="icon" type="image/svg+xml" href="favicon.svg">
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
 </head>
@@ -73,7 +74,7 @@ if (isset($_GET['quick_login_id']) && is_numeric($_GET['quick_login_id'])) {
 
         <form method="POST" action="login.php" class="space-y-4">
             <div>
-                <label class="block text-xs font-semibold text-slate-700 mb-1">Email công vụ</label>
+                <label class="block text-xs font-semibold text-slate-700 mb-1">Email đăng nhập</label>
                 <div class="relative">
                     <span class="absolute inset-y-0 left-0 pl-3 flex items-center text-slate-400">
                         <i class="fa-solid fa-envelope"></i>
@@ -106,24 +107,24 @@ if (isset($_GET['quick_login_id']) && is_numeric($_GET['quick_login_id'])) {
             <div class="grid grid-cols-1 gap-2">
                 <a href="login.php?quick_login_id=1" class="p-2.5 bg-purple-50 hover:bg-purple-100 border border-purple-200 rounded-lg flex items-center justify-between text-xs transition">
                     <div>
-                        <div class="font-bold text-purple-900">1. TS. Nguyễn Văn A</div>
+                        <div class="font-bold text-purple-900">1. Bùi Thị Yến Linh</div>
                         <div class="text-purple-700">Ban Giám đốc (BGD)</div>
                     </div>
                     <span class="px-2 py-1 bg-purple-600 text-white rounded text-[10px] font-bold">BGD</span>
                 </a>
 
-                <a href="login.php?quick_login_id=2" class="p-2.5 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 rounded-lg flex items-center justify-between text-xs transition">
+                <a href="login.php?quick_login_id=11" class="p-2.5 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 rounded-lg flex items-center justify-between text-xs transition">
                     <div>
-                        <div class="font-bold text-emerald-900">2. ThS. Phạm Ngọc Thắng</div>
+                        <div class="font-bold text-emerald-900">2. Phạm Hoài Nam</div>
                         <div class="text-emerald-700">Trưởng Phòng Đào tạo (DTT)</div>
                     </div>
                     <span class="px-2 py-1 bg-emerald-600 text-white rounded text-[10px] font-bold">Trưởng Phòng</span>
                 </a>
 
-                <a href="login.php?quick_login_id=4" class="p-2.5 bg-blue-50 hover:bg-blue-100 border border-blue-200 rounded-lg flex items-center justify-between text-xs transition">
+                <a href="login.php?quick_login_id=6" class="p-2.5 bg-blue-50 hover:bg-blue-100 border border-blue-200 rounded-lg flex items-center justify-between text-xs transition">
                     <div>
                         <div class="font-bold text-blue-900">3. Huỳnh Thị Anh Tùng</div>
-                        <div class="text-blue-700">Nhân viên Phòng Đào tạo (DTT)</div>
+                        <div class="text-blue-700">Nhân viên Phòng Hành chính - Tài vụ (HCTV)</div>
                     </div>
                     <span class="px-2 py-1 bg-blue-600 text-white rounded text-[10px] font-bold">Nhân Viên</span>
                 </a>
