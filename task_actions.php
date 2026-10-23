@@ -84,10 +84,8 @@ if ($action === 'delete') {
     }
 
     $canDelete = false;
-    if ($currentUser['role'] === 'SUPER_ADMIN') {
-        $canDelete = true;
-    } elseif ($task['created_by'] == $currentUser['id'] && ($task['status'] === 'CHO_DUYET' || $task['status'] === 'CHO_BGD_DUYET')) {
-        // Cá nhân người tạo chỉ được xóa công việc do chính mình tạo khi ở trạng thái Chờ duyệt
+    if ($currentUser['role'] === 'SUPER_ADMIN' || $task['created_by'] == $currentUser['id']) {
+        // Cá nhân được quyền xóa công việc do chính mình đã tạo/đăng ký hoặc Super Admin
         $canDelete = true;
     }
 
@@ -97,7 +95,7 @@ if ($action === 'delete') {
         logActivity($pdo, $currentUser['id'], 'DELETE_TASK', "Đã xóa công việc ID #$taskId: {$task['title']}");
         $_SESSION['flash_success'] = "Đã xóa công việc thành công!";
     } else {
-        $_SESSION['flash_error'] = "Ban Giám đốc và Trưởng/Phó phòng không có quyền xóa công việc của cấp dưới/nhân viên!";
+        $_SESSION['flash_error'] = "Bạn chỉ có quyền xóa công việc do chính mình đã tạo!";
     }
     header("Location: index.php");
     exit;
@@ -134,19 +132,11 @@ if ($action === 'save_task') {
             exit;
         }
 
-        // Nhân viên only edits tasks created by themselves in CHO_DUYET status
-        if ($currentUser['role'] === 'NHAN_VIEN') {
-            if ($existingTask['created_by'] != $currentUser['id'] || $existingTask['status'] !== 'CHO_DUYET') {
-                $_SESSION['flash_error'] = "Nhân viên chỉ được phép chỉnh sửa công việc do mình đăng ký ở trạng thái Chờ duyệt!";
-                header("Location: index.php");
-                exit;
-            }
-        } elseif ($currentUser['role'] === 'TRUONG_PHONG' || $currentUser['role'] === 'BGD') {
-            if ($existingTask['created_by'] != $currentUser['id']) {
-                $_SESSION['flash_error'] = "Trưởng phòng/BGD không chỉnh sửa trực tiếp nội dung công việc của nhân viên, hãy sử dụng chức năng 'Duyệt / Cho ý kiến'.";
-                header("Location: index.php");
-                exit;
-            }
+        // Cá nhân được quyền sửa công việc do chính mình tạo/đăng ký
+        if ($currentUser['role'] !== 'SUPER_ADMIN' && $existingTask['created_by'] != $currentUser['id']) {
+            $_SESSION['flash_error'] = "Bạn chỉ có quyền chỉnh sửa công việc do chính mình đã tạo!";
+            header("Location: index.php");
+            exit;
         }
 
         // Edit existing task
@@ -197,11 +187,11 @@ if ($action === 'save_task') {
     exit;
 }
 
-// 5. RESPOND TO ASSIGNED TASK (ACCEPT / REJECT) BY NHAN VIEN
+// 5. RESPOND TO ASSIGNED TASK (ACCEPT / OTHER OPINIONS "Ý KIẾN KHÁC") BY NHAN VIEN
 if ($action === 'respond_assigned_task') {
     $taskId = (int)($_POST['task_id'] ?? 0);
     $response = $_POST['response'] ?? '';
-    $rejectionReason = trim($_POST['rejection_reason'] ?? '');
+    $commentFeedback = trim($_POST['comment_feedback'] ?? '');
 
     // Check task existence & assignment
     $stmtCheck = $pdo->prepare("
@@ -219,20 +209,20 @@ if ($action === 'respond_assigned_task') {
     }
 
     if ($response === 'ACCEPT') {
-        $stmtUpdate = $pdo->prepare("UPDATE tasks SET status = 'DANG_THUC_HIEN', rejection_reason = NULL WHERE id = ?");
+        $stmtUpdate = $pdo->prepare("UPDATE tasks SET status = 'DANG_THUC_HIEN' WHERE id = ?");
         $stmtUpdate->execute([$taskId]);
-        logActivity($pdo, $currentUser['id'], 'ACCEPT_TASK', "Đã đồng ý nhận công việc ID #$taskId: {$task['title']}");
-        $_SESSION['flash_success'] = "Bạn đã đồng ý tiếp nhận công việc! Công việc đã được chuyển sang danh sách 'Công việc của tôi'.";
-    } elseif ($response === 'REJECT') {
-        if (empty($rejectionReason)) {
-            $_SESSION['flash_error'] = "Vui lòng nhập lý do từ chối công việc!";
+        logActivity($pdo, $currentUser['id'], 'ACCEPT_TASK', "Đã tiếp nhận công việc ID #$taskId: {$task['title']}");
+        $_SESSION['flash_success'] = "Bạn đã tiếp nhận công việc thành công!";
+    } elseif ($response === 'FEEDBACK') {
+        if (empty($commentFeedback)) {
+            $_SESSION['flash_error'] = "Vui lòng nhập nội dung ý kiến, đề xuất hoặc vướng mắc!";
             header("Location: index.php");
             exit;
         }
-        $stmtUpdate = $pdo->prepare("UPDATE tasks SET status = 'TU_CHOI_CHO_TP_XAC_NHAN', rejection_reason = ? WHERE id = ?");
-        $stmtUpdate->execute([$rejectionReason, $taskId]);
-        logActivity($pdo, $currentUser['id'], 'REJECT_TASK', "Đã từ chối công việc ID #$taskId: {$task['title']}. Lý do: $rejectionReason");
-        $_SESSION['flash_success'] = "Đã gửi phản hồi từ chối công việc tới Trưởng phòng xem xét xử lý.";
+        $stmtUpdate = $pdo->prepare("UPDATE tasks SET status = 'TU_CHOI_CHO_TP_XAC_NHAN', comment_feedback = ? WHERE id = ?");
+        $stmtUpdate->execute([$commentFeedback, $taskId]);
+        logActivity($pdo, $currentUser['id'], 'FEEDBACK_TASK', "Đã gửi ý kiến khác cho công việc ID #$taskId: {$task['title']}. Ý kiến: $commentFeedback");
+        $_SESSION['flash_success'] = "Đã gửi ý kiến / đề xuất của bạn tới Trưởng phòng xem xét!";
     }
 
     header("Location: index.php");

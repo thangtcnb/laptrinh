@@ -65,7 +65,8 @@ if (!empty($status) && $status !== 'ALL') {
 
 if (strpos($scope, 'DEPT_') === 0) {
     $deptId = (int)str_replace('DEPT_', '', $scope);
-    $where[] = "t.department_id = ?";
+    $where[] = "(t.department_id = ? OR t.id IN (SELECT task_id FROM task_assignees ta JOIN users u ON ta.user_id = u.id WHERE u.department_id = ?))";
+    $params[] = $deptId;
     $params[] = $deptId;
 } elseif (strpos($scope, 'USER_') === 0) {
     $userId = (int)str_replace('USER_', '', $scope);
@@ -104,20 +105,97 @@ if ($exportType === 'excel') {
 
     header("Content-Type: application/vnd.ms-excel; charset=UTF-8");
     header("Content-Disposition: attachment; filename=\"$filename\"");
-    header("Pragma: no-cache");
+    header("Cache-Control: max-age=0");
+    header("Pragma: public");
     header("Expires: 0");
 
     echo "\xEF\xBB\xBF"; // UTF-8 BOM
+
+    // Split tasks into Part 1 (MAIN) and Part 2 (COOP)
+    $part1Tasks = [];
+    $part2Tasks = [];
+
+    if (strpos($scope, 'USER_') === 0) {
+        $targetUserId = (int)str_replace('USER_', '', $scope);
+        foreach ($allTasksForExcel as $t) {
+            $mains = array_filter($t['assignees'], fn($a) => $a['role_type'] === 'MAIN');
+            $coops = array_filter($t['assignees'], fn($a) => $a['role_type'] === 'COOP');
+
+            $isMain = in_array($targetUserId, array_column($mains, 'user_id'));
+            $isCoop = in_array($targetUserId, array_column($coops, 'user_id'));
+
+            if ($isMain) {
+                $part1Tasks[] = $t;
+            }
+            if ($isCoop) {
+                $part2Tasks[] = $t;
+            }
+        }
+    } elseif (strpos($scope, 'DEPT_') === 0) {
+        $targetDeptId = (int)str_replace('DEPT_', '', $scope);
+        $deptUserIds = array_column(getUsers($pdo, $targetDeptId), 'id');
+        foreach ($allTasksForExcel as $t) {
+            $mains = array_filter($t['assignees'], fn($a) => $a['role_type'] === 'MAIN');
+            $coops = array_filter($t['assignees'], fn($a) => $a['role_type'] === 'COOP');
+
+            $mainUserIds = array_column($mains, 'user_id');
+            $coopUserIds = array_column($coops, 'user_id');
+
+            $hasDeptMain = !empty(array_intersect($deptUserIds, $mainUserIds)) || ($t['department_id'] == $targetDeptId);
+            $hasDeptCoop = !empty(array_intersect($deptUserIds, $coopUserIds));
+
+            if ($hasDeptMain) {
+                $part1Tasks[] = $t;
+            }
+            if ($hasDeptCoop) {
+                $part2Tasks[] = $t;
+            }
+        }
+    } else {
+        foreach ($allTasksForExcel as $t) {
+            $coops = array_filter($t['assignees'], fn($a) => $a['role_type'] === 'COOP');
+
+            $part1Tasks[] = $t;
+            if (!empty($coops)) {
+                $part2Tasks[] = $t;
+            }
+        }
+    }
+
+    $statusMap = [
+        'CHO_DUYET' => 'Chờ Trưởng phòng duyệt',
+        'CHO_BGD_DUYET' => 'Chờ BGD duyệt',
+        'CHO_XAC_NHAN' => 'Chờ NV xác nhận',
+        'TU_CHOI_CHO_TP_XAC_NHAN' => 'Từ chối - Chờ TP xác nhận',
+        'DANG_THUC_HIEN' => 'Đang thực hiện',
+        'HOAN_THANH' => 'Hoàn thành'
+    ];
     ?>
     <html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns="http://www.w3.org/TR/REC-html40">
     <head>
         <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+        <!--[if gte mso 9]>
+        <xml>
+         <x:ExcelWorkbook>
+          <x:ExcelWorksheets>
+           <x:ExcelWorksheet>
+            <x:Name>Bao Cao Cong Viec</x:Name>
+            <x:WorksheetOptions>
+             <x:DisplayGridlines/>
+            </x:WorksheetOptions>
+           </x:ExcelWorksheet>
+          </x:ExcelWorksheets>
+         </x:ExcelWorkbook>
+        </xml>
+        <![endif]-->
         <style>
-            table { border-collapse: collapse; width: 100%; font-family: Arial, sans-serif; font-size: 12px; }
-            th { background-color: #1e3a8a; color: #ffffff; font-weight: bold; padding: 10px; border: 1px solid #000; text-align: center; }
-            td { padding: 8px; border: 1px solid #ccc; vertical-align: top; }
+            body { font-family: Arial, sans-serif; font-size: 12px; }
+            table { border-collapse: collapse; width: 100%; margin-bottom: 25px; }
+            th { background-color: #1e3a8a; color: #ffffff; font-weight: bold; padding: 10px; border: 1px solid #000000; text-align: center; }
+            td { padding: 8px; border: 1px solid #cccccc; vertical-align: top; }
             .header-title { font-size: 16px; font-weight: bold; text-align: center; color: #1e3a8a; }
             .sub-title { font-size: 13px; font-weight: bold; text-align: center; }
+            .section-banner { background-color: #0f172a; color: #ffffff; font-size: 13px; font-weight: bold; padding: 10px; text-align: left; }
         </style>
     </head>
     <body>
@@ -126,70 +204,141 @@ if ($exportType === 'excel') {
         <div style="text-align: center; font-size: 14px; font-weight: bold; margin: 10px 0;">
             BÁO CÁO KẾT QUẢ THỰC HIỆN CÔNG VIỆC
         </div>
-        <div style="text-align: center; font-style: italic; margin-bottom: 15px;">
+        <div style="text-align: center; font-style: italic; margin-bottom: 20px;">
             Từ ngày <?= date('d/m/Y', strtotime($dateFrom)) ?> đến ngày <?= date('d/m/Y', strtotime($dateTo)) ?>
         </div>
 
+        <!-- PHẦN 1: CÔNG VIỆC CHÍNH -->
         <table>
             <thead>
                 <tr>
+                    <th colspan="6" class="section-banner">PHẦN 1: CÔNG VIỆC CHÍNH (CÁ NHÂN PHỤ TRÁCH CHÍNH)</th>
+                </tr>
+                <tr>
+                    <th style="width: 5%;">STT</th>
                     <th style="width: 25%;">1. Người phụ trách (Chính & Phối hợp)</th>
                     <th style="width: 30%;">2. Tên công việc (Nội dung)</th>
                     <th style="width: 15%;">3. Thời gian thực hiện</th>
-                    <th style="width: 15%;">4. Trạng thái</th>
+                    <th style="width: 10%;">4. Trạng thái</th>
                     <th style="width: 15%;">5. Minh chứng (Link Google Drive)</th>
                 </tr>
             </thead>
             <tbody>
-                <?php
-                $statusMap = [
-                    'CHO_DUYET' => 'Chờ Trưởng phòng duyệt',
-                    'CHO_BGD_DUYET' => 'Chờ BGD duyệt',
-                    'CHO_XAC_NHAN' => 'Chờ NV xác nhận',
-                    'TU_CHOI_CHO_TP_XAC_NHAN' => 'Từ chối - Chờ TP xác nhận',
-                    'DANG_THUC_HIEN' => 'Đang thực hiện',
-                    'HOAN_THANH' => 'Hoàn thành'
-                ];
+                <?php if (!empty($part1Tasks)): ?>
+                    <?php
+                    $stt1 = 1;
+                    foreach ($part1Tasks as $t):
+                        $mains = array_filter($t['assignees'], fn($a) => $a['role_type'] === 'MAIN');
+                        $coops = array_filter($t['assignees'], fn($a) => $a['role_type'] === 'COOP');
+                        $mainNames = implode(', ', array_column($mains, 'fullname'));
+                        $coopNames = implode(', ', array_column($coops, 'fullname'));
 
-                foreach ($allTasksForExcel as $t):
-                    $mains = array_filter($t['assignees'], fn($a) => $a['role_type'] === 'MAIN');
-                    $coops = array_filter($t['assignees'], fn($a) => $a['role_type'] === 'COOP');
-                    $mainNames = implode(', ', array_column($mains, 'fullname'));
-                    $coopNames = implode(', ', array_column($coops, 'fullname'));
+                        $assigneeText = $mainNames;
+                        if (!empty($coopNames)) {
+                            $assigneeText .= " (Phối hợp: " . $coopNames . ")";
+                        }
+                        if (empty($assigneeText)) {
+                            $assigneeText = "Chưa phân công";
+                        }
 
-                    $assigneeText = $mainNames;
-                    if (!empty($coopNames)) {
-                        $assigneeText .= " (Phối hợp: " . $coopNames . ")";
-                    }
-                    if (empty($assigneeText)) {
-                        $assigneeText = "Chưa phân công";
-                    }
+                        $startDateFmt = !empty($t['start_date']) ? date('d/m/Y', strtotime($t['start_date'])) : '';
+                        $dueDateFmt = !empty($t['due_date']) ? date('d/m/Y', strtotime($t['due_date'])) : '';
+                        if (!empty($startDateFmt) && !empty($dueDateFmt)) {
+                            $timeStr = $startDateFmt . ' - ' . $dueDateFmt;
+                        } elseif (!empty($dueDateFmt)) {
+                            $timeStr = $dueDateFmt;
+                        } else {
+                            $timeStr = '---';
+                        }
 
-                    $startDateFmt = !empty($t['start_date']) ? date('d/m/Y', strtotime($t['start_date'])) : '';
-                    $dueDateFmt = !empty($t['due_date']) ? date('d/m/Y', strtotime($t['due_date'])) : '';
-                    if (!empty($startDateFmt) && !empty($dueDateFmt)) {
-                        $timeStr = $startDateFmt . ' - ' . $dueDateFmt;
-                    } elseif (!empty($dueDateFmt)) {
-                        $timeStr = $dueDateFmt;
-                    } else {
-                        $timeStr = '---';
-                    }
-
-                    $statusText = $statusMap[$t['status']] ?? $t['status'];
-                ?>
+                        $statusText = $statusMap[$t['status']] ?? $t['status'];
+                    ?>
+                        <tr>
+                            <td style="text-align: center; font-weight: bold;"><?= $stt1++ ?></td>
+                            <td><?= htmlspecialchars($assigneeText) ?></td>
+                            <td>
+                                <strong><?= htmlspecialchars($t['title']) ?></strong>
+                                <?php if (!empty($t['description'])): ?>
+                                    <br/><span style="color: #555; font-size: 11px;"><?= htmlspecialchars($t['description']) ?></span>
+                                <?php endif; ?>
+                            </td>
+                            <td style="text-align: center;"><?= htmlspecialchars($timeStr) ?></td>
+                            <td style="text-align: center;"><?= htmlspecialchars($statusText) ?></td>
+                            <td><?= htmlspecialchars($t['proof_link'] ?? '') ?></td>
+                        </tr>
+                    <?php endforeach; ?>
+                <?php else: ?>
                     <tr>
-                        <td><?= htmlspecialchars($assigneeText) ?></td>
-                        <td>
-                            <strong><?= htmlspecialchars($t['title']) ?></strong>
-                            <?php if (!empty($t['description'])): ?>
-                                <br/><span style="color: #555; font-size: 11px;"><?= htmlspecialchars($t['description']) ?></span>
-                            <?php endif; ?>
-                        </td>
-                        <td style="text-align: center;"><?= htmlspecialchars($timeStr) ?></td>
-                        <td style="text-align: center;"><?= htmlspecialchars($statusText) ?></td>
-                        <td><?= htmlspecialchars($t['proof_link'] ?? '') ?></td>
+                        <td colspan="6" style="text-align: center; color: #888; font-style: italic;">Không có công việc chính nào trong thời gian này.</td>
                     </tr>
-                <?php endforeach; ?>
+                <?php endif; ?>
+            </tbody>
+        </table>
+
+        <!-- PHẦN 2: CÔNG VIỆC PHỐI HỢP -->
+        <table>
+            <thead>
+                <tr>
+                    <th colspan="6" class="section-banner">PHẦN 2: CÔNG VIỆC PHỐI HỢP (CÁ NHÂN TỔ CHỨC/THAM GIA PHỐI HỢP)</th>
+                </tr>
+                <tr>
+                    <th style="width: 5%;">STT</th>
+                    <th style="width: 25%;">1. Người phụ trách (Chính & Phối hợp)</th>
+                    <th style="width: 30%;">2. Tên công việc (Nội dung)</th>
+                    <th style="width: 15%;">3. Thời gian thực hiện</th>
+                    <th style="width: 10%;">4. Trạng thái</th>
+                    <th style="width: 15%;">5. Minh chứng (Link Google Drive)</th>
+                </tr>
+            </thead>
+            <tbody>
+                <?php if (!empty($part2Tasks)): ?>
+                    <?php
+                    $stt2 = 1;
+                    foreach ($part2Tasks as $t):
+                        $mains = array_filter($t['assignees'], fn($a) => $a['role_type'] === 'MAIN');
+                        $coops = array_filter($t['assignees'], fn($a) => $a['role_type'] === 'COOP');
+                        $mainNames = implode(', ', array_column($mains, 'fullname'));
+                        $coopNames = implode(', ', array_column($coops, 'fullname'));
+
+                        $assigneeText = $mainNames;
+                        if (!empty($coopNames)) {
+                            $assigneeText .= " (Phối hợp: " . $coopNames . ")";
+                        }
+                        if (empty($assigneeText)) {
+                            $assigneeText = "Chưa phân công";
+                        }
+
+                        $startDateFmt = !empty($t['start_date']) ? date('d/m/Y', strtotime($t['start_date'])) : '';
+                        $dueDateFmt = !empty($t['due_date']) ? date('d/m/Y', strtotime($t['due_date'])) : '';
+                        if (!empty($startDateFmt) && !empty($dueDateFmt)) {
+                            $timeStr = $startDateFmt . ' - ' . $dueDateFmt;
+                        } elseif (!empty($dueDateFmt)) {
+                            $timeStr = $dueDateFmt;
+                        } else {
+                            $timeStr = '---';
+                        }
+
+                        $statusText = $statusMap[$t['status']] ?? $t['status'];
+                    ?>
+                        <tr>
+                            <td style="text-align: center; font-weight: bold;"><?= $stt2++ ?></td>
+                            <td><?= htmlspecialchars($assigneeText) ?></td>
+                            <td>
+                                <strong><?= htmlspecialchars($t['title']) ?></strong>
+                                <?php if (!empty($t['description'])): ?>
+                                    <br/><span style="color: #555; font-size: 11px;"><?= htmlspecialchars($t['description']) ?></span>
+                                <?php endif; ?>
+                            </td>
+                            <td style="text-align: center;"><?= htmlspecialchars($timeStr) ?></td>
+                            <td style="text-align: center;"><?= htmlspecialchars($statusText) ?></td>
+                            <td><?= htmlspecialchars($t['proof_link'] ?? '') ?></td>
+                        </tr>
+                    <?php endforeach; ?>
+                <?php else: ?>
+                    <tr>
+                        <td colspan="6" style="text-align: center; color: #888; font-style: italic;">Không có công việc phối hợp nào trong thời gian này.</td>
+                    </tr>
+                <?php endif; ?>
             </tbody>
         </table>
     </body>

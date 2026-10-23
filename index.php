@@ -49,7 +49,12 @@ $totalPages = $result['total_pages'];
 
 // Data for dropdowns
 $departmentsList = getDepartments($pdo);
-$usersList = getUsers($pdo);
+$usersList = getUsers($pdo); // All users for filters & admin views
+$assignableUsers = getUsers($pdo, null, true); // Exclude Super Admin from assignments
+$deptEmployeesForMain = ($currentUser['role'] === 'TRUONG_PHONG')
+    ? getUsers($pdo, $currentUser['department_id'], true)
+    : $assignableUsers;
+$coopUsersList = array_filter($assignableUsers, fn($u) => $u['role'] !== 'BGD'); // Exclude BGD from COOP
 
 // Check if current logged-in user (Nhân viên) has pending assigned tasks (CHO_XAC_NHAN)
 $pendingAssignedTasks = [];
@@ -66,7 +71,50 @@ if ($currentUser['role'] === 'NHAN_VIEN') {
     $stmtPending->execute([$currentUser['id']]);
     $pendingAssignedTasks = $stmtPending->fetchAll();
 }
+
+// Check if current logged-in user (Trưởng/Phó phòng) has pending approval tasks (CHO_DUYET) from their department
+$pendingApprovalTasksForDept = [];
+if ($currentUser['role'] === 'TRUONG_PHONG') {
+    $stmtDeptPending = $pdo->prepare("
+        SELECT t.*, u.fullname AS creator_name
+        FROM tasks t
+        JOIN users u ON t.created_by = u.id
+        WHERE t.department_id = ? AND t.status = 'CHO_DUYET' AND t.created_by != ?
+        ORDER BY t.id DESC
+    ");
+    $stmtDeptPending->execute([$currentUser['department_id'], $currentUser['id']]);
+    $pendingApprovalTasksForDept = $stmtDeptPending->fetchAll();
+}
 ?>
+
+<!-- WORKFLOW NOTIFICATION BANNER FOR TRƯỞNG/PHÓ PHÒNG: PENDING APPROVAL TASKS REGISTERED BY EMPLOYEES -->
+<?php if (count($pendingApprovalTasksForDept) > 0): ?>
+    <div class="mb-6 bg-gradient-to-r from-blue-700 via-indigo-700 to-indigo-900 rounded-2xl p-5 text-white shadow-xl relative overflow-hidden border border-indigo-400">
+        <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
+            <div class="flex items-start gap-3">
+                <div class="w-12 h-12 rounded-xl bg-white/20 backdrop-blur-md flex items-center justify-center shrink-0 text-amber-300">
+                    <i class="fa-solid fa-clipboard-question text-2xl animate-pulse"></i>
+                </div>
+                <div>
+                    <span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-amber-400/30 text-amber-200 text-xs font-bold uppercase tracking-wider mb-1">
+                        <i class="fa-solid fa-bell"></i> THÔNG BÁO CÔNG VIỆC CẦN DUYỆT
+                    </span>
+                    <h3 class="text-base md:text-lg font-bold text-white">
+                        Phòng bạn có <span class="underline underline-offset-4 decoration-2 decoration-amber-300 font-extrabold text-amber-200"><?= count($pendingApprovalTasksForDept) ?> công việc mới</span> do nhân viên đăng ký đang chờ phê duyệt!
+                    </h3>
+                    <p class="text-xs text-indigo-100 mt-0.5">Vui lòng xem chi tiết nội dung và thực hiện Duyệt / Cho ý kiến chỉ đạo.</p>
+                </div>
+            </div>
+
+            <div>
+                <a href="index.php?dept_filter=<?= $currentUser['department_id'] ?>&status=CHO_DUYET" class="bg-white text-indigo-900 hover:bg-indigo-50 font-bold px-5 py-2.5 rounded-xl text-xs shadow-lg transition flex items-center gap-2 transform hover:scale-105">
+                    <i class="fa-solid fa-list-check text-indigo-600 text-sm"></i>
+                    <span>Xem danh sách cần duyệt</span>
+                </a>
+            </div>
+        </div>
+    </div>
+<?php endif; ?>
 
 <!-- WORKFLOW NOTIFICATION BANNER / MODAL FOR NEWLY ASSIGNED TASKS (NHÂN VIÊN) -->
 <?php if (count($pendingAssignedTasks) > 0): ?>
@@ -83,14 +131,14 @@ if ($currentUser['role'] === 'NHAN_VIEN') {
                     <h3 class="text-base md:text-lg font-bold text-white">
                         Bạn có <span class="underline underline-offset-4 decoration-2 decoration-amber-300 font-extrabold text-amber-200"><?= count($pendingAssignedTasks) ?> công việc mới</span> đang chờ phản hồi tiếp nhận!
                     </h3>
-                    <p class="text-xs text-amber-100 mt-0.5">Vui lòng xem chi tiết nội dung và chọn Đồng ý tiếp nhận hoặc Từ chối kèm lý do.</p>
+                    <p class="text-xs text-amber-100 mt-0.5">Vui lòng xem chi tiết nội dung và chọn Đồng ý tiếp nhận hoặc gửi Ý kiến khác / vướng mắc.</p>
                 </div>
             </div>
 
             <div>
                 <button onclick="openPendingTaskModal()" class="bg-white text-indigo-900 hover:bg-amber-50 font-bold px-5 py-2.5 rounded-xl text-xs shadow-lg transition flex items-center gap-2 transform hover:scale-105">
                     <i class="fa-solid fa-clipboard-check text-indigo-600 text-sm"></i>
-                    <span>Xem & Xác nhận ngay</span>
+                    <span>Xem & Tiếp nhận ngay</span>
                 </button>
             </div>
         </div>
@@ -258,13 +306,13 @@ if ($currentUser['role'] === 'NHAN_VIEN') {
                                     </div>
                                 <?php endif; ?>
 
-                                <?php if (!empty($t['rejection_reason'])): ?>
-                                    <div class="mt-2 bg-rose-50 border-l-4 border-rose-500 rounded-r-xl p-2 text-xs text-rose-950">
-                                        <div class="font-bold text-rose-800 text-[11px] mb-0.5">
-                                            <i class="fa-solid fa-triangle-exclamation text-rose-600 mr-1"></i>LÝ DO TỪ CHỐI:
+                                <?php if (!empty($t['comment_feedback']) || !empty($t['rejection_reason'])): ?>
+                                    <div class="mt-2 bg-amber-50 border-l-4 border-amber-500 rounded-r-xl p-2 text-xs text-amber-950">
+                                        <div class="font-bold text-amber-800 text-[11px] mb-0.5">
+                                            <i class="fa-solid fa-comments text-amber-600 mr-1"></i>Ý KIẾN / ĐỀ XUẤT NGUỜI THỰC HIỆN:
                                         </div>
-                                        <div class="text-rose-900 font-medium">
-                                            <?= htmlspecialchars($t['rejection_reason']) ?>
+                                        <div class="text-slate-800 font-medium">
+                                            <?= htmlspecialchars($t['comment_feedback'] ?: $t['rejection_reason']) ?>
                                         </div>
                                     </div>
                                 <?php endif; ?>
@@ -373,23 +421,15 @@ if ($currentUser['role'] === 'NHAN_VIEN') {
                                         </button>
                                     <?php endif; ?>
 
-                                    <!-- Edit Button (For Nhân viên on CHO_DUYET tasks created by themselves) -->
-                                    <?php if ($currentUser['role'] === 'NHAN_VIEN' && $isCreator && $t['status'] === 'CHO_DUYET'): ?>
+                                    <!-- Edit Button (Cá nhân được quyền sửa công việc do chính mình đã tạo/đăng ký) -->
+                                    <?php if ($isCreator || $currentUser['role'] === 'SUPER_ADMIN'): ?>
                                         <button onclick='openTaskModal(<?= json_encode($t) ?>)' class="p-1.5 bg-amber-50 hover:bg-amber-600 text-amber-600 hover:text-white rounded-lg transition" title="Chỉnh sửa nội dung">
                                             <i class="fa-solid fa-pen-to-square text-xs"></i>
                                         </button>
                                     <?php endif; ?>
 
-                                    <!-- Delete Button: Chỉ dành cho chính cá nhân tạo công việc (khi còn ở trạng thái Chờ duyệt) hoặc Super Admin -->
-                                    <?php
-                                    $canShowDelete = false;
-                                    if ($currentUser['role'] === 'SUPER_ADMIN') {
-                                        $canShowDelete = true;
-                                    } elseif ($isCreator && ($t['status'] === 'CHO_DUYET' || $t['status'] === 'CHO_BGD_DUYET')) {
-                                        $canShowDelete = true;
-                                    }
-                                    ?>
-                                    <?php if ($canShowDelete): ?>
+                                    <!-- Delete Button (Cá nhân được quyền xóa công việc do chính mình đã tạo/đăng ký) -->
+                                    <?php if ($isCreator || $currentUser['role'] === 'SUPER_ADMIN'): ?>
                                         <a href="task_actions.php?action=delete&task_id=<?= $t['id'] ?>" onclick="return confirm('Bạn có chắc chắn muốn xóa công việc này không?');" class="p-1.5 bg-rose-50 hover:bg-rose-600 text-rose-600 hover:text-white rounded-lg transition" title="Xóa">
                                             <i class="fa-solid fa-trash text-xs"></i>
                                         </a>
@@ -471,24 +511,24 @@ if ($currentUser['role'] === 'NHAN_VIEN') {
                         <input type="hidden" name="task_id" value="<?= $pt['id'] ?>">
 
                         <div id="reject_reason_box_<?= $pt['id'] ?>" class="hidden">
-                            <label class="block text-xs font-bold text-rose-700 mb-1">Nhập Lý do từ chối (Bắt buộc) <span class="text-rose-500">*</span></label>
-                            <textarea name="rejection_reason" id="reject_input_<?= $pt['id'] ?>" rows="2" placeholder="Vui lòng nêu rõ lý do từ chối công việc này..." class="w-full p-2.5 border border-rose-300 rounded-xl text-xs focus:ring-2 focus:ring-rose-500 outline-none font-medium"></textarea>
+                            <label class="block text-xs font-bold text-amber-700 mb-1">Nhập Ý kiến khác / Đề xuất / Vướng mắc (Bắt buộc) <span class="text-rose-500">*</span></label>
+                            <textarea name="comment_feedback" id="reject_input_<?= $pt['id'] ?>" rows="2" placeholder="Vui lòng nhập trực tiếp các ý kiến, đề xuất hoặc vướng mắc cá nhân..." class="w-full p-2.5 border border-amber-300 rounded-xl text-xs focus:ring-2 focus:ring-amber-500 outline-none font-medium"></textarea>
                         </div>
 
                         <div class="flex items-center justify-end gap-2" id="action_buttons_<?= $pt['id'] ?>">
-                            <button type="button" onclick="showRejectReason(<?= $pt['id'] ?>)" class="px-4 py-2 bg-rose-50 hover:bg-rose-600 text-rose-700 hover:text-white border border-rose-200 rounded-xl text-xs font-bold transition flex items-center gap-1.5">
-                                <i class="fa-solid fa-xmark"></i>
-                                <span>Từ chối</span>
+                            <button type="button" onclick="showRejectReason(<?= $pt['id'] ?>)" class="px-4 py-2 bg-amber-50 hover:bg-amber-600 text-amber-700 hover:text-white border border-amber-200 rounded-xl text-xs font-bold transition flex items-center gap-1.5">
+                                <i class="fa-solid fa-comment-dots"></i>
+                                <span>Ý kiến khác</span>
                             </button>
                             <button type="submit" name="response" value="ACCEPT" class="px-5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold shadow transition flex items-center gap-1.5">
                                 <i class="fa-solid fa-check"></i>
-                                <span>Đồng ý</span>
+                                <span>Đồng ý tiếp nhận</span>
                             </button>
                         </div>
 
                         <div id="reject_submit_buttons_<?= $pt['id'] ?>" class="hidden flex items-center justify-end gap-2">
                             <button type="button" onclick="hideRejectReason(<?= $pt['id'] ?>)" class="px-3 py-1.5 bg-slate-100 text-slate-600 text-xs font-semibold rounded-xl">Hủy</button>
-                            <button type="submit" name="response" value="REJECT" onclick="return validateRejection(<?= $pt['id'] ?>)" class="px-4 py-1.5 bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold rounded-xl shadow">Xác nhận Từ chối</button>
+                            <button type="submit" name="response" value="FEEDBACK" onclick="return validateRejection(<?= $pt['id'] ?>)" class="px-4 py-1.5 bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold rounded-xl shadow">Gửi Ý kiến</button>
                         </div>
                     </form>
                 </div>
@@ -683,23 +723,25 @@ if ($currentUser['role'] === 'NHAN_VIEN') {
                 </div>
 
                 <div>
-                    <label class="block text-[11px] font-semibold text-slate-600 mb-1">1. Người phụ trách chính (MAIN)</label>
+                    <label class="block text-[11px] font-semibold text-slate-600 mb-1">1. Người phụ trách chính (MAIN) <?php if ($currentUser['role'] === 'TRUONG_PHONG'): ?><span class="text-indigo-600 font-normal">(Chỉ gồm nhân viên thuộc phòng)</span><?php endif; ?></label>
                     <select name="main_assignee" id="form_main_assignee" class="w-full p-2 border border-slate-300 rounded-lg text-xs font-medium bg-white">
                         <option value="">-- Chọn Người phụ trách chính --</option>
-                        <?php foreach ($usersList as $u): ?>
+                        <?php foreach ($deptEmployeesForMain as $u): ?>
                             <option value="<?= $u['id'] ?>"><?= htmlspecialchars($u['fullname']) ?> (<?= htmlspecialchars($u['department_name']) ?>)</option>
                         <?php endforeach; ?>
                     </select>
                 </div>
 
                 <div>
-                    <label class="block text-[11px] font-semibold text-slate-600 mb-1">2. Bộ chọn Người phối hợp (2 cấp: Chọn Phòng -> Chọn Nhân viên)</label>
+                    <label class="block text-[11px] font-semibold text-slate-600 mb-1">2. Bộ chọn Người phối hợp (Không chọn Ban Giám đốc) (2 cấp: Chọn Phòng -> Chọn Nhân viên)</label>
                     <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 mb-2">
                         <div>
                             <select id="form_coop_dept_filter" onchange="filterCoopUsersByDeptModal()" class="w-full p-2 border border-slate-300 rounded-lg text-xs bg-white font-medium text-slate-700">
                                 <option value="ALL">-- Cấp 1: Tất cả Phòng ban --</option>
                                 <?php foreach ($departmentsList as $d): ?>
-                                    <option value="<?= $d['id'] ?>">[<?= htmlspecialchars($d['code']) ?>] <?= htmlspecialchars($d['name']) ?></option>
+                                    <?php if ($d['id'] != 1): // skip BGD department from coop filter ?>
+                                        <option value="<?= $d['id'] ?>">[<?= htmlspecialchars($d['code']) ?>] <?= htmlspecialchars($d['name']) ?></option>
+                                    <?php endif; ?>
                                 <?php endforeach; ?>
                             </select>
                         </div>
@@ -708,7 +750,7 @@ if ($currentUser['role'] === 'NHAN_VIEN') {
                         </div>
                     </div>
                     <select name="coop_assignees[]" id="form_coop_assignees" multiple class="w-full p-2 border border-slate-300 rounded-lg text-xs bg-white h-24">
-                        <?php foreach ($usersList as $u): ?>
+                        <?php foreach ($coopUsersList as $u): ?>
                             <option value="<?= $u['id'] ?>" data-dept-id="<?= $u['department_id'] ?>"><?= htmlspecialchars($u['fullname']) ?> (<?= htmlspecialchars($u['department_name']) ?>)</option>
                         <?php endforeach; ?>
                     </select>
@@ -755,7 +797,7 @@ function hideRejectReason(taskId) {
 function validateRejection(taskId) {
     const val = document.getElementById(`reject_input_${taskId}`).value.trim();
     if (!val) {
-        alert('Vui lòng nhập lý do từ chối công việc!');
+        alert('Vui lòng nhập nội dung ý kiến, đề xuất hoặc vướng mắc!');
         return false;
     }
     return true;

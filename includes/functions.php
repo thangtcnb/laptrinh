@@ -7,14 +7,25 @@ function getDepartments($pdo) {
     return $stmt->fetchAll();
 }
 
-// Get list of users (optionally filtered by department)
-function getUsers($pdo, $departmentId = null) {
+// Get list of users (optionally filtered by department) - Excludes Super Admin from task assignments
+function getUsers($pdo, $departmentId = null, $excludeSuperAdmin = false) {
+    $where = [];
+    $params = [];
+
     if ($departmentId) {
-        $stmt = $pdo->prepare("SELECT u.*, d.name AS department_name FROM users u JOIN departments d ON u.department_id = d.id WHERE u.department_id = ? ORDER BY u.fullname ASC");
-        $stmt->execute([$departmentId]);
-    } else {
-        $stmt = $pdo->query("SELECT u.*, d.name AS department_name FROM users u JOIN departments d ON u.department_id = d.id ORDER BY d.id ASC, u.fullname ASC");
+        $where[] = "u.department_id = ?";
+        $params[] = $departmentId;
     }
+
+    if ($excludeSuperAdmin) {
+        $where[] = "u.role != 'SUPER_ADMIN' AND u.email != 'thangtcnb@gmail.com'";
+    }
+
+    $whereSql = !empty($where) ? "WHERE " . implode(" AND ", $where) : "";
+
+    $sql = "SELECT u.*, d.name AS department_name FROM users u JOIN departments d ON u.department_id = d.id $whereSql ORDER BY d.id ASC, u.fullname ASC";
+    $stmt = $pdo->prepare($sql);
+    $stmt->execute($params);
     return $stmt->fetchAll();
 }
 
