@@ -187,7 +187,45 @@ if ($action === 'save_task') {
     exit;
 }
 
-// 5. RESPOND TO ASSIGNED TASK (ACCEPT / "Đồng ý" + "Ý kiến khác") BY NHAN VIEN
+// 5. RESPOND TO ALL ASSIGNED TASKS (BATCH ACCEPTANCE) BY NHAN VIEN
+if ($action === 'respond_all_assigned_tasks') {
+    $taskIds = $_POST['task_ids'] ?? [];
+    $generalComment = trim($_POST['general_comment'] ?? '');
+    $comments = $_POST['comments'] ?? [];
+
+    if (!empty($taskIds) && is_array($taskIds)) {
+        $stmtUpdate = $pdo->prepare("UPDATE tasks SET status = 'DANG_THUC_HIEN', comment_feedback = ? WHERE id = ?");
+
+        $stmtCheck = $pdo->prepare("
+            SELECT t.id, t.title FROM tasks t
+            JOIN task_assignees ta ON t.id = ta.task_id
+            WHERE t.id = ? AND ta.user_id = ? AND t.status = 'CHO_XAC_NHAN'
+        ");
+
+        $acceptedCount = 0;
+        foreach ($taskIds as $taskId) {
+            $taskId = (int)$taskId;
+            $stmtCheck->execute([$taskId, $currentUser['id']]);
+            $task = $stmtCheck->fetch();
+            if ($task) {
+                $indivComment = trim($comments[$taskId] ?? '');
+                $feedback = !empty($indivComment) ? $indivComment : $generalComment;
+                $stmtUpdate->execute([$feedback ?: null, $taskId]);
+                logActivity($pdo, $currentUser['id'], 'ACCEPT_TASK', "Đã đồng ý tiếp nhận công việc ID #$taskId: {$task['title']}" . ($feedback ? ". Ý kiến khác: $feedback" : ""));
+                $acceptedCount++;
+            }
+        }
+
+        if ($acceptedCount > 0) {
+            $_SESSION['flash_success'] = "Đã đồng ý tiếp nhận hàng loạt $acceptedCount công việc thành công!";
+        }
+    }
+
+    header("Location: index.php");
+    exit;
+}
+
+// 6. RESPOND TO ASSIGNED TASK (ACCEPT SINGLE TASK) BY NHAN VIEN
 if ($action === 'respond_assigned_task') {
     $taskId = (int)($_POST['task_id'] ?? 0);
     $commentFeedback = trim($_POST['comment_feedback'] ?? '');
