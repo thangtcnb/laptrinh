@@ -11,8 +11,8 @@
             </div>
         </div>
         <div class="text-slate-500 text-right">
-            <div>Hệ thống Quản lý Công việc Nội bộ v2.0</div>
-            <div>&copy; <?= date('Y') ?> Phân hiệu UFM Quảng Ngãi. All rights reserved.</div>
+            <div>Hệ thống Quản lý công việc Nội bộ - Phiên bản thử nghiệm</div>
+            <div>&copy; 2026 Phân hiệu UFM Quảng Ngãi. All rights reserved.</div>
         </div>
     </div>
 </footer>

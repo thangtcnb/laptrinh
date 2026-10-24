@@ -784,11 +784,11 @@ if ($currentUser['role'] === 'TRUONG_PHONG') {
                 </div>
 
                 <div>
-                    <label class="block text-[11px] font-semibold text-slate-600 mb-1">2. Bộ chọn Người phối hợp (Không chọn Ban Giám đốc) (2 cấp: Chọn Phòng -> Chọn Nhân viên)</label>
+                    <label class="block text-[11px] font-semibold text-slate-600 mb-1">2. Bộ chọn Người phối hợp (2 cấp: Chọn Phòng -> Chọn Nhân viên)</label>
                     <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 mb-2">
                         <div>
                             <select id="form_coop_dept_filter" onchange="filterCoopUsersByDeptModal()" class="w-full p-2 border border-slate-300 rounded-lg text-xs bg-white font-medium text-slate-700">
-                                <option value="ALL">-- Cấp 1: Tất cả Phòng ban --</option>
+                                <option value="">-- Chọn Phòng ban --</option>
                                 <?php foreach ($departmentsList as $d): ?>
                                     <?php if ($d['id'] != 1): // skip BGD department from coop filter ?>
                                         <option value="<?= $d['id'] ?>">[<?= htmlspecialchars($d['code']) ?>] <?= htmlspecialchars($d['name']) ?></option>
@@ -922,6 +922,16 @@ function openTaskModal(task = null) {
             opt.selected = coopUsers.includes(opt.value);
         });
 
+        let deptFilterVal = '';
+        if (coopUsers.length > 0) {
+            const firstCoopOpt = Array.from(coopSelect.options).find(opt => coopUsers.includes(opt.value));
+            if (firstCoopOpt) {
+                deptFilterVal = firstCoopOpt.getAttribute('data-dept-id') || '';
+            }
+        }
+        document.getElementById('form_coop_dept_filter').value = deptFilterVal;
+        filterCoopUsersByDeptModal();
+
     } else {
         document.getElementById('modalTitle').innerText = 'Thêm Công Việc Mới';
         document.getElementById('form_task_id').value = 0;
@@ -932,6 +942,9 @@ function openTaskModal(task = null) {
 
         let coopSelect = document.getElementById('form_coop_assignees');
         Array.from(coopSelect.options).forEach(opt => opt.selected = false);
+
+        document.getElementById('form_coop_dept_filter').value = '';
+        filterCoopUsersByDeptModal();
     }
 
     document.getElementById('taskModal').classList.remove('hidden');
@@ -948,7 +961,7 @@ function filterCoopUsersByDeptModal() {
     const coopSelect = document.getElementById('form_coop_assignees');
     Array.from(coopSelect.options).forEach(opt => {
         const optDept = opt.getAttribute('data-dept-id');
-        if (deptId === 'ALL' || optDept === deptId) {
+        if (deptId !== '' && optDept === deptId) {
             opt.style.display = '';
         } else {
             opt.style.display = 'none';

@@ -111,10 +111,10 @@ require_once __DIR__ . '/includes/header.php';
         <div>
             <div class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/10 backdrop-blur-md text-blue-200 text-xs font-semibold mb-2">
                 <i class="fa-solid fa-calendar-week"></i>
-                <span>Phân hệ Đăng Ký Công Việc Theo Tuần</span>
+                <span>Phân hệ Đăng Ký Công Việc</span>
             </div>
             <h2 class="text-xl md:text-2xl font-bold tracking-tight">ĐĂNG KÝ HÀNG LOẠT DANH MỤC CÔNG VIỆC</h2>
-            <p class="text-xs text-blue-200 mt-1">Đăng ký danh sách công việc cá nhân/đơn vị thực hiện trong tuần, gửi cấp quản lý phê duyệt.</p>
+            <p class="text-xs text-blue-200 mt-1">Đăng ký danh sách công việc cá nhân/đơn vị thực hiện, gửi cấp quản lý phê duyệt.</p>
         </div>
         <div>
             <a href="index.php" class="bg-white/10 hover:bg-white/20 text-white border border-white/20 px-4 py-2 rounded-xl text-xs font-semibold transition inline-flex items-center gap-1.5">
@@ -218,7 +218,7 @@ function filterBatchCoopDept(rowIndex, deptId) {
     if (!coopSelect) return;
     Array.from(coopSelect.options).forEach(opt => {
         const optDept = opt.getAttribute('data-dept-id');
-        if (deptId === 'ALL' || optDept === deptId) {
+        if (deptId !== '' && optDept === deptId) {
             opt.style.display = '';
         } else {
             opt.style.display = 'none';
@@ -274,9 +274,9 @@ function createRowHtml(index) {
                     </select>
                 </div>
                 <div>
-                    <label class="block text-[11px] font-semibold text-slate-600 mb-1">Bộ chọn Người phối hợp (Không chọn Ban Giám đốc)</label>
+                    <label class="block text-[11px] font-semibold text-slate-600 mb-1">Bộ chọn Người phối hợp</label>
                     <select onchange="filterBatchCoopDept(${index}, this.value)" class="w-full p-1.5 border border-slate-300 rounded-xl text-[11px] bg-white mb-1">
-                        <option value="ALL">-- Cấp 1: Tất cả Phòng ban --</option>
+                        <option value="">-- Chọn Phòng ban --</option>
                         <?php foreach ($departmentsList as $d): ?>
                             <?php if ($d['id'] != 1): ?>
                                 <option value="<?= $d['id'] ?>">[<?= htmlspecialchars($d['code']) ?>] <?= htmlspecialchars($d['name']) ?></option>
@@ -303,6 +303,9 @@ function addRow() {
     if (newMainSelect) {
         newMainSelect.value = '<?= $currentUser['id'] ?>';
     }
+
+    // Default hide all coop users until a department is selected
+    filterBatchCoopDept(rowCount, '');
 
     rowCount++;
 }
