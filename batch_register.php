@@ -34,7 +34,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $insertedCount = 0;
 
     // Default status depends on role
-    $defaultStatus = ($currentUser['role'] === 'NHAN_VIEN') ? 'CHO_DUYET' : 'CHO_BGD_DUYET';
+    $defaultStatus = ($currentUser['role'] === 'NHAN_VIEN' || $currentUser['role'] === 'HO_TRO') ? 'CHO_DUYET' : 'CHO_BGD_DUYET';
 
     $pdo->beginTransaction();
     try {

@@ -206,6 +206,7 @@ $auditLogs = $pdo->query("SELECT l.*, u.fullname, u.email FROM audit_logs l LEFT
                         <label class="block text-[11px] font-bold text-slate-600 mb-1">Vai trò (Role)</label>
                         <select name="role" class="w-full p-2 border border-slate-300 rounded-xl text-xs focus:ring-2 focus:ring-indigo-500 outline-none bg-white font-semibold">
                             <option value="NHAN_VIEN">Nhân viên</option>
+                            <option value="HO_TRO">Hỗ trợ</option>
                             <option value="TRUONG_PHONG">Trưởng / Phó phòng</option>
                             <option value="BGD">Ban Giám đốc</option>
                             <option value="SUPER_ADMIN">Super Admin</option>
@@ -265,6 +266,8 @@ $auditLogs = $pdo->query("SELECT l.*, u.fullname, u.email FROM audit_logs l LEFT
                                             <span class="px-2 py-0.5 rounded text-[11px] font-bold bg-amber-100 text-amber-800 border border-amber-200">Ban Giám đốc</span>
                                         <?php elseif ($u['role'] === 'TRUONG_PHONG'): ?>
                                             <span class="px-2 py-0.5 rounded text-[11px] font-bold bg-blue-100 text-blue-800 border border-blue-200">Trưởng phòng</span>
+                                        <?php elseif ($u['role'] === 'HO_TRO'): ?>
+                                            <span class="px-2 py-0.5 rounded text-[11px] font-bold bg-teal-100 text-teal-800 border border-teal-200">Hỗ trợ</span>
                                         <?php else: ?>
                                             <span class="px-2 py-0.5 rounded text-[11px] font-bold bg-slate-100 text-slate-700">Nhân viên</span>
                                         <?php endif; ?>
@@ -329,6 +332,7 @@ $auditLogs = $pdo->query("SELECT l.*, u.fullname, u.email FROM audit_logs l LEFT
                         <label class="block text-xs font-semibold text-slate-700 mb-1">Vai trò (Role)</label>
                         <select name="role" id="edit_role" class="w-full p-2.5 border border-slate-300 rounded-xl text-xs font-semibold bg-white outline-none">
                             <option value="NHAN_VIEN">Nhân viên</option>
+                            <option value="HO_TRO">Hỗ trợ</option>
                             <option value="TRUONG_PHONG">Trưởng / Phó phòng</option>
                             <option value="BGD">Ban Giám đốc</option>
                             <option value="SUPER_ADMIN">Super Admin</option>

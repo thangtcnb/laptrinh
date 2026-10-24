@@ -56,9 +56,9 @@ $deptEmployeesForMain = ($currentUser['role'] === 'TRUONG_PHONG')
     : $assignableUsers;
 $coopUsersList = array_filter($assignableUsers, fn($u) => $u['role'] !== 'BGD'); // Exclude BGD from COOP
 
-// Check if current logged-in user (Nhân viên) has pending assigned tasks (CHO_XAC_NHAN)
+// Check if current logged-in user (Nhân viên / Hỗ trợ) has pending assigned tasks (CHO_XAC_NHAN)
 $pendingAssignedTasks = [];
-if ($currentUser['role'] === 'NHAN_VIEN') {
+if ($currentUser['role'] === 'NHAN_VIEN' || $currentUser['role'] === 'HO_TRO') {
     $stmtPending = $pdo->prepare("
         SELECT t.*, d.name AS dept_name, u.fullname AS assigner_name
         FROM tasks t
@@ -510,25 +510,16 @@ if ($currentUser['role'] === 'TRUONG_PHONG') {
                         <input type="hidden" name="action" value="respond_assigned_task">
                         <input type="hidden" name="task_id" value="<?= $pt['id'] ?>">
 
-                        <div id="reject_reason_box_<?= $pt['id'] ?>" class="hidden">
-                            <label class="block text-xs font-bold text-amber-700 mb-1">Nhập Ý kiến khác / Đề xuất / Vướng mắc (Bắt buộc) <span class="text-rose-500">*</span></label>
-                            <textarea name="comment_feedback" id="reject_input_<?= $pt['id'] ?>" rows="2" placeholder="Vui lòng nhập trực tiếp các ý kiến, đề xuất hoặc vướng mắc cá nhân..." class="w-full p-2.5 border border-amber-300 rounded-xl text-xs focus:ring-2 focus:ring-amber-500 outline-none font-medium"></textarea>
+                        <div>
+                            <label class="block text-xs font-bold text-slate-700 mb-1">Ý kiến khác (Không bắt buộc):</label>
+                            <textarea name="comment_feedback" rows="2" placeholder="Nhập thêm ý kiến, đề xuất hoặc phản hồi cá nhân khi tiếp nhận công việc..." class="w-full p-2.5 border border-slate-300 rounded-xl text-xs focus:ring-2 focus:ring-indigo-500 outline-none font-medium"></textarea>
                         </div>
 
-                        <div class="flex items-center justify-end gap-2" id="action_buttons_<?= $pt['id'] ?>">
-                            <button type="button" onclick="showRejectReason(<?= $pt['id'] ?>)" class="px-4 py-2 bg-amber-50 hover:bg-amber-600 text-amber-700 hover:text-white border border-amber-200 rounded-xl text-xs font-bold transition flex items-center gap-1.5">
-                                <i class="fa-solid fa-comment-dots"></i>
-                                <span>Ý kiến khác</span>
+                        <div class="flex items-center justify-end">
+                            <button type="submit" name="response" value="ACCEPT" class="px-6 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold shadow-md transition flex items-center gap-1.5">
+                                <i class="fa-solid fa-check text-sm"></i>
+                                <span>Đồng ý</span>
                             </button>
-                            <button type="submit" name="response" value="ACCEPT" class="px-5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold shadow transition flex items-center gap-1.5">
-                                <i class="fa-solid fa-check"></i>
-                                <span>Đồng ý tiếp nhận</span>
-                            </button>
-                        </div>
-
-                        <div id="reject_submit_buttons_<?= $pt['id'] ?>" class="hidden flex items-center justify-end gap-2">
-                            <button type="button" onclick="hideRejectReason(<?= $pt['id'] ?>)" class="px-3 py-1.5 bg-slate-100 text-slate-600 text-xs font-semibold rounded-xl">Hủy</button>
-                            <button type="submit" name="response" value="FEEDBACK" onclick="return validateRejection(<?= $pt['id'] ?>)" class="px-4 py-1.5 bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold rounded-xl shadow">Gửi Ý kiến</button>
                         </div>
                     </form>
                 </div>
@@ -671,7 +662,7 @@ if ($currentUser['role'] === 'TRUONG_PHONG') {
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                     <label class="block text-xs font-semibold text-slate-700 mb-1">Đơn vị chủ trì</label>
-                    <?php if (in_array($currentUser['role'], ['TRUONG_PHONG', 'NHAN_VIEN'])): ?>
+                    <?php if (in_array($currentUser['role'], ['TRUONG_PHONG', 'NHAN_VIEN', 'HO_TRO'])): ?>
                         <?php
                         $userDept = array_filter($departmentsList, fn($d) => $d['id'] == $currentUser['department_id']);
                         $userDeptObj = reset($userDept);

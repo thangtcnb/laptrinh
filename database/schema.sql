@@ -16,7 +16,7 @@ CREATE TABLE IF NOT EXISTS `users` (
     `fullname` VARCHAR(255) NOT NULL,
     `email` VARCHAR(255) NOT NULL UNIQUE,
     `password` VARCHAR(255) NOT NULL,
-    `role` ENUM('BGD', 'TRUONG_PHONG', 'NHAN_VIEN', 'SUPER_ADMIN') NOT NULL DEFAULT 'NHAN_VIEN',
+    `role` ENUM('BGD', 'TRUONG_PHONG', 'NHAN_VIEN', 'HO_TRO', 'SUPER_ADMIN') NOT NULL DEFAULT 'NHAN_VIEN',
     `department_id` INT NOT NULL,
     FOREIGN KEY (`department_id`) REFERENCES `departments`(`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

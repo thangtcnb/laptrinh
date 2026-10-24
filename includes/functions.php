@@ -237,7 +237,7 @@ function getTasksFiltered($pdo, $filters = [], $limit = 15, $offset = 0, $curren
             $params[] = $currentUser['department_id'];
             $params[] = $currentUser['id'];
             $params[] = $currentUser['id'];
-        } elseif ($currentUser['role'] === 'NHAN_VIEN') {
+        } elseif ($currentUser['role'] === 'NHAN_VIEN' || $currentUser['role'] === 'HO_TRO') {
             $where[] = "(t.status != 'CHO_DUYET' OR t.created_by = ? OR t.id IN (SELECT task_id FROM task_assignees WHERE user_id = ?))";
             $params[] = $currentUser['id'];
             $params[] = $currentUser['id'];

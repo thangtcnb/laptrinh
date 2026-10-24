@@ -71,8 +71,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
                 <i class="fa-solid fa-id-card text-indigo-600"></i>
                 <span>Thông tin cá nhân</span>
             </h3>
+            <?php
+            $displayRole = $currentUser['role'];
+            if ($displayRole === 'HO_TRO') $displayRole = 'Hỗ trợ';
+            elseif ($displayRole === 'TRUONG_PHONG') $displayRole = 'Trưởng phòng';
+            elseif ($displayRole === 'NHAN_VIEN') $displayRole = 'Nhân viên';
+            elseif ($displayRole === 'BGD') $displayRole = 'Ban Giám đốc';
+            elseif ($displayRole === 'SUPER_ADMIN') $displayRole = 'Super Admin';
+            ?>
             <span class="px-2.5 py-1 rounded-full text-xs font-bold bg-indigo-50 text-indigo-700 border border-indigo-100">
-                <?= htmlspecialchars($currentUser['role']) ?>
+                <?= htmlspecialchars($displayRole) ?>
             </span>
         </div>
 
