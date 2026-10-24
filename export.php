@@ -3,6 +3,13 @@ session_start();
 require_once __DIR__ . '/config.php';
 require_once __DIR__ . '/includes/auth.php';
 require_once __DIR__ . '/includes/functions.php';
+require_once __DIR__ . '/vendor/autoload.php';
+
+use PhpOffice\PhpSpreadsheet\Spreadsheet;
+use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
+use PhpOffice\PhpSpreadsheet\Style\Alignment;
+use PhpOffice\PhpSpreadsheet\Style\Border;
+use PhpOffice\PhpSpreadsheet\Style\Fill;
 
 requireLogin();
 $currentUser = getCurrentUser($pdo);
@@ -95,22 +102,11 @@ $stmt->execute($params);
     $t['assignees'] = getTaskAssignees($pdo, $t['id']);
 }
 
-// ---------------- Handle Excel (.xls) Download ----------------
+// ---------------- Handle Standard Excel (.xlsx) Download ----------------
 if ($exportType === 'excel') {
     while (ob_get_level()) {
         ob_end_clean();
     }
-    ob_start();
-
-    $filename = "Bao_Cao_Cong_Viec_UFM_Quang_Ngai_" . date('Ymd_His') . ".xls";
-
-    header("Content-Type: application/vnd.ms-excel; charset=utf-8");
-    header("Content-Disposition: attachment; filename=\"$filename\"");
-    header("Cache-Control: max-age=0");
-    header("Pragma: public");
-    header("Expires: 0");
-
-    echo "\xEF\xBB\xBF"; // UTF-8 BOM
 
     // Split tasks into Part 1 (MAIN) and Part 2 (COOP)
     $part1Tasks = [];
@@ -171,180 +167,151 @@ if ($exportType === 'excel') {
         'DANG_THUC_HIEN' => 'Đang thực hiện',
         'HOAN_THANH' => 'Hoàn thành'
     ];
-    ?>
-    <html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns="http://www.w3.org/TR/REC-html40">
-    <head>
-        <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
-        <!--[if gte mso 9]>
-        <xml>
-         <x:ExcelWorkbook>
-          <x:ExcelWorksheets>
-           <x:ExcelWorksheet>
-            <x:Name>Bao Cao Cong Viec</x:Name>
-            <x:WorksheetOptions>
-             <x:DisplayGridlines/>
-            </x:WorksheetOptions>
-           </x:ExcelWorksheet>
-          </x:ExcelWorksheets>
-         </x:ExcelWorkbook>
-        </xml>
-        <![endif]-->
-        <style>
-            body { font-family: Arial, sans-serif; font-size: 12px; }
-            table { border-collapse: collapse; width: 100%; margin-bottom: 25px; }
-            th { background-color: #1e3a8a; color: #ffffff; font-weight: bold; padding: 10px; border: 1px solid #000000; text-align: center; }
-            td { padding: 8px; border: 1px solid #cccccc; vertical-align: top; }
-            .header-title { font-size: 16px; font-weight: bold; text-align: center; color: #1e3a8a; }
-            .sub-title { font-size: 13px; font-weight: bold; text-align: center; }
-            .section-banner { background-color: #0f172a; color: #ffffff; font-size: 13px; font-weight: bold; padding: 10px; text-align: left; }
-        </style>
-    </head>
-    <body>
-        <div class="header-title">TRƯỜNG ĐẠI HỌC TÀI CHÍNH - MARKETING</div>
-        <div class="sub-title">PHÂN HIỆU TẠI TỈNH QUẢNG NGÃI</div>
-        <div style="text-align: center; font-size: 14px; font-weight: bold; margin: 10px 0;">
-            BÁO CÁO KẾT QUẢ THỰC HIỆN CÔNG VIỆC
-        </div>
-        <div style="text-align: center; font-style: italic; margin-bottom: 20px;">
-            Từ ngày <?= date('d/m/Y', strtotime($dateFrom)) ?> đến ngày <?= date('d/m/Y', strtotime($dateTo)) ?>
-        </div>
 
-        <!-- BẢNG 1: CÔNG VIỆC CHÍNH PHỤ TRÁCH -->
-        <table>
-            <thead>
-                <tr>
-                    <th colspan="6" class="section-banner">Bảng 1: Công việc chính phụ trách</th>
-                </tr>
-                <tr>
-                    <th style="width: 5%;">STT</th>
-                    <th style="width: 25%;">1. Người phụ trách (Chính & Phối hợp)</th>
-                    <th style="width: 30%;">2. Tên công việc (Nội dung)</th>
-                    <th style="width: 15%;">3. Thời gian thực hiện</th>
-                    <th style="width: 10%;">4. Trạng thái</th>
-                    <th style="width: 15%;">5. Minh chứng (Link Google Drive)</th>
-                </tr>
-            </thead>
-            <tbody>
-                <?php if (!empty($part1Tasks)): ?>
-                    <?php
-                    $stt1 = 1;
-                    foreach ($part1Tasks as $t):
-                        $mains = array_filter($t['assignees'], fn($a) => $a['role_type'] === 'MAIN');
-                        $coops = array_filter($t['assignees'], fn($a) => $a['role_type'] === 'COOP');
-                        $mainNames = implode(', ', array_column($mains, 'fullname'));
-                        $coopNames = implode(', ', array_column($coops, 'fullname'));
+    $spreadsheet = new Spreadsheet();
+    $sheet = $spreadsheet->getActiveSheet();
+    $sheet->setTitle('Bao Cao Cong Viec');
 
-                        $assigneeText = $mainNames;
-                        if (!empty($coopNames)) {
-                            $assigneeText .= " (Phối hợp: " . $coopNames . ")";
-                        }
-                        if (empty($assigneeText)) {
-                            $assigneeText = "Chưa phân công";
-                        }
+    $spreadsheet->getDefaultStyle()->getFont()->setName('Calibri')->setSize(11);
 
-                        $startDateFmt = !empty($t['start_date']) ? date('d/m/Y', strtotime($t['start_date'])) : '';
-                        $dueDateFmt = !empty($t['due_date']) ? date('d/m/Y', strtotime($t['due_date'])) : '';
-                        if (!empty($startDateFmt) && !empty($dueDateFmt)) {
-                            $timeStr = $startDateFmt . ' - ' . $dueDateFmt;
-                        } elseif (!empty($dueDateFmt)) {
-                            $timeStr = $dueDateFmt;
-                        } else {
-                            $timeStr = '---';
-                        }
+    // Header Title
+    $sheet->setCellValue('A1', 'TRƯỜNG ĐẠI HỌC TÀI CHÍNH - MARKETING');
+    $sheet->mergeCells('A1:F1');
+    $sheet->getStyle('A1')->getFont()->setBold(true)->setSize(12)->setColor(new \PhpOffice\PhpSpreadsheet\Style\Color('1E3A8A'));
+    $sheet->getStyle('A1')->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
 
-                        $statusText = $statusMap[$t['status']] ?? $t['status'];
-                    ?>
-                        <tr>
-                            <td style="text-align: center; font-weight: bold;"><?= $stt1++ ?></td>
-                            <td><?= htmlspecialchars($assigneeText) ?></td>
-                            <td>
-                                <strong><?= htmlspecialchars($t['title']) ?></strong>
-                                <?php if (!empty($t['description'])): ?>
-                                    <br/><span style="color: #555; font-size: 11px;"><?= htmlspecialchars($t['description']) ?></span>
-                                <?php endif; ?>
-                            </td>
-                            <td style="text-align: center;"><?= htmlspecialchars($timeStr) ?></td>
-                            <td style="text-align: center;"><?= htmlspecialchars($statusText) ?></td>
-                            <td><?= htmlspecialchars($t['proof_link'] ?? '') ?></td>
-                        </tr>
-                    <?php endforeach; ?>
-                <?php else: ?>
-                    <tr>
-                        <td colspan="6" style="text-align: center; color: #888; font-style: italic;">Không có công việc chính nào trong thời gian này.</td>
-                    </tr>
-                <?php endif; ?>
-            </tbody>
-        </table>
+    $sheet->setCellValue('A2', 'PHÂN HIỆU TẠI TỈNH QUẢNG NGÃI');
+    $sheet->mergeCells('A2:F2');
+    $sheet->getStyle('A2')->getFont()->setBold(true)->setSize(11);
+    $sheet->getStyle('A2')->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
 
-        <!-- BẢNG 2: CÔNG VIỆC PHỐI HỢP -->
-        <table>
-            <thead>
-                <tr>
-                    <th colspan="6" class="section-banner">Bảng 2: Công việc phối hợp</th>
-                </tr>
-                <tr>
-                    <th style="width: 5%;">STT</th>
-                    <th style="width: 25%;">1. Người phụ trách (Chính & Phối hợp)</th>
-                    <th style="width: 30%;">2. Tên công việc (Nội dung)</th>
-                    <th style="width: 15%;">3. Thời gian thực hiện</th>
-                    <th style="width: 10%;">4. Trạng thái</th>
-                    <th style="width: 15%;">5. Minh chứng (Link Google Drive)</th>
-                </tr>
-            </thead>
-            <tbody>
-                <?php if (!empty($part2Tasks)): ?>
-                    <?php
-                    $stt2 = 1;
-                    foreach ($part2Tasks as $t):
-                        $mains = array_filter($t['assignees'], fn($a) => $a['role_type'] === 'MAIN');
-                        $coops = array_filter($t['assignees'], fn($a) => $a['role_type'] === 'COOP');
-                        $mainNames = implode(', ', array_column($mains, 'fullname'));
-                        $coopNames = implode(', ', array_column($coops, 'fullname'));
+    $sheet->setCellValue('A3', 'BÁO CÁO KẾT QUẢ THỰC HIỆN CÔNG VIỆC');
+    $sheet->mergeCells('A3:F3');
+    $sheet->getStyle('A3')->getFont()->setBold(true)->setSize(14)->setColor(new \PhpOffice\PhpSpreadsheet\Style\Color('1E3A8A'));
+    $sheet->getStyle('A3')->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
 
-                        $assigneeText = $mainNames;
-                        if (!empty($coopNames)) {
-                            $assigneeText .= " (Phối hợp: " . $coopNames . ")";
-                        }
-                        if (empty($assigneeText)) {
-                            $assigneeText = "Chưa phân công";
-                        }
+    $dateStr = "Từ ngày " . date('d/m/Y', strtotime($dateFrom)) . " đến ngày " . date('d/m/Y', strtotime($dateTo));
+    $sheet->setCellValue('A4', $dateStr);
+    $sheet->mergeCells('A4:F4');
+    $sheet->getStyle('A4')->getFont()->setItalic(true)->setSize(10);
+    $sheet->getStyle('A4')->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
 
-                        $startDateFmt = !empty($t['start_date']) ? date('d/m/Y', strtotime($t['start_date'])) : '';
-                        $dueDateFmt = !empty($t['due_date']) ? date('d/m/Y', strtotime($t['due_date'])) : '';
-                        if (!empty($startDateFmt) && !empty($dueDateFmt)) {
-                            $timeStr = $startDateFmt . ' - ' . $dueDateFmt;
-                        } elseif (!empty($dueDateFmt)) {
-                            $timeStr = $dueDateFmt;
-                        } else {
-                            $timeStr = '---';
-                        }
+    $currentRow = 6;
 
-                        $statusText = $statusMap[$t['status']] ?? $t['status'];
-                    ?>
-                        <tr>
-                            <td style="text-align: center; font-weight: bold;"><?= $stt2++ ?></td>
-                            <td><?= htmlspecialchars($assigneeText) ?></td>
-                            <td>
-                                <strong><?= htmlspecialchars($t['title']) ?></strong>
-                                <?php if (!empty($t['description'])): ?>
-                                    <br/><span style="color: #555; font-size: 11px;"><?= htmlspecialchars($t['description']) ?></span>
-                                <?php endif; ?>
-                            </td>
-                            <td style="text-align: center;"><?= htmlspecialchars($timeStr) ?></td>
-                            <td style="text-align: center;"><?= htmlspecialchars($statusText) ?></td>
-                            <td><?= htmlspecialchars($t['proof_link'] ?? '') ?></td>
-                        </tr>
-                    <?php endforeach; ?>
-                <?php else: ?>
-                    <tr>
-                        <td colspan="6" style="text-align: center; color: #888; font-style: italic;">Không có công việc phối hợp nào trong thời gian này.</td>
-                    </tr>
-                <?php endif; ?>
-            </tbody>
-        </table>
-    </body>
-    </html>
-    <?php
+    // Closure to generate table
+    $buildTable = function($sheet, &$row, $bannerText, $tasks) use ($statusMap) {
+        // Section Banner
+        $sheet->setCellValue("A{$row}", $bannerText);
+        $sheet->mergeCells("A{$row}:F{$row}");
+        $sheet->getStyle("A{$row}")->getFont()->setBold(true)->setSize(11)->setColor(new \PhpOffice\PhpSpreadsheet\Style\Color('FFFFFF'));
+        $sheet->getStyle("A{$row}")->getFill()->setFillType(Fill::FILL_SOLID)->getStartColor()->setRGB('0F172A');
+        $sheet->getStyle("A{$row}")->getAlignment()->setVertical(Alignment::VERTICAL_CENTER);
+        $sheet->getRowDimension($row)->setRowHeight(24);
+        $row++;
+
+        // Table Header
+        $headers = [
+            'A' => 'STT',
+            'B' => '1. Người phụ trách (Chính & Phối hợp)',
+            'C' => '2. Tên công việc (Nội dung)',
+            'D' => '3. Thời gian thực hiện',
+            'E' => '4. Trạng thái',
+            'F' => '5. Minh chứng (Link Google Drive)'
+        ];
+
+        foreach ($headers as $col => $text) {
+            $sheet->setCellValue("{$col}{$row}", $text);
+            $sheet->getStyle("{$col}{$row}")->getFont()->setBold(true)->setColor(new \PhpOffice\PhpSpreadsheet\Style\Color('FFFFFF'));
+            $sheet->getStyle("{$col}{$row}")->getFill()->setFillType(Fill::FILL_SOLID)->getStartColor()->setRGB('1E3A8A');
+            $sheet->getStyle("{$col}{$row}")->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER)->setVertical(Alignment::VERTICAL_CENTER);
+        }
+        $sheet->getRowDimension($row)->setRowHeight(25);
+        $row++;
+
+        if (!empty($tasks)) {
+            $stt = 1;
+            foreach ($tasks as $t) {
+                $mains = array_filter($t['assignees'], fn($a) => $a['role_type'] === 'MAIN');
+                $coops = array_filter($t['assignees'], fn($a) => $a['role_type'] === 'COOP');
+                $mainNames = implode(', ', array_column($mains, 'fullname'));
+                $coopNames = implode(', ', array_column($coops, 'fullname'));
+
+                $assigneeText = $mainNames;
+                if (!empty($coopNames)) {
+                    $assigneeText .= " (Phối hợp: " . $coopNames . ")";
+                }
+                if (empty($assigneeText)) {
+                    $assigneeText = "Chưa phân công";
+                }
+
+                $content = $t['title'];
+                if (!empty($t['description'])) {
+                    $content .= "\n" . $t['description'];
+                }
+
+                $startDateFmt = !empty($t['start_date']) ? date('d/m/Y', strtotime($t['start_date'])) : '';
+                $dueDateFmt = !empty($t['due_date']) ? date('d/m/Y', strtotime($t['due_date'])) : '';
+                if (!empty($startDateFmt) && !empty($dueDateFmt)) {
+                    $timeStr = $startDateFmt . ' - ' . $dueDateFmt;
+                } elseif (!empty($dueDateFmt)) {
+                    $timeStr = $dueDateFmt;
+                } else {
+                    $timeStr = '---';
+                }
+
+                $statusText = $statusMap[$t['status']] ?? $t['status'];
+                $proofLink = $t['proof_link'] ?? '';
+
+                $sheet->setCellValue("A{$row}", $stt++);
+                $sheet->setCellValue("B{$row}", $assigneeText);
+                $sheet->setCellValue("C{$row}", $content);
+                $sheet->setCellValue("D{$row}", $timeStr);
+                $sheet->setCellValue("E{$row}", $statusText);
+                $sheet->setCellValue("F{$row}", $proofLink);
+
+                $sheet->getStyle("A{$row}")->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER)->setVertical(Alignment::VERTICAL_TOP);
+                $sheet->getStyle("B{$row}")->getAlignment()->setHorizontal(Alignment::HORIZONTAL_LEFT)->setVertical(Alignment::VERTICAL_TOP)->setWrapText(true);
+                $sheet->getStyle("C{$row}")->getAlignment()->setHorizontal(Alignment::HORIZONTAL_LEFT)->setVertical(Alignment::VERTICAL_TOP)->setWrapText(true);
+                $sheet->getStyle("D{$row}")->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER)->setVertical(Alignment::VERTICAL_TOP)->setWrapText(true);
+                $sheet->getStyle("E{$row}")->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER)->setVertical(Alignment::VERTICAL_TOP);
+                $sheet->getStyle("F{$row}")->getAlignment()->setHorizontal(Alignment::HORIZONTAL_LEFT)->setVertical(Alignment::VERTICAL_TOP)->setWrapText(true);
+
+                $sheet->getStyle("A{$row}:F{$row}")->getBorders()->getAllBorders()->setBorderStyle(Border::BORDER_THIN)->setColor(new \PhpOffice\PhpSpreadsheet\Style\Color('CCCCCC'));
+
+                $row++;
+            }
+        } else {
+            $sheet->setCellValue("A{$row}", "Không có công việc nào trong danh mục này.");
+            $sheet->mergeCells("A{$row}:F{$row}");
+            $sheet->getStyle("A{$row}")->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
+            $sheet->getStyle("A{$row}")->getFont()->setItalic(true)->setColor(new \PhpOffice\PhpSpreadsheet\Style\Color('888888'));
+            $sheet->getStyle("A{$row}:F{$row}")->getBorders()->getAllBorders()->setBorderStyle(Border::BORDER_THIN)->setColor(new \PhpOffice\PhpSpreadsheet\Style\Color('CCCCCC'));
+            $row++;
+        }
+
+        $row += 2;
+    };
+
+    $buildTable($sheet, $currentRow, "Bảng 1: Công việc chính phụ trách", $part1Tasks);
+    $buildTable($sheet, $currentRow, "Bảng 2: Công việc phối hợp", $part2Tasks);
+
+    $sheet->getColumnDimension('A')->setWidth(8);
+    $sheet->getColumnDimension('B')->setWidth(32);
+    $sheet->getColumnDimension('C')->setWidth(45);
+    $sheet->getColumnDimension('D')->setWidth(22);
+    $sheet->getColumnDimension('E')->setWidth(22);
+    $sheet->getColumnDimension('F')->setWidth(35);
+
+    $filename = "Bao_Cao_Cong_Viec_UFM_Quang_Ngai.xlsx";
+
+    header("Content-Type: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+    header("Content-Disposition: attachment; filename=\"$filename\"");
+    header("Cache-Control: max-age=0");
+    header("Pragma: public");
+    header("Expires: 0");
+
+    $writer = new Xlsx($spreadsheet);
+    $writer->save('php://output');
     exit;
 }
 

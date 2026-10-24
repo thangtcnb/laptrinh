@@ -4,6 +4,10 @@ Thumbs.db
 .idea/
 .vscode/
 
+vendor/
+/vendor/
+/vendor/**
+
 # Ensure database directory and files are NOT ignored
 !database/
 !database/schema.sql

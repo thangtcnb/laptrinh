@@ -135,33 +135,38 @@ if ($roleLabel === 'TRUONG_PHONG') {
     </div>
 
     <!-- Navigation Bar -->
-    <nav class="bg-blue-950/80 border-t border-indigo-800/60 px-4 sm:px-6 lg:px-8">
-        <div class="w-full flex items-center space-x-1 sm:space-x-4 py-2 overflow-x-auto">
+    <nav class="bg-slate-950/90 border-t border-indigo-800/60 px-4 sm:px-6 lg:px-8">
+        <div class="w-full flex items-center space-x-1 sm:space-x-2 py-2 overflow-x-auto">
             <?php
             $currentPage = basename($_SERVER['PHP_SELF']);
             ?>
-            <a href="index.php" class="px-3.5 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap transition flex items-center gap-1.5 <?= $currentPage === 'index.php' ? 'bg-indigo-600 text-white shadow' : 'text-slate-200 hover:bg-white/10' ?>">
+            <!-- Tab 1: Trang chủ (Xanh Dương) -->
+            <a href="index.php" class="px-3.5 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition flex items-center gap-1.5 <?= $currentPage === 'index.php' ? 'bg-blue-600 text-white shadow-md shadow-blue-900/50' : 'bg-blue-950/40 text-blue-200 hover:bg-blue-800/50 border border-blue-800/40' ?>">
                 <i class="fa-solid fa-house"></i>
                 <span>Trang Chủ</span>
             </a>
 
-            <a href="index.php" class="px-3.5 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap transition flex items-center gap-1.5 <?= $currentPage === 'index.php' ? 'bg-indigo-600 text-white shadow' : 'text-slate-200 hover:bg-white/10' ?>">
-                <i class="fa-solid fa-table-list"></i>
-                <span>Bảng Danh Sách Công Việc</span>
-            </a>
-
-            <a href="batch_register.php" class="px-3.5 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap transition flex items-center gap-1.5 <?= $currentPage === 'batch_register.php' ? 'bg-indigo-600 text-white shadow' : 'text-slate-200 hover:bg-white/10' ?>">
+            <!-- Tab 2: Đăng ký công việc (Xanh Lá) -->
+            <a href="batch_register.php" class="px-3.5 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition flex items-center gap-1.5 <?= $currentPage === 'batch_register.php' ? 'bg-emerald-600 text-white shadow-md shadow-emerald-900/50' : 'bg-emerald-950/40 text-emerald-200 hover:bg-emerald-800/50 border border-emerald-800/40' ?>">
                 <i class="fa-solid fa-calendar-plus"></i>
-                <span>Đăng Ký Công Việc Theo Tuần</span>
+                <span>Đăng Ký Công Việc</span>
             </a>
 
-            <a href="export.php" class="px-3.5 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap transition flex items-center gap-1.5 <?= $currentPage === 'export.php' ? 'bg-indigo-600 text-white shadow' : 'text-slate-200 hover:bg-white/10' ?>">
+            <!-- Tab 3: Lịch họp BGD (Tím) -->
+            <a href="bgd_schedule.php" class="px-3.5 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition flex items-center gap-1.5 <?= $currentPage === 'bgd_schedule.php' ? 'bg-purple-600 text-white shadow-md shadow-purple-900/50' : 'bg-purple-950/40 text-purple-200 hover:bg-purple-800/50 border border-purple-800/40' ?>">
+                <i class="fa-solid fa-calendar-days"></i>
+                <span>Lịch Họp BGD</span>
+            </a>
+
+            <!-- Tab 4: Xuất báo cáo (Cam) -->
+            <a href="export.php" class="px-3.5 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition flex items-center gap-1.5 <?= $currentPage === 'export.php' ? 'bg-amber-600 text-white shadow-md shadow-amber-900/50' : 'bg-amber-950/40 text-amber-200 hover:bg-amber-800/50 border border-amber-800/40' ?>">
                 <i class="fa-solid fa-file-excel"></i>
                 <span>Xuất Báo Cáo & In Ấn</span>
             </a>
 
+            <!-- Tab 5: Super Admin -->
             <?php if (isset($currentUser['role']) && $currentUser['role'] === 'SUPER_ADMIN'): ?>
-                <a href="admin.php" class="px-3.5 py-1.5 rounded-lg text-xs font-bold whitespace-nowrap transition flex items-center gap-1.5 <?= $currentPage === 'admin.php' ? 'bg-amber-500 text-white shadow' : 'bg-amber-500/80 hover:bg-amber-500 text-white' ?>">
+                <a href="admin.php" class="px-3.5 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition flex items-center gap-1.5 <?= $currentPage === 'admin.php' ? 'bg-rose-600 text-white shadow-md shadow-rose-900/50' : 'bg-rose-950/40 text-rose-200 hover:bg-rose-800/50 border border-rose-800/40' ?>">
                     <i class="fa-solid fa-user-shield"></i>
                     <span>Quản Trị Hệ Thống (Super Admin)</span>
                 </a>

@@ -176,10 +176,6 @@ if ($currentUser['role'] === 'TRUONG_PHONG') {
             <h3 class="font-bold text-slate-800 text-base">Bộ Lọc Thông Minh & Tìm Kiếm</h3>
         </div>
         <div class="flex items-center gap-2">
-            <a href="batch_register.php" class="bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 px-3.5 py-2 rounded-xl text-xs font-semibold transition flex items-center gap-1.5 shadow-sm">
-                <i class="fa-solid fa-calendar-plus"></i>
-                <span>Đăng kí công việc</span>
-            </a>
             <button onclick="openTaskModal()" class="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-xl text-xs font-semibold transition flex items-center gap-1.5 shadow-md shadow-indigo-100">
                 <i class="fa-solid fa-plus"></i>
                 <span>Thêm công việc</span>
@@ -484,47 +480,111 @@ if ($currentUser['role'] === 'TRUONG_PHONG') {
             <button onclick="closePendingTaskModal()" class="text-slate-400 hover:text-slate-600"><i class="fa-solid fa-xmark text-lg"></i></button>
         </div>
 
-        <div class="space-y-6">
-            <?php foreach ($pendingAssignedTasks as $pt): ?>
-                <div class="bg-slate-50 border border-slate-200 rounded-2xl p-4 shadow-sm">
-                    <div class="flex items-center justify-between gap-2 mb-2">
-                        <span class="text-[11px] font-bold text-indigo-700 bg-indigo-50 border border-indigo-200 px-2.5 py-0.5 rounded-full">
-                            Mã công việc #<?= $pt['id'] ?>
-                        </span>
-                        <span class="text-xs text-slate-500 font-medium">
-                            <i class="fa-solid fa-user-tie text-slate-400 mr-1"></i>Người giao: <strong class="text-slate-700"><?= htmlspecialchars($pt['assigner_name']) ?></strong>
-                        </span>
-                    </div>
+        <?php if (count($pendingAssignedTasks) >= 2): ?>
+            <!-- BATCH ACCEPTANCE UI FOR 2 OR MORE TASKS -->
+            <form method="POST" action="task_actions.php" id="batchAcceptForm">
+                <input type="hidden" name="action" value="respond_all_assigned_tasks">
 
-                    <h4 class="font-bold text-slate-900 text-sm mb-1"><?= htmlspecialchars($pt['title']) ?></h4>
-                    <?php if (!empty($pt['description'])): ?>
-                        <p class="text-xs text-slate-600 mb-3 bg-white p-2.5 rounded-xl border border-slate-200 leading-relaxed"><?= htmlspecialchars($pt['description']) ?></p>
-                    <?php endif; ?>
-
-                    <div class="flex items-center gap-4 text-xs text-slate-500 font-medium mb-4">
-                        <div><i class="fa-regular fa-calendar-check text-slate-400 mr-1"></i>Hạn chót: <strong class="text-slate-800"><?= $pt['due_date'] ? date('d/m/Y', strtotime($pt['due_date'])) : 'Không quy định' ?></strong></div>
-                    </div>
-
-                    <!-- Action form for this task -->
-                    <form method="POST" action="task_actions.php" class="space-y-3 pt-3 border-t border-slate-200">
-                        <input type="hidden" name="action" value="respond_assigned_task">
-                        <input type="hidden" name="task_id" value="<?= $pt['id'] ?>">
-
-                        <div>
-                            <label class="block text-xs font-bold text-slate-700 mb-1">Ý kiến khác (Không bắt buộc):</label>
-                            <textarea name="comment_feedback" rows="2" placeholder="Nhập thêm ý kiến, đề xuất hoặc phản hồi cá nhân khi tiếp nhận công việc..." class="w-full p-2.5 border border-slate-300 rounded-xl text-xs focus:ring-2 focus:ring-indigo-500 outline-none font-medium"></textarea>
+                <div class="mb-4 bg-emerald-50 border border-emerald-200 rounded-2xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-sm">
+                    <div>
+                        <div class="font-bold text-emerald-900 text-sm flex items-center gap-1.5">
+                            <i class="fa-solid fa-list-check text-emerald-600"></i>
+                            <span>Tiếp nhận hàng loạt (<?= count($pendingAssignedTasks) ?> công việc)</span>
                         </div>
-
-                        <div class="flex items-center justify-end">
-                            <button type="submit" name="response" value="ACCEPT" class="px-6 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold shadow-md transition flex items-center gap-1.5">
-                                <i class="fa-solid fa-check text-sm"></i>
-                                <span>Đồng ý</span>
-                            </button>
-                        </div>
-                    </form>
+                        <p class="text-xs text-emerald-700 mt-0.5">Bạn có thể nhập ý kiến chung hoặc riêng cho từng việc và nhấn "Chấp nhận tất cả".</p>
+                    </div>
+                    <button type="submit" class="bg-emerald-600 hover:bg-emerald-700 text-white font-bold px-5 py-2.5 rounded-xl text-xs shadow-md transition flex items-center justify-center gap-2 shrink-0">
+                        <i class="fa-solid fa-check-double text-sm"></i>
+                        <span>Chấp nhận tất cả</span>
+                    </button>
                 </div>
-            <?php endforeach; ?>
-        </div>
+
+                <div class="mb-4">
+                    <label class="block text-xs font-bold text-slate-700 mb-1">Ý kiến khác chung (Áp dụng cho toàn bộ danh sách nếu không nhập riêng):</label>
+                    <textarea name="general_comment" rows="2" placeholder="Nhập thêm ý kiến, đề xuất chung khi tiếp nhận hàng loạt..." class="w-full p-2.5 border border-slate-300 rounded-xl text-xs focus:ring-2 focus:ring-indigo-500 outline-none font-medium bg-white"></textarea>
+                </div>
+
+                <div class="space-y-4">
+                    <?php foreach ($pendingAssignedTasks as $pt): ?>
+                        <input type="hidden" name="task_ids[]" value="<?= $pt['id'] ?>">
+                        <div class="bg-slate-50 border border-slate-200 rounded-2xl p-4 shadow-sm">
+                            <div class="flex items-center justify-between gap-2 mb-2">
+                                <span class="text-[11px] font-bold text-indigo-700 bg-indigo-50 border border-indigo-200 px-2.5 py-0.5 rounded-full">
+                                    Mã công việc #<?= $pt['id'] ?>
+                                </span>
+                                <span class="text-xs text-slate-500 font-medium">
+                                    <i class="fa-solid fa-user-tie text-slate-400 mr-1"></i>Người giao: <strong class="text-slate-700"><?= htmlspecialchars($pt['assigner_name']) ?></strong>
+                                </span>
+                            </div>
+
+                            <h4 class="font-bold text-slate-900 text-sm mb-1"><?= htmlspecialchars($pt['title']) ?></h4>
+                            <?php if (!empty($pt['description'])): ?>
+                                <p class="text-xs text-slate-600 mb-3 bg-white p-2.5 rounded-xl border border-slate-200 leading-relaxed"><?= htmlspecialchars($pt['description']) ?></p>
+                            <?php endif; ?>
+
+                            <div class="flex items-center gap-4 text-xs text-slate-500 font-medium mb-3">
+                                <div><i class="fa-regular fa-calendar-check text-slate-400 mr-1"></i>Hạn chót: <strong class="text-slate-800"><?= $pt['due_date'] ? date('d/m/Y', strtotime($pt['due_date'])) : 'Không quy định' ?></strong></div>
+                            </div>
+
+                            <div>
+                                <label class="block text-xs font-bold text-slate-700 mb-1">Ý kiến riêng cho việc này (Không bắt buộc):</label>
+                                <textarea name="comments[<?= $pt['id'] ?>]" rows="2" placeholder="Nhập ý kiến / phản hồi cá nhân riêng cho công việc này..." class="w-full p-2.5 border border-slate-300 rounded-xl text-xs focus:ring-2 focus:ring-indigo-500 outline-none font-medium bg-white"></textarea>
+                            </div>
+                        </div>
+                    <?php endforeach; ?>
+                </div>
+
+                <div class="mt-5 pt-4 border-t border-slate-200 flex justify-end">
+                    <button type="submit" class="bg-emerald-600 hover:bg-emerald-700 text-white font-bold px-6 py-2.5 rounded-xl text-xs shadow-md transition flex items-center gap-2">
+                        <i class="fa-solid fa-check-double text-sm"></i>
+                        <span>Chấp nhận tất cả</span>
+                    </button>
+                </div>
+            </form>
+        <?php else: ?>
+            <!-- SINGLE TASK ACCEPTANCE UI -->
+            <div class="space-y-6">
+                <?php foreach ($pendingAssignedTasks as $pt): ?>
+                    <div class="bg-slate-50 border border-slate-200 rounded-2xl p-4 shadow-sm">
+                        <div class="flex items-center justify-between gap-2 mb-2">
+                            <span class="text-[11px] font-bold text-indigo-700 bg-indigo-50 border border-indigo-200 px-2.5 py-0.5 rounded-full">
+                                Mã công việc #<?= $pt['id'] ?>
+                            </span>
+                            <span class="text-xs text-slate-500 font-medium">
+                                <i class="fa-solid fa-user-tie text-slate-400 mr-1"></i>Người giao: <strong class="text-slate-700"><?= htmlspecialchars($pt['assigner_name']) ?></strong>
+                            </span>
+                        </div>
+
+                        <h4 class="font-bold text-slate-900 text-sm mb-1"><?= htmlspecialchars($pt['title']) ?></h4>
+                        <?php if (!empty($pt['description'])): ?>
+                            <p class="text-xs text-slate-600 mb-3 bg-white p-2.5 rounded-xl border border-slate-200 leading-relaxed"><?= htmlspecialchars($pt['description']) ?></p>
+                        <?php endif; ?>
+
+                        <div class="flex items-center gap-4 text-xs text-slate-500 font-medium mb-4">
+                            <div><i class="fa-regular fa-calendar-check text-slate-400 mr-1"></i>Hạn chót: <strong class="text-slate-800"><?= $pt['due_date'] ? date('d/m/Y', strtotime($pt['due_date'])) : 'Không quy định' ?></strong></div>
+                        </div>
+
+                        <!-- Action form for single task -->
+                        <form method="POST" action="task_actions.php" class="space-y-3 pt-3 border-t border-slate-200">
+                            <input type="hidden" name="action" value="respond_assigned_task">
+                            <input type="hidden" name="task_id" value="<?= $pt['id'] ?>">
+
+                            <div>
+                                <label class="block text-xs font-bold text-slate-700 mb-1">Ý kiến khác (Không bắt buộc):</label>
+                                <textarea name="comment_feedback" rows="2" placeholder="Nhập thêm ý kiến, đề xuất hoặc phản hồi cá nhân khi tiếp nhận công việc..." class="w-full p-2.5 border border-slate-300 rounded-xl text-xs focus:ring-2 focus:ring-indigo-500 outline-none font-medium"></textarea>
+                            </div>
+
+                            <div class="flex items-center justify-end">
+                                <button type="submit" name="response" value="ACCEPT" class="px-6 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold shadow-md transition flex items-center gap-1.5">
+                                    <i class="fa-solid fa-check text-sm"></i>
+                                    <span>Đồng ý</span>
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                <?php endforeach; ?>
+            </div>
+        <?php endif; ?>
     </div>
 </div>
 <?php endif; ?>
