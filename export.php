@@ -3,6 +3,9 @@ session_start();
 require_once __DIR__ . '/config.php';
 require_once __DIR__ . '/includes/auth.php';
 require_once __DIR__ . '/includes/functions.php';
+require_once __DIR__ . '/libs/SimpleXLSXGen.php';
+
+use Shuchkin\SimpleXLSXGen;
 
 requireLogin();
 $currentUser = getCurrentUser($pdo);
@@ -89,19 +92,14 @@ $sql = "
 
 $stmt = $pdo->prepare($sql);
 $stmt->execute($params);
-    $allTasksForExcel = $stmt->fetchAll();
+$allTasksForExcel = $stmt->fetchAll();
 
-    foreach ($allTasksForExcel as &$t) {
+foreach ($allTasksForExcel as &$t) {
     $t['assignees'] = getTaskAssignees($pdo, $t['id']);
 }
 
-// ---------------- Handle Standard Native PHP Excel Download ----------------
+// ---------------- Handle Standard OpenXML .xlsx Excel Download ----------------
 if ($exportType === 'excel') {
-    while (ob_get_level()) {
-        ob_end_clean();
-    }
-    ob_start();
-
     // Split tasks into Part 1 (MAIN) and Part 2 (COOP)
     $part1Tasks = [];
     $part2Tasks = [];
@@ -162,138 +160,136 @@ if ($exportType === 'excel') {
         'HOAN_THANH' => 'Hoàn thành'
     ];
 
-    $filename = "Bao_Cao_Cong_Viec_UFM_Quang_Ngai.xls";
+    $rows = [];
+    $mergeRanges = [];
 
-    header("Content-Type: application/vnd.ms-excel; charset=UTF-8");
-    header("Content-Disposition: attachment; filename=\"$filename\"");
-    header("Cache-Control: max-age=0, no-cache, must-revalidate");
-    header("Pragma: public");
-    header("Expires: 0");
+    // Title Section
+    $rows[] = ['<center><b><style color="#1E3A8A" font-size="12">TRƯỜNG ĐẠI HỌC TÀI CHÍNH - MARKETING</style></b></center>', '', '', '', ''];
+    $mergeRanges[] = 'A1:E1';
 
-    // Output UTF-8 BOM
-    echo "\xEF\xBB\xBF";
+    $rows[] = ['<center><b><style font-size="11">PHÂN HIỆU TẠI TỈNH QUẢNG NGÃI</style></b></center>', '', '', '', ''];
+    $mergeRanges[] = 'A2:E2';
 
-    // Build Native HTML Excel Table Structure
-    ?>
-    <html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns="http://www.w3.org/TR/REC-html40">
-    <head>
-        <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
-        <!--[if gte mso 9]>
-        <xml>
-            <x:ExcelWorkbook>
-                <x:ExcelWorksheets>
-                    <x:ExcelWorksheet>
-                        <x:Name>Bao Cao Cong Viec</x:Name>
-                        <x:WorksheetOptions>
-                            <x:DisplayGridlines/>
-                        </x:WorksheetOptions>
-                    </x:ExcelWorksheet>
-                </x:ExcelWorksheets>
-            </x:ExcelWorkbook>
-        </xml>
-        <![endif]-->
-        <style>
-            body { font-family: Calibri, Arial, sans-serif; font-size: 11pt; }
-            table { border-collapse: collapse; width: 100%; }
-            th, td { border: 1px solid #CCCCCC; padding: 6px 8px; vertical-align: top; }
-            .header-title { font-size: 12pt; font-weight: bold; color: #1E3A8A; text-align: center; }
-            .header-sub { font-size: 11pt; font-weight: bold; text-align: center; }
-            .header-main { font-size: 14pt; font-weight: bold; color: #1E3A8A; text-align: center; }
-            .header-date { font-size: 10pt; font-style: italic; text-align: center; }
-            .banner { background-color: #0F172A; color: #FFFFFF; font-weight: bold; font-size: 11pt; text-align: left; padding: 8px; }
-            .th-header { background-color: #1E3A8A; color: #FFFFFF; font-weight: bold; text-align: center; vertical-align: middle; }
-            .text-center { text-align: center; }
-            .text-left { text-align: left; }
-            .text-muted { color: #888888; font-style: italic; text-align: center; }
-        </style>
-    </head>
-    <body>
-        <table>
-            <tr><td colspan="6" class="header-title" style="border:none;">TRƯỜNG ĐẠI HỌC TÀI CHÍNH - MARKETING</td></tr>
-            <tr><td colspan="6" class="header-sub" style="border:none;">PHÂN HIỆU TẠI TỈNH QUẢNG NGÃI</td></tr>
-            <tr><td colspan="6" class="header-main" style="border:none;">BÁO CÁO KẾT QUẢ THỰC HIỆN CÔNG VIỆC</td></tr>
-            <tr><td colspan="6" class="header-date" style="border:none;">Từ ngày <?= date('d/m/Y', strtotime($dateFrom)) ?> đến ngày <?= date('d/m/Y', strtotime($dateTo)) ?></td></tr>
-            <tr><td colspan="6" style="border:none;">&nbsp;</td></tr>
-        </table>
+    $rows[] = ['<center><b><style color="#1E3A8A" font-size="14">BÁO CÁO KẾT QUẢ THỰC HIỆN CÔNG VIỆC</style></b></center>', '', '', '', ''];
+    $mergeRanges[] = 'A3:E3';
 
-        <?php
-        $renderTable = function($bannerText, $tasks) use ($statusMap) {
-            ?>
-            <table>
-                <tr>
-                    <td colspan="6" class="banner"><?= htmlspecialchars($bannerText) ?></td>
-                </tr>
-                <tr>
-                    <th class="th-header" style="width: 50px;">STT</th>
-                    <th class="th-header" style="width: 250px;">1. Người phụ trách (Chính &amp; Phối hợp)</th>
-                    <th class="th-header" style="width: 350px;">2. Tên công việc (Nội dung)</th>
-                    <th class="th-header" style="width: 160px;">3. Thời gian thực hiện</th>
-                    <th class="th-header" style="width: 160px;">4. Trạng thái</th>
-                    <th class="th-header" style="width: 280px;">5. Minh chứng (Link Google Drive)</th>
-                </tr>
-                <?php if (!empty($tasks)): ?>
-                    <?php $stt = 1; foreach ($tasks as $t): ?>
-                        <?php
-                        $mains = array_filter($t['assignees'], fn($a) => $a['role_type'] === 'MAIN');
-                        $coops = array_filter($t['assignees'], fn($a) => $a['role_type'] === 'COOP');
-                        $mainNames = implode(', ', array_column($mains, 'fullname'));
-                        $coopNames = implode(', ', array_column($coops, 'fullname'));
+    $dateFromStr = date('d/m/Y', strtotime($dateFrom));
+    $dateToStr = date('d/m/Y', strtotime($dateTo));
+    $rows[] = ['<center><i><style font-size="10">Từ ngày ' . $dateFromStr . ' đến ngày ' . $dateToStr . '</style></i></center>', '', '', '', ''];
+    $mergeRanges[] = 'A4:E4';
 
-                        $assigneeText = $mainNames;
-                        if (!empty($coopNames)) {
-                            $assigneeText .= " (Phối hợp: " . $coopNames . ")";
-                        }
-                        if (empty($assigneeText)) {
-                            $assigneeText = "Chưa phân công";
-                        }
+    $rows[] = ['', '', '', '', '']; // Empty row
 
-                        $content = htmlspecialchars($t['title']);
-                        if (!empty($t['description'])) {
-                            $content .= "<br><small style='color:#555555;'>" . nl2br(htmlspecialchars($t['description'])) . "</small>";
-                        }
+    // Helper to append table
+    $appendTable = function($bannerTitle, $tasks) use (&$rows, &$mergeRanges, $statusMap) {
+        $startRow = count($rows) + 1;
+        // Banner Row
+        $rows[] = ['<style bgcolor="#0F172A" color="#FFFFFF" height="24"><b> ' . $bannerTitle . '</b></style>', '', '', '', ''];
+        $mergeRanges[] = 'A' . $startRow . ':E' . $startRow;
 
-                        $startDateFmt = !empty($t['start_date']) ? date('d/m/Y', strtotime($t['start_date'])) : '';
-                        $dueDateFmt = !empty($t['due_date']) ? date('d/m/Y', strtotime($t['due_date'])) : '';
-                        if (!empty($startDateFmt) && !empty($dueDateFmt)) {
-                            $timeStr = $startDateFmt . ' - ' . $dueDateFmt;
-                        } elseif (!empty($dueDateFmt)) {
-                            $timeStr = $dueDateFmt;
-                        } else {
-                            $timeStr = '---';
-                        }
+        // Header Row (5 exact columns)
+        $rows[] = [
+            '<style bgcolor="#1E3A8A" color="#FFFFFF"><center><b>Người phụ trách</b></center></style>',
+            '<style bgcolor="#1E3A8A" color="#FFFFFF"><center><b>Tên công việc</b></center></style>',
+            '<style bgcolor="#1E3A8A" color="#FFFFFF"><center><b>Thời gian thực hiện</b></center></style>',
+            '<style bgcolor="#1E3A8A" color="#FFFFFF"><center><b>Trạng thái</b></center></style>',
+            '<style bgcolor="#1E3A8A" color="#FFFFFF"><center><b>Minh chứng</b></center></style>'
+        ];
 
-                        $statusText = $statusMap[$t['status']] ?? $t['status'];
-                        $proofLink = htmlspecialchars($t['proof_link'] ?? '');
-                        ?>
-                        <tr>
-                            <td class="text-center"><?= $stt++ ?></td>
-                            <td class="text-left"><?= htmlspecialchars($assigneeText) ?></td>
-                            <td class="text-left"><?= $content ?></td>
-                            <td class="text-center"><?= $timeStr ?></td>
-                            <td class="text-center"><?= htmlspecialchars($statusText) ?></td>
-                            <td class="text-left">
-                                <?php if (!empty($proofLink)): ?>
-                                    <a href="<?= $proofLink ?>"><?= $proofLink ?></a>
-                                <?php endif; ?>
-                            </td>
-                        </tr>
-                    <?php endforeach; ?>
-                <?php else: ?>
-                    <tr>
-                        <td colspan="6" class="text-muted">Không có công việc nào trong danh mục này.</td>
-                    </tr>
-                <?php endif; ?>
-            </table>
-            <br>
-            <?php
-        };
+        if (!empty($tasks)) {
+            foreach ($tasks as $t) {
+                $mains = array_filter($t['assignees'], fn($a) => $a['role_type'] === 'MAIN');
+                $coops = array_filter($t['assignees'], fn($a) => $a['role_type'] === 'COOP');
+                $mainNames = implode(', ', array_column($mains, 'fullname'));
+                $coopNames = implode(', ', array_column($coops, 'fullname'));
 
-        $renderTable("Bảng 1: Công việc chính phụ trách", $part1Tasks);
-        $renderTable("Bảng 2: Công việc phối hợp", $part2Tasks);
-        ?>
-    </body>
-    </html>
-    <?php
+                $assigneeText = $mainNames;
+                if (!empty($coopNames)) {
+                    $assigneeText .= " (Phối hợp: " . $coopNames . ")";
+                }
+                if (empty($assigneeText)) {
+                    $assigneeText = "Chưa phân công";
+                }
+
+                $taskContent = '<b>' . htmlspecialchars($t['title'], ENT_QUOTES) . '</b>';
+                if (!empty($t['description'])) {
+                    $taskContent .= "\n" . htmlspecialchars($t['description'], ENT_QUOTES);
+                }
+                $taskContentFormatted = '<wraptext>' . $taskContent . '</wraptext>';
+
+                $startDateFmt = !empty($t['start_date']) ? date('d/m/Y', strtotime($t['start_date'])) : '';
+                $dueDateFmt = !empty($t['due_date']) ? date('d/m/Y', strtotime($t['due_date'])) : '';
+                if (!empty($startDateFmt) && !empty($dueDateFmt)) {
+                    $timeStr = $startDateFmt . ' - ' . $dueDateFmt;
+                } elseif (!empty($dueDateFmt)) {
+                    $timeStr = $dueDateFmt;
+                } else {
+                    $timeStr = '---';
+                }
+                $timeFormatted = '<center>' . $timeStr . '</center>';
+
+                $statusText = $statusMap[$t['status']] ?? $t['status'];
+                $statusFormatted = '<center>' . htmlspecialchars($statusText, ENT_QUOTES) . '</center>';
+
+                $proofLink = trim($t['proof_link'] ?? '');
+                if (!empty($proofLink)) {
+                    $proofFormatted = '<a href="' . htmlspecialchars($proofLink, ENT_QUOTES) . '">' . htmlspecialchars($proofLink, ENT_QUOTES) . '</a>';
+                } else {
+                    $proofFormatted = '';
+                }
+
+                $rows[] = [
+                    $assigneeText,
+                    $taskContentFormatted,
+                    $timeFormatted,
+                    $statusFormatted,
+                    $proofFormatted
+                ];
+            }
+        } else {
+            $emptyRowIndex = count($rows) + 1;
+            $rows[] = ['<i><center><style color="#888888">Không có công việc nào trong danh mục này.</style></center></i>', '', '', '', ''];
+            $mergeRanges[] = 'A' . $emptyRowIndex . ':E' . $emptyRowIndex;
+        }
+
+        $rows[] = ['', '', '', '', '']; // Empty spacing row
+    };
+
+    // Build Table 1 & Table 2
+    $appendTable("BẢNG 1: CÔNG VIỆC CHÍNH (Do cá nhân phụ trách chính)", $part1Tasks);
+    $appendTable("BẢNG 2: CÔNG VIỆC PHỐI HỢP (Cá nhân tham gia phối hợp)", $part2Tasks);
+
+    $xlsx = SimpleXLSXGen::fromArray($rows, "Bao Cao Cong Viec");
+
+    foreach ($mergeRanges as $range) {
+        $xlsx->mergeCells($range);
+    }
+
+    // Set custom column widths (5 columns)
+    $xlsx->setColWidth(1, 30);
+    $xlsx->setColWidth(2, 50);
+    $xlsx->setColWidth(3, 24);
+    $xlsx->setColWidth(4, 26);
+    $xlsx->setColWidth(5, 38);
+
+    // Save to temp file and serve with binary download headers
+    $filename = 'Bao_Cao_Cong_Viec_UFM_Quang_Ngai_' . date('Ymd_His') . '.xlsx';
+    $tmpFile = tempnam(sys_get_temp_dir(), 'xlsx_');
+    $xlsx->saveAs($tmpFile);
+
+    while (ob_get_level()) {
+        ob_end_clean();
+    }
+
+    header('Content-Type: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    header('Content-Disposition: attachment; filename="' . $filename . '"');
+    header('Content-Transfer-Encoding: binary');
+    header('Cache-Control: must-revalidate, post-check=0, pre-check=0');
+    header('Pragma: public');
+    header('Content-Length: ' . filesize($tmpFile));
+
+    readfile($tmpFile);
+    @unlink($tmpFile);
     exit;
 }
 
