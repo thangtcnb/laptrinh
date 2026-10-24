@@ -108,7 +108,7 @@ if ($action === 'save_task') {
     $description = trim($_POST['description'] ?? '');
     $departmentId = (int)($_POST['department_id'] ?? $currentUser['department_id']);
     $priority = $_POST['priority'] ?? 'TRUNG_BINH';
-    $status = $_POST['status'] ?? ($currentUser['role'] === 'NHAN_VIEN' ? 'CHO_DUYET' : 'DANG_THUC_HIEN');
+    $status = $_POST['status'] ?? (in_array($currentUser['role'], ['NHAN_VIEN', 'HO_TRO']) ? 'CHO_DUYET' : 'DANG_THUC_HIEN');
     $startDate = $_POST['start_date'] ?: null;
     $dueDate = $_POST['due_date'] ?: null;
     $mainAssignee = (int)($_POST['main_assignee'] ?? 0);
@@ -187,10 +187,9 @@ if ($action === 'save_task') {
     exit;
 }
 
-// 5. RESPOND TO ASSIGNED TASK (ACCEPT / OTHER OPINIONS "Ý KIẾN KHÁC") BY NHAN VIEN
+// 5. RESPOND TO ASSIGNED TASK (ACCEPT / "Đồng ý" + "Ý kiến khác") BY NHAN VIEN
 if ($action === 'respond_assigned_task') {
     $taskId = (int)($_POST['task_id'] ?? 0);
-    $response = $_POST['response'] ?? '';
     $commentFeedback = trim($_POST['comment_feedback'] ?? '');
 
     // Check task existence & assignment
@@ -208,22 +207,10 @@ if ($action === 'respond_assigned_task') {
         exit;
     }
 
-    if ($response === 'ACCEPT') {
-        $stmtUpdate = $pdo->prepare("UPDATE tasks SET status = 'DANG_THUC_HIEN' WHERE id = ?");
-        $stmtUpdate->execute([$taskId]);
-        logActivity($pdo, $currentUser['id'], 'ACCEPT_TASK', "Đã tiếp nhận công việc ID #$taskId: {$task['title']}");
-        $_SESSION['flash_success'] = "Bạn đã tiếp nhận công việc thành công!";
-    } elseif ($response === 'FEEDBACK') {
-        if (empty($commentFeedback)) {
-            $_SESSION['flash_error'] = "Vui lòng nhập nội dung ý kiến, đề xuất hoặc vướng mắc!";
-            header("Location: index.php");
-            exit;
-        }
-        $stmtUpdate = $pdo->prepare("UPDATE tasks SET status = 'TU_CHOI_CHO_TP_XAC_NHAN', comment_feedback = ? WHERE id = ?");
-        $stmtUpdate->execute([$commentFeedback, $taskId]);
-        logActivity($pdo, $currentUser['id'], 'FEEDBACK_TASK', "Đã gửi ý kiến khác cho công việc ID #$taskId: {$task['title']}. Ý kiến: $commentFeedback");
-        $_SESSION['flash_success'] = "Đã gửi ý kiến / đề xuất của bạn tới Trưởng phòng xem xét!";
-    }
+    $stmtUpdate = $pdo->prepare("UPDATE tasks SET status = 'DANG_THUC_HIEN', comment_feedback = ? WHERE id = ?");
+    $stmtUpdate->execute([$commentFeedback ?: null, $taskId]);
+    logActivity($pdo, $currentUser['id'], 'ACCEPT_TASK', "Đã đồng ý tiếp nhận công việc ID #$taskId: {$task['title']}" . ($commentFeedback ? ". Ý kiến khác: $commentFeedback" : ""));
+    $_SESSION['flash_success'] = "Bạn đã tiếp nhận công việc thành công!";
 
     header("Location: index.php");
     exit;

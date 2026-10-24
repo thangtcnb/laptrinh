@@ -10,6 +10,8 @@ if ($roleLabel === 'TRUONG_PHONG') {
     $roleLabel = 'Trưởng phòng';
 } elseif ($roleLabel === 'NHAN_VIEN') {
     $roleLabel = 'Nhân viên';
+} elseif ($roleLabel === 'HO_TRO') {
+    $roleLabel = 'Hỗ trợ';
 } elseif ($roleLabel === 'BGD') {
     $roleLabel = 'Ban Giám đốc';
 } elseif ($roleLabel === 'SUPER_ADMIN') {

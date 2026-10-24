@@ -17,7 +17,7 @@ $exportType = $_GET['export_type'] ?? '';
 $departmentsList = getDepartments($pdo);
 $usersList = getUsers($pdo);
 
-if ($currentUser['role'] === 'NHAN_VIEN') {
+if ($currentUser['role'] === 'NHAN_VIEN' || $currentUser['role'] === 'HO_TRO') {
     $scope = 'USER_' . $currentUser['id'];
 } elseif ($currentUser['role'] === 'TRUONG_PHONG') {
     $deptId = $currentUser['department_id'];
@@ -100,10 +100,11 @@ if ($exportType === 'excel') {
     while (ob_get_level()) {
         ob_end_clean();
     }
+    ob_start();
 
     $filename = "Bao_Cao_Cong_Viec_UFM_Quang_Ngai_" . date('Ymd_His') . ".xls";
 
-    header("Content-Type: application/vnd.ms-excel; charset=UTF-8");
+    header("Content-Type: application/vnd.ms-excel; charset=utf-8");
     header("Content-Disposition: attachment; filename=\"$filename\"");
     header("Cache-Control: max-age=0");
     header("Pragma: public");
@@ -208,11 +209,11 @@ if ($exportType === 'excel') {
             Từ ngày <?= date('d/m/Y', strtotime($dateFrom)) ?> đến ngày <?= date('d/m/Y', strtotime($dateTo)) ?>
         </div>
 
-        <!-- PHẦN 1: CÔNG VIỆC CHÍNH -->
+        <!-- BẢNG 1: CÔNG VIỆC CHÍNH PHỤ TRÁCH -->
         <table>
             <thead>
                 <tr>
-                    <th colspan="6" class="section-banner">PHẦN 1: CÔNG VIỆC CHÍNH (CÁ NHÂN PHỤ TRÁCH CHÍNH)</th>
+                    <th colspan="6" class="section-banner">Bảng 1: Công việc chính phụ trách</th>
                 </tr>
                 <tr>
                     <th style="width: 5%;">STT</th>
@@ -275,11 +276,11 @@ if ($exportType === 'excel') {
             </tbody>
         </table>
 
-        <!-- PHẦN 2: CÔNG VIỆC PHỐI HỢP -->
+        <!-- BẢNG 2: CÔNG VIỆC PHỐI HỢP -->
         <table>
             <thead>
                 <tr>
-                    <th colspan="6" class="section-banner">PHẦN 2: CÔNG VIỆC PHỐI HỢP (CÁ NHÂN TỔ CHỨC/THAM GIA PHỐI HỢP)</th>
+                    <th colspan="6" class="section-banner">Bảng 2: Công việc phối hợp</th>
                 </tr>
                 <tr>
                     <th style="width: 5%;">STT</th>
@@ -396,7 +397,7 @@ require_once __DIR__ . '/includes/header.php';
         <div>
             <label class="block text-xs font-semibold text-slate-600 mb-1">Đối tượng xuất báo cáo</label>
             <select name="scope" class="w-full p-2.5 border border-slate-300 rounded-xl text-xs outline-none focus:ring-2 focus:ring-indigo-500 bg-white font-medium">
-                <?php if ($currentUser['role'] === 'NHAN_VIEN'): ?>
+                <?php if ($currentUser['role'] === 'NHAN_VIEN' || $currentUser['role'] === 'HO_TRO'): ?>
                     <option value="USER_<?= $currentUser['id'] ?>" selected>
                         📌 Cá nhân tôi: <?= htmlspecialchars($currentUser['fullname']) ?>
                     </option>
