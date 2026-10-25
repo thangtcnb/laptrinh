@@ -39,10 +39,18 @@ if %ERRORLEVEL% NEQ 0 (
     exit /b %ERRORLEVEL%
 )
 
-echo "[6/6] Dang thuc thi Migration Stats, Idle Timeout, Login BG va Task Logs (database\migrations\update_20261025_stats_idle.sql)..."
+echo "[6/7] Dang thuc thi Migration Stats, Idle Timeout, Login BG va Task Logs (database\migrations\update_20261025_stats_idle.sql)..."
 %MYSQL_CMD% -h localhost -P 3306 -u root laptrinh_db < "database\migrations\update_20261025_stats_idle.sql"
 if %ERRORLEVEL% NEQ 0 (
     echo "[LOI] Khong the thuc thi database\migrations\update_20261025_stats_idle.sql. Vui long kiem tra XAMPP MySQL."
+    pause
+    exit /b %ERRORLEVEL%
+)
+
+echo "[7/7] Dang thuc thi Migration Workflow Redesign va Decision Workflow (database\migrations\update_20261026_workflow_redesign.sql)..."
+%MYSQL_CMD% -h localhost -P 3306 -u root laptrinh_db < "database\migrations\update_20261026_workflow_redesign.sql"
+if %ERRORLEVEL% NEQ 0 (
+    echo "[LOI] Khong the thuc thi database\migrations\update_20261026_workflow_redesign.sql. Vui long kiem tra XAMPP MySQL."
     pause
     exit /b %ERRORLEVEL%
 )

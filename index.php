@@ -56,16 +56,18 @@ $deptEmployeesForMain = ($currentUser['role'] === 'TRUONG_PHONG')
     : $assignableUsers;
 $coopUsersList = array_filter($assignableUsers, fn($u) => $u['role'] !== 'BGD'); // Exclude BGD from COOP
 
-// Check if current logged-in user (Nhân viên / Hỗ trợ) has pending assigned tasks (CHO_XAC_NHAN)
+// Check if current logged-in user has pending assigned tasks (CHO_TIEP_NHAN / CHO_XAC_NHAN where user has not accepted yet)
 $pendingAssignedTasks = [];
-if ($currentUser['role'] === 'NHAN_VIEN' || $currentUser['role'] === 'HO_TRO') {
+if ($currentUser) {
     $stmtPending = $pdo->prepare("
-        SELECT t.*, d.name AS dept_name, u.fullname AS assigner_name
+        SELECT DISTINCT t.*, d.name AS dept_name, u.fullname AS assigner_name
         FROM tasks t
         JOIN departments d ON t.department_id = d.id
         JOIN users u ON t.created_by = u.id
         JOIN task_assignees ta ON t.id = ta.task_id
-        WHERE ta.user_id = ? AND t.status = 'CHO_XAC_NHAN'
+        WHERE ta.user_id = ?
+          AND (ta.is_accepted = 0 OR ta.is_accepted IS NULL)
+          AND t.status IN ('CHO_XAC_NHAN', 'CHO_TIEP_NHAN')
         ORDER BY t.id DESC
     ");
     $stmtPending->execute([$currentUser['id']]);
@@ -298,7 +300,6 @@ $kpiStats = getKpiStats($pdo, $currentUser);
                 <option value="OVERDUE" <?= $filters['status'] === 'OVERDUE' ? 'selected' : '' ?>>CV quá hạn</option>
                 <option value="CHO_DUYET_ALL" <?= $filters['status'] === 'CHO_DUYET_ALL' ? 'selected' : '' ?>>CV đang chờ duyệt</option>
                 <option value="CHO_BGD_DUYET" <?= $filters['status'] === 'CHO_BGD_DUYET' ? 'selected' : '' ?>>Chờ BGD duyệt</option>
-                <option value="CHO_DUYET" <?= $filters['status'] === 'CHO_DUYET' ? 'selected' : '' ?>>Chờ Trưởng phòng duyệt</option>
                 <option value="YEU_CAU_CHINH_SUA" <?= $filters['status'] === 'YEU_CAU_CHINH_SUA' ? 'selected' : '' ?>>Yêu cầu chỉnh sửa</option>
             </select>
         </div>
@@ -935,18 +936,21 @@ $kpiStats = getKpiStats($pdo, $currentUser);
             </div>
 
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div>
-                    <label class="block text-xs font-semibold text-slate-700 mb-1">Trạng thái</label>
-                    <select name="status" id="form_status" class="w-full p-2.5 border border-slate-300 rounded-xl text-xs focus:ring-2 focus:ring-indigo-500 outline-none bg-white">
-                        <option value="CHO_DUYET">Chờ Trưởng phòng duyệt</option>
-                        <option value="CHO_BGD_DUYET">Chờ BGD duyệt</option>
-                        <option value="YEU_CAU_CHINH_SUA">Yêu cầu chỉnh sửa</option>
-                        <option value="DANG_THUC_HIEN">Đang thực hiện</option>
-                        <option value="HOAN_THANH">Hoàn thành</option>
-                    </select>
-                </div>
+                <?php if ($currentUser['role'] === 'SUPER_ADMIN'): ?>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-700 mb-1">Trạng thái</label>
+                        <select name="status" id="form_status" class="w-full p-2.5 border border-slate-300 rounded-xl text-xs focus:ring-2 focus:ring-indigo-500 outline-none bg-white">
+                            <option value="CHO_DUYET">Chờ Trưởng phòng duyệt</option>
+                            <option value="CHO_BGD_DUYET">Chờ BGD duyệt</option>
+                            <option value="CHO_TIEP_NHAN">Chờ tiếp nhận</option>
+                            <option value="YEU_CAU_CHINH_SUA">Yêu cầu chỉnh sửa</option>
+                            <option value="DANG_THUC_HIEN">Đang thực hiện</option>
+                            <option value="HOAN_THANH">Hoàn thành</option>
+                        </select>
+                    </div>
+                <?php endif; ?>
 
-                <div>
+                <div class="<?= $currentUser['role'] === 'SUPER_ADMIN' ? '' : 'sm:col-span-2' ?>">
                     <label class="block text-xs font-semibold text-slate-700 mb-1">Hạn chót hoàn thành (dd/mm/yyyy)</label>
                     <input type="date" name="due_date" id="form_due_date" class="w-full p-2.5 border border-slate-300 rounded-xl text-xs focus:ring-2 focus:ring-indigo-500 outline-none">
                 </div>
@@ -1383,7 +1387,9 @@ function openTaskModal(task = null) {
         document.getElementById('form_description').value = task.description || '';
         document.getElementById('form_department_id').value = task.department_id;
         document.getElementById('form_priority').value = task.priority;
-        document.getElementById('form_status').value = task.status;
+        if (document.getElementById('form_status')) {
+            document.getElementById('form_status').value = task.status;
+        }
         document.getElementById('form_due_date').value = task.due_date || '';
 
         // Assignees

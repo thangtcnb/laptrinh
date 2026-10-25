@@ -34,16 +34,28 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $insertedCount = 0;
 
     // Default status depends on role
-    $defaultStatus = ($currentUser['role'] === 'NHAN_VIEN' || $currentUser['role'] === 'HO_TRO') ? 'CHO_DUYET' : 'CHO_BGD_DUYET';
+    $defaultStatus = 'CHO_DUYET';
+    $targetStatus = null;
+
+    if ($currentUser['role'] === 'TRUONG_PHONG') {
+        $defaultStatus = 'CHO_TIEP_NHAN';
+        $targetStatus = 'CHO_BGD_DUYET';
+    } elseif ($currentUser['role'] === 'BGD') {
+        $defaultStatus = 'CHO_TIEP_NHAN';
+        $targetStatus = 'DANG_THUC_HIEN';
+    } elseif (in_array($currentUser['role'], ['NHAN_VIEN', 'HO_TRO'])) {
+        $defaultStatus = 'CHO_DUYET';
+        $targetStatus = null;
+    }
 
     $pdo->beginTransaction();
     try {
         $stmtTask = $pdo->prepare("
-            INSERT INTO tasks (title, description, department_id, status, priority, progress, start_date, due_date, created_by)
-            VALUES (?, ?, ?, ?, ?, 0, ?, ?, ?)
+            INSERT INTO tasks (title, description, department_id, status, target_status, priority, progress, start_date, due_date, created_by)
+            VALUES (?, ?, ?, ?, ?, ?, 0, ?, ?, ?)
         ");
 
-        $stmtAssignee = $pdo->prepare("INSERT INTO task_assignees (task_id, user_id, role_type) VALUES (?, ?, ?)");
+        $stmtAssignee = $pdo->prepare("INSERT INTO task_assignees (task_id, user_id, role_type, is_accepted, accepted_at) VALUES (?, ?, ?, ?, ?)");
 
         foreach ($tasksData as $tData) {
             $title = trim($tData['title'] ?? '');
@@ -61,6 +73,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $description,
                 $currentUser['department_id'],
                 $defaultStatus,
+                $targetStatus,
                 $priority,
                 $batchStartDate,
                 $dueDate,
@@ -72,7 +85,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
             // Insert MAIN Assignee
             if ($mainAssignee > 0) {
-                $stmtAssignee->execute([$newTaskId, $mainAssignee, 'MAIN']);
+                $isAcceptedMain = ($mainAssignee === $currentUser['id'] && $defaultStatus !== 'CHO_TIEP_NHAN') ? 1 : 0;
+                $acceptedAtMain = $isAcceptedMain ? date('Y-m-d H:i:s') : null;
+                $stmtAssignee->execute([$newTaskId, $mainAssignee, 'MAIN', $isAcceptedMain, $acceptedAtMain]);
             }
 
             // Insert COOP Assignees
@@ -80,7 +95,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 foreach ($coopAssignees as $coopId) {
                     $coopId = (int)$coopId;
                     if ($coopId > 0 && $coopId !== $mainAssignee) {
-                        $stmtAssignee->execute([$newTaskId, $coopId, 'COOP']);
+                        $isAcceptedCoop = ($coopId === $currentUser['id'] && $defaultStatus !== 'CHO_TIEP_NHAN') ? 1 : 0;
+                        $acceptedAtCoop = $isAcceptedCoop ? date('Y-m-d H:i:s') : null;
+                        $stmtAssignee->execute([$newTaskId, $coopId, 'COOP', $isAcceptedCoop, $acceptedAtCoop]);
                     }
                 }
             }

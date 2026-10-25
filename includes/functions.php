@@ -110,6 +110,10 @@ function renderStatusBadge($status) {
             return '<span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800 border border-yellow-200">
                         <i class="fa-solid fa-hourglass-half"></i> Chờ Trưởng phòng duyệt
                     </span>';
+        case 'CHO_TIEP_NHAN':
+            return '<span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium bg-cyan-100 text-cyan-800 border border-cyan-200">
+                        <i class="fa-solid fa-clock"></i> Chờ tiếp nhận
+                    </span>';
         case 'YEU_CAU_CHINH_SUA':
             return '<span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium bg-orange-100 text-orange-800 border border-orange-300">
                         <i class="fa-solid fa-pen-to-square"></i> Yêu cầu chỉnh sửa
@@ -220,7 +224,7 @@ function getKpiStats($pdo, $currentUser) {
         SELECT
             SUM(CASE WHEN t.status = 'HOAN_THANH' THEN 1 ELSE 0 END) AS completed_count,
             SUM(CASE WHEN t.status = 'DANG_THUC_HIEN' THEN 1 ELSE 0 END) AS in_progress_count,
-            SUM(CASE WHEN t.status IN ('CHO_DUYET', 'CHO_BGD_DUYET') THEN 1 ELSE 0 END) AS pending_count,
+            SUM(CASE WHEN t.status IN ('CHO_DUYET', 'CHO_BGD_DUYET', 'CHO_TIEP_NHAN') THEN 1 ELSE 0 END) AS pending_count,
             SUM(CASE WHEN (t.due_date IS NOT NULL AND t.due_date < CURDATE() AND t.status != 'HOAN_THANH') THEN 1 ELSE 0 END) AS overdue_count
         FROM tasks t
         WHERE $whereSql

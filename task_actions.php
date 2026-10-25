@@ -42,7 +42,7 @@ if ($action === 'save_leader_comment' || $action === 'approve') {
     $leaderComment = trim($_REQUEST['leader_comments'] ?? '');
 
     // Check task info
-    $stmt = $pdo->prepare("SELECT department_id FROM tasks WHERE id = ?");
+    $stmt = $pdo->prepare("SELECT department_id, status FROM tasks WHERE id = ?");
     $stmt->execute([$taskId]);
     $task = $stmt->fetch();
 
@@ -60,10 +60,27 @@ if ($action === 'save_leader_comment' || $action === 'approve') {
     }
 
     if ($canApprove) {
-        $stmtUpdate = $pdo->prepare("UPDATE tasks SET status = ?, leader_comments = ?, leader_comment_user_id = ? WHERE id = ?");
-        $stmtUpdate->execute([$newStatus, $leaderComment ?: null, $currentUser['id'], $taskId]);
+        if ($newStatus === 'CHO_BGD_DUYET') {
+            $stmtUnaccepted = $pdo->prepare("SELECT COUNT(*) FROM task_assignees WHERE task_id = ? AND (is_accepted = 0 OR is_accepted IS NULL)");
+            $stmtUnaccepted->execute([$taskId]);
+            $unacceptedCount = (int)$stmtUnaccepted->fetchColumn();
 
-        $statusName = $newStatus === 'DANG_THUC_HIEN' ? 'Đã duyệt' : ($newStatus === 'CHO_BGD_DUYET' ? 'Trình BGD duyệt' : 'Yêu cầu chỉnh sửa');
+            if ($unacceptedCount > 0) {
+                $actualStatus = 'CHO_TIEP_NHAN';
+                $targetStatus = 'CHO_BGD_DUYET';
+            } else {
+                $actualStatus = 'CHO_BGD_DUYET';
+                $targetStatus = 'CHO_BGD_DUYET';
+            }
+        } else {
+            $actualStatus = $newStatus;
+            $targetStatus = null;
+        }
+
+        $stmtUpdate = $pdo->prepare("UPDATE tasks SET status = ?, target_status = ?, leader_comments = ?, leader_comment_user_id = ? WHERE id = ?");
+        $stmtUpdate->execute([$actualStatus, $targetStatus, $leaderComment ?: null, $currentUser['id'], $taskId]);
+
+        $statusName = $actualStatus === 'DANG_THUC_HIEN' ? 'Đã duyệt' : ($actualStatus === 'CHO_TIEP_NHAN' ? 'Chờ tiếp nhận (Trình BGD)' : ($actualStatus === 'CHO_BGD_DUYET' ? 'Trình BGD duyệt' : 'Yêu cầu chỉnh sửa'));
         logTaskTimeline($pdo, $taskId, $currentUser['id'], 'LEADER_APPROVAL', "Cập nhật trạng thái: $statusName" . ($leaderComment ? ". Ý kiến: $leaderComment" : ""));
 
         $_SESSION['flash_success'] = "Đã lưu ý kiến chỉ đạo và cập nhật phê duyệt!";
@@ -112,19 +129,26 @@ if ($action === 'save_task') {
     $taskId = (int)($_POST['task_id'] ?? 0);
     $title = trim($_POST['title'] ?? '');
     $description = trim($_POST['description'] ?? '');
-    $departmentId = (int)($_POST['department_id'] ?? $currentUser['department_id']);
+    $departmentId = in_array($currentUser['role'], ['TRUONG_PHONG', 'NHAN_VIEN', 'HO_TRO'])
+        ? $currentUser['department_id']
+        : (int)($_POST['department_id'] ?? $currentUser['department_id']);
     $priority = $_POST['priority'] ?? 'TRUNG_BINH';
 
-    // Default status logic:
-    // - TRUONG_PHONG or BGD: CHO_BGD_DUYET
-    // - NHAN_VIEN or HO_TRO: CHO_DUYET
-    $defaultStatus = in_array($currentUser['role'], ['TRUONG_PHONG', 'BGD']) ? 'CHO_BGD_DUYET' : 'CHO_DUYET';
-    $status = $_POST['status'] ?? $defaultStatus;
-
+    // Default status logic by role:
+    $targetStatus = null;
     if (in_array($currentUser['role'], ['NHAN_VIEN', 'HO_TRO'])) {
         $status = 'CHO_DUYET';
-    } elseif (in_array($currentUser['role'], ['TRUONG_PHONG', 'BGD']) && $taskId === 0) {
-        $status = 'CHO_BGD_DUYET';
+        $targetStatus = null;
+    } elseif ($currentUser['role'] === 'TRUONG_PHONG') {
+        $status = 'CHO_TIEP_NHAN';
+        $targetStatus = 'CHO_BGD_DUYET';
+    } elseif ($currentUser['role'] === 'BGD') {
+        $status = 'CHO_TIEP_NHAN';
+        $targetStatus = 'DANG_THUC_HIEN';
+    } else {
+        // SUPER_ADMIN
+        $status = $_POST['status'] ?? 'CHO_DUYET';
+        $targetStatus = ($status === 'CHO_TIEP_NHAN') ? 'DANG_THUC_HIEN' : null;
     }
 
     $startDate = $_POST['start_date'] ?: null;
@@ -140,7 +164,7 @@ if ($action === 'save_task') {
 
     if ($taskId > 0) {
         // Edit existing task permission check
-        $stmtExisting = $pdo->prepare("SELECT created_by, status FROM tasks WHERE id = ?");
+        $stmtExisting = $pdo->prepare("SELECT created_by, status, target_status FROM tasks WHERE id = ?");
         $stmtExisting->execute([$taskId]);
         $existingTask = $stmtExisting->fetch();
 
@@ -150,20 +174,26 @@ if ($action === 'save_task') {
             exit;
         }
 
-        // Cá nhân được quyền sửa công việc do chính mình tạo/đăng ký
+        // Cá nhân được quyền sửa công việc do chính mình tạo/đăng ký hoặc SUPER_ADMIN
         if ($currentUser['role'] !== 'SUPER_ADMIN' && $existingTask['created_by'] != $currentUser['id']) {
             $_SESSION['flash_error'] = "Bạn chỉ có quyền chỉnh sửa công việc do chính mình đã tạo!";
             header("Location: index.php");
             exit;
         }
 
+        // On edit, keep existing status & target_status if standard user, unless super admin
+        if ($currentUser['role'] !== 'SUPER_ADMIN') {
+            $status = $existingTask['status'];
+            $targetStatus = $existingTask['target_status'];
+        }
+
         // Edit existing task
         $stmt = $pdo->prepare("
             UPDATE tasks
-            SET title = ?, description = ?, department_id = ?, priority = ?, status = ?, start_date = ?, due_date = ?
+            SET title = ?, description = ?, department_id = ?, priority = ?, status = ?, target_status = ?, start_date = ?, due_date = ?
             WHERE id = ?
         ");
-        $stmt->execute([$title, $description, $departmentId, $priority, $status, $startDate, $dueDate, $taskId]);
+        $stmt->execute([$title, $description, $departmentId, $priority, $status, $targetStatus, $startDate, $dueDate, $taskId]);
 
         // Reassign assignees
         $pdo->prepare("DELETE FROM task_assignees WHERE task_id = ?")->execute([$taskId]);
@@ -171,10 +201,10 @@ if ($action === 'save_task') {
     } else {
         // Insert new task
         $stmt = $pdo->prepare("
-            INSERT INTO tasks (title, description, department_id, status, priority, progress, start_date, due_date, created_by)
-            VALUES (?, ?, ?, ?, ?, 0, ?, ?, ?)
+            INSERT INTO tasks (title, description, department_id, status, target_status, priority, progress, start_date, due_date, created_by)
+            VALUES (?, ?, ?, ?, ?, ?, 0, ?, ?, ?)
         ");
-        $stmt->execute([$title, $description, $departmentId, $status, $priority, $startDate, $dueDate, $currentUser['id']]);
+        $stmt->execute([$title, $description, $departmentId, $status, $targetStatus, $priority, $startDate, $dueDate, $currentUser['id']]);
         $taskId = $pdo->lastInsertId();
 
         logTaskTimeline($pdo, $taskId, $currentUser['id'], 'CREATE_TASK', "Đăng ký/Tạo mới công việc");
@@ -182,23 +212,22 @@ if ($action === 'save_task') {
 
     // Insert MAIN assignee
     if ($mainAssignee > 0) {
-        $stmtMain = $pdo->prepare("INSERT INTO task_assignees (task_id, user_id, role_type) VALUES (?, ?, 'MAIN') ON DUPLICATE KEY UPDATE role_type = 'MAIN'");
-        $stmtMain->execute([$taskId, $mainAssignee]);
+        $isAcceptedMain = ($mainAssignee === $currentUser['id'] && $status !== 'CHO_TIEP_NHAN' && $status !== 'CHO_XAC_NHAN') ? 1 : 0;
+        $acceptedAtMain = $isAcceptedMain ? date('Y-m-d H:i:s') : null;
 
-        // Workflow Notification: When Trưởng phòng assigns a new task to a Nhân viên
-        if ($currentUser['role'] === 'TRUONG_PHONG' && $mainAssignee !== $currentUser['id']) {
-            $stmtSetPending = $pdo->prepare("UPDATE tasks SET status = 'CHO_XAC_NHAN' WHERE id = ?");
-            $stmtSetPending->execute([$taskId]);
-        }
+        $stmtMain = $pdo->prepare("INSERT INTO task_assignees (task_id, user_id, role_type, is_accepted, accepted_at) VALUES (?, ?, 'MAIN', ?, ?) ON DUPLICATE KEY UPDATE role_type = 'MAIN'");
+        $stmtMain->execute([$taskId, $mainAssignee, $isAcceptedMain, $acceptedAtMain]);
     }
 
     // Insert COOP assignees
     if (is_array($coopAssignees)) {
-        $stmtCoop = $pdo->prepare("INSERT IGNORE INTO task_assignees (task_id, user_id, role_type) VALUES (?, ?, 'COOP')");
+        $stmtCoop = $pdo->prepare("INSERT IGNORE INTO task_assignees (task_id, user_id, role_type, is_accepted, accepted_at) VALUES (?, ?, 'COOP', ?, ?)");
         foreach ($coopAssignees as $coopId) {
             $coopId = (int)$coopId;
             if ($coopId > 0 && $coopId !== $mainAssignee) {
-                $stmtCoop->execute([$taskId, $coopId]);
+                $isAcceptedCoop = ($coopId === $currentUser['id'] && $status !== 'CHO_TIEP_NHAN' && $status !== 'CHO_XAC_NHAN') ? 1 : 0;
+                $acceptedAtCoop = $isAcceptedCoop ? date('Y-m-d H:i:s') : null;
+                $stmtCoop->execute([$taskId, $coopId, $isAcceptedCoop, $acceptedAtCoop]);
             }
         }
     }
@@ -208,31 +237,51 @@ if ($action === 'save_task') {
     exit;
 }
 
-// 5. RESPOND TO ALL ASSIGNED TASKS (BATCH ACCEPTANCE) BY NHAN VIEN
+// 5. RESPOND TO ALL ASSIGNED TASKS (BATCH ACCEPTANCE) BY ASSIGNED USERS
 if ($action === 'respond_all_assigned_tasks') {
     $taskIds = $_POST['task_ids'] ?? [];
     $generalComment = trim($_POST['general_comment'] ?? '');
     $comments = $_POST['comments'] ?? [];
 
     if (!empty($taskIds) && is_array($taskIds)) {
-        $stmtUpdate = $pdo->prepare("UPDATE tasks SET status = 'DANG_THUC_HIEN', comment_feedback = ? WHERE id = ?");
-
         $stmtCheck = $pdo->prepare("
-            SELECT t.id, t.title FROM tasks t
+            SELECT t.* FROM tasks t
             JOIN task_assignees ta ON t.id = ta.task_id
-            WHERE t.id = ? AND ta.user_id = ? AND t.status = 'CHO_XAC_NHAN'
+            WHERE t.id = ? AND ta.user_id = ?
         ");
+
+        $stmtAccept = $pdo->prepare("UPDATE task_assignees SET is_accepted = 1, accepted_at = NOW() WHERE task_id = ? AND user_id = ?");
+        $stmtFeedback = $pdo->prepare("UPDATE tasks SET comment_feedback = ? WHERE id = ?");
+        $stmtCount = $pdo->prepare("SELECT COUNT(*) FROM task_assignees WHERE task_id = ? AND (is_accepted = 0 OR is_accepted IS NULL)");
+        $stmtUpdateStatus = $pdo->prepare("UPDATE tasks SET status = ? WHERE id = ?");
 
         $acceptedCount = 0;
         foreach ($taskIds as $taskId) {
             $taskId = (int)$taskId;
             $stmtCheck->execute([$taskId, $currentUser['id']]);
             $task = $stmtCheck->fetch();
+
             if ($task) {
                 $indivComment = trim($comments[$taskId] ?? '');
                 $feedback = !empty($indivComment) ? $indivComment : $generalComment;
-                $stmtUpdate->execute([$feedback ?: null, $taskId]);
-                logActivity($pdo, $currentUser['id'], 'ACCEPT_TASK', "Đã đồng ý tiếp nhận công việc ID #$taskId: {$task['title']}" . ($feedback ? ". Ý kiến khác: $feedback" : ""));
+
+                $stmtAccept->execute([$taskId, $currentUser['id']]);
+                if (!empty($feedback)) {
+                    $stmtFeedback->execute([$feedback, $taskId]);
+                }
+
+                $stmtCount->execute([$taskId]);
+                $unacceptedCount = (int)$stmtCount->fetchColumn();
+
+                if ($unacceptedCount === 0) {
+                    $nextStatus = !empty($task['target_status']) ? $task['target_status'] : 'DANG_THUC_HIEN';
+                    $stmtUpdateStatus->execute([$nextStatus, $taskId]);
+                    logTaskTimeline($pdo, $taskId, $currentUser['id'], 'ACCEPT_TASK', "Tất cả người được giao việc đã đồng ý tiếp nhận. Chuyển sang: $nextStatus" . ($feedback ? ". Ý kiến: $feedback" : ""));
+                } else {
+                    logTaskTimeline($pdo, $taskId, $currentUser['id'], 'ACCEPT_TASK', "{$currentUser['fullname']} đã đồng ý tiếp nhận (Đang chờ thành viên khác)" . ($feedback ? ". Ý kiến: $feedback" : ""));
+                }
+
+                logActivity($pdo, $currentUser['id'], 'ACCEPT_TASK', "Đã đồng ý tiếp nhận công việc ID #$taskId: {$task['title']}");
                 $acceptedCount++;
             }
         }
@@ -323,7 +372,7 @@ if ($action === 'batch_approve_tasks') {
     exit;
 }
 
-// 6. RESPOND TO ASSIGNED TASK (ACCEPT SINGLE TASK) BY NHAN VIEN
+// 6. RESPOND TO ASSIGNED TASK (ACCEPT SINGLE TASK) BY ASSIGNED USER
 if ($action === 'respond_assigned_task') {
     $taskId = (int)($_POST['task_id'] ?? 0);
     $commentFeedback = trim($_POST['comment_feedback'] ?? '');
@@ -343,10 +392,34 @@ if ($action === 'respond_assigned_task') {
         exit;
     }
 
-    $stmtUpdate = $pdo->prepare("UPDATE tasks SET status = 'DANG_THUC_HIEN', comment_feedback = ? WHERE id = ?");
-    $stmtUpdate->execute([$commentFeedback ?: null, $taskId]);
-    logActivity($pdo, $currentUser['id'], 'ACCEPT_TASK', "Đã đồng ý tiếp nhận công việc ID #$taskId: {$task['title']}" . ($commentFeedback ? ". Ý kiến khác: $commentFeedback" : ""));
-    $_SESSION['flash_success'] = "Bạn đã tiếp nhận công việc thành công!";
+    // Mark current user as accepted
+    $stmtAccept = $pdo->prepare("UPDATE task_assignees SET is_accepted = 1, accepted_at = NOW() WHERE task_id = ? AND user_id = ?");
+    $stmtAccept->execute([$taskId, $currentUser['id']]);
+
+    // Save feedback if provided
+    if (!empty($commentFeedback)) {
+        $pdo->prepare("UPDATE tasks SET comment_feedback = ? WHERE id = ?")->execute([$commentFeedback, $taskId]);
+    }
+
+    // Check remaining unaccepted assignees
+    $stmtCount = $pdo->prepare("SELECT COUNT(*) FROM task_assignees WHERE task_id = ? AND (is_accepted = 0 OR is_accepted IS NULL)");
+    $stmtCount->execute([$taskId]);
+    $unacceptedCount = (int)$stmtCount->fetchColumn();
+
+    if ($unacceptedCount === 0) {
+        // All assignees have accepted! Move to target_status or DANG_THUC_HIEN
+        $nextStatus = !empty($task['target_status']) ? $task['target_status'] : 'DANG_THUC_HIEN';
+        $pdo->prepare("UPDATE tasks SET status = ? WHERE id = ?")->execute([$nextStatus, $taskId]);
+
+        $statusLabel = $nextStatus === 'CHO_BGD_DUYET' ? 'Chờ BGD duyệt' : 'Đang thực hiện';
+        logTaskTimeline($pdo, $taskId, $currentUser['id'], 'ACCEPT_TASK', "Tất cả người được giao việc đã đồng ý tiếp nhận. Công việc chuyển sang trạng thái: $statusLabel" . ($commentFeedback ? ". Ý kiến: $commentFeedback" : ""));
+        logActivity($pdo, $currentUser['id'], 'ACCEPT_TASK', "Đã đồng ý tiếp nhận công việc ID #$taskId: {$task['title']}");
+        $_SESSION['flash_success'] = "Tất cả người thực hiện đã tiếp nhận công việc. Công việc chuyển sang trạng thái $statusLabel!";
+    } else {
+        logTaskTimeline($pdo, $taskId, $currentUser['id'], 'ACCEPT_TASK', "{$currentUser['fullname']} đã đồng ý tiếp nhận công việc (Đang chờ các thành viên khác xác nhận)" . ($commentFeedback ? ". Ý kiến: $commentFeedback" : ""));
+        logActivity($pdo, $currentUser['id'], 'ACCEPT_TASK', "Đã đồng ý tiếp nhận công việc ID #$taskId: {$task['title']}");
+        $_SESSION['flash_success'] = "Bạn đã tiếp nhận công việc thành công. Đang chờ các người phối hợp khác xác nhận!";
+    }
 
     header("Location: index.php");
     exit;
