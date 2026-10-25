@@ -23,10 +23,18 @@ echo [2/4] Dang thuc thi Migration update_v2.sql (database\migrations\update_v2.
 echo [3/4] Dang thuc thi Migration Lich hop BGD (database\migrations\update_bgd_schedules.sql)...
 %MYSQL_CMD% -h localhost -P 3306 -u root < database\migrations\update_bgd_schedules.sql
 
-echo [4/4] Dang thuc thi Migration Approval & Priority (database\migrations\update_20261025_approval_priority.sql)...
+echo [4/5] Dang thuc thi Migration Approval & Priority (database\migrations\update_20261025_approval_priority.sql)...
 %MYSQL_CMD% -h localhost -P 3306 -u root < database\migrations\update_20261025_approval_priority.sql
 if %ERRORLEVEL% NEQ 0 (
     echo [LOI] Khong the thuc thi database\migrations\update_20261025_approval_priority.sql. Vui long kiem tra XAMPP MySQL.
+    pause
+    exit /b %ERRORLEVEL%
+)
+
+echo [5/5] Dang thuc thi Migration Batch Approval (database\migrations\update_20261026_batch_approval.sql)...
+%MYSQL_CMD% -h localhost -P 3306 -u root < database\migrations\update_20261026_batch_approval.sql
+if %ERRORLEVEL% NEQ 0 (
+    echo [LOI] Khong the thuc thi database\migrations\update_20261026_batch_approval.sql. Vui long kiem tra XAMPP MySQL.
     pause
     exit /b %ERRORLEVEL%
 )

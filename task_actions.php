@@ -237,6 +237,82 @@ if ($action === 'respond_all_assigned_tasks') {
     exit;
 }
 
+// BATCH APPROVAL OF TASKS BY LEADERS (TRƯỞNG PHÒNG & BGD)
+if ($action === 'batch_approve_tasks') {
+    $taskIds = $_POST['task_ids'] ?? [];
+    $generalComment = trim($_POST['leader_comments_general'] ?? '');
+
+    if (!in_array($currentUser['role'], ['TRUONG_PHONG', 'BGD', 'SUPER_ADMIN'])) {
+        $_SESSION['flash_error'] = "Bạn không có quyền thực hiện chức năng phê duyệt hàng loạt!";
+        header("Location: index.php");
+        exit;
+    }
+
+    if (empty($taskIds) || !is_array($taskIds)) {
+        $_SESSION['flash_error'] = "Vui lòng chọn ít nhất một công việc để phê duyệt!";
+        header("Location: index.php");
+        exit;
+    }
+
+    $approvedCount = 0;
+    $stmtCheck = $pdo->prepare("SELECT id, title, department_id, status, leader_comments FROM tasks WHERE id = ?");
+
+    $stmtUpdateWithComment = $pdo->prepare("
+        UPDATE tasks
+        SET status = 'DANG_THUC_HIEN', leader_comments = ?, leader_comment_user_id = ?
+        WHERE id = ?
+    ");
+
+    $stmtUpdateKeepComment = $pdo->prepare("
+        UPDATE tasks
+        SET status = 'DANG_THUC_HIEN', leader_comment_user_id = ?
+        WHERE id = ?
+    ");
+
+    foreach ($taskIds as $taskId) {
+        $taskId = (int)$taskId;
+        $stmtCheck->execute([$taskId]);
+        $task = $stmtCheck->fetch();
+
+        if (!$task) {
+            continue;
+        }
+
+        // RBAC validation:
+        // - BGD / SUPER_ADMIN: can approve any pending task (CHO_BGD_DUYET / CHO_DUYET)
+        // - TRUONG_PHONG: can approve pending tasks in their department (CHO_DUYET)
+        $canApprove = false;
+        if (in_array($currentUser['role'], ['BGD', 'SUPER_ADMIN'])) {
+            if ($task['status'] === 'CHO_BGD_DUYET' || $task['status'] === 'CHO_DUYET') {
+                $canApprove = true;
+            }
+        } elseif ($currentUser['role'] === 'TRUONG_PHONG') {
+            if ($task['status'] === 'CHO_DUYET' && $task['department_id'] == $currentUser['department_id']) {
+                $canApprove = true;
+            }
+        }
+
+        if ($canApprove) {
+            if (!empty($generalComment)) {
+                $stmtUpdateWithComment->execute([$generalComment, $currentUser['id'], $taskId]);
+            } else {
+                $stmtUpdateKeepComment->execute([$currentUser['id'], $taskId]);
+            }
+            $approvedCount++;
+            logActivity($pdo, $currentUser['id'], 'BATCH_APPROVE_TASK', "Đã phê duyệt công việc ID #$taskId: {$task['title']}");
+        }
+    }
+
+    if ($approvedCount > 0) {
+        $_SESSION['flash_success'] = "Đã phê duyệt hàng loạt $approvedCount công việc thành công!";
+    } else {
+        $_SESSION['flash_error'] = "Không có công việc nào được phê duyệt (kiểm tra lại quyền hoặc trạng thái công việc).";
+    }
+
+    header("Location: index.php");
+    exit;
+}
+
 // 6. RESPOND TO ASSIGNED TASK (ACCEPT SINGLE TASK) BY NHAN VIEN
 if ($action === 'respond_assigned_task') {
     $taskId = (int)($_POST['task_id'] ?? 0);
