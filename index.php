@@ -120,6 +120,9 @@ if ($currentUser['role'] === 'BGD') {
     $stmtAdminPending->execute();
     $pendingApprovalTasks = $stmtAdminPending->fetchAll();
 }
+
+// Fetch KPI Stats for Stats Bar
+$kpiStats = getKpiStats($pdo, $currentUser);
 ?>
 
 <!-- WORKFLOW NOTIFICATION BANNER FOR BAN GIÁM ĐỐC: PENDING APPROVAL TASKS -->
@@ -290,11 +293,13 @@ if ($currentUser['role'] === 'BGD') {
             <label class="block text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-1">Trạng thái</label>
             <select name="status" class="w-full px-3 py-2 border border-slate-200 rounded-xl text-xs focus:ring-2 focus:ring-indigo-500 outline-none bg-white font-medium text-slate-700">
                 <option value="ALL">-- Tất cả trạng thái --</option>
+                <option value="HOAN_THANH" <?= $filters['status'] === 'HOAN_THANH' ? 'selected' : '' ?>>CV đã hoàn thành</option>
+                <option value="DANG_THUC_HIEN" <?= $filters['status'] === 'DANG_THUC_HIEN' ? 'selected' : '' ?>>CV đang thực hiện</option>
+                <option value="OVERDUE" <?= $filters['status'] === 'OVERDUE' ? 'selected' : '' ?>>CV quá hạn</option>
+                <option value="CHO_DUYET_ALL" <?= $filters['status'] === 'CHO_DUYET_ALL' ? 'selected' : '' ?>>CV đang chờ duyệt</option>
                 <option value="CHO_BGD_DUYET" <?= $filters['status'] === 'CHO_BGD_DUYET' ? 'selected' : '' ?>>Chờ BGD duyệt</option>
                 <option value="CHO_DUYET" <?= $filters['status'] === 'CHO_DUYET' ? 'selected' : '' ?>>Chờ Trưởng phòng duyệt</option>
                 <option value="YEU_CAU_CHINH_SUA" <?= $filters['status'] === 'YEU_CAU_CHINH_SUA' ? 'selected' : '' ?>>Yêu cầu chỉnh sửa</option>
-                <option value="DANG_THUC_HIEN" <?= $filters['status'] === 'DANG_THUC_HIEN' ? 'selected' : '' ?>>Đang thực hiện</option>
-                <option value="HOAN_THANH" <?= $filters['status'] === 'HOAN_THANH' ? 'selected' : '' ?>>Hoàn thành</option>
             </select>
         </div>
 
@@ -310,6 +315,86 @@ if ($currentUser['role'] === 'BGD') {
             </a>
         </div>
     </form>
+
+    <!-- THANH THỐNG KÊ NHANH KPI (Stats Bar Phân Quyền) -->
+    <?php
+    // Scope label based on role
+    $scopeLabel = 'Cá nhân';
+    if ($currentUser['role'] === 'TRUONG_PHONG') {
+        $scopeLabel = 'Toàn Phòng ' . htmlspecialchars($currentUser['department_code']);
+    } elseif (in_array($currentUser['role'], ['BGD', 'SUPER_ADMIN'])) {
+        $scopeLabel = 'Toàn Phân hiệu';
+    }
+
+    // Preserve existing filter params except status for quick filtering
+    $baseQuery = $_GET;
+    unset($baseQuery['status'], $baseQuery['page']);
+
+    $urlCompleted = 'index.php?' . http_build_query(array_merge($baseQuery, ['status' => 'HOAN_THANH']));
+    $urlInProgress = 'index.php?' . http_build_query(array_merge($baseQuery, ['status' => 'DANG_THUC_HIEN']));
+    $urlOverdue = 'index.php?' . http_build_query(array_merge($baseQuery, ['status' => 'OVERDUE']));
+    $urlPending = 'index.php?' . http_build_query(array_merge($baseQuery, ['status' => 'CHO_DUYET_ALL']));
+    ?>
+    <div class="mt-4 pt-4 border-t border-slate-100">
+        <div class="flex items-center justify-between mb-2">
+            <span class="text-[11px] font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1.5">
+                <i class="fa-solid fa-chart-simple text-indigo-600"></i>
+                <span>Thống Kê Nhanh KPI (Phạm vi: <strong class="text-indigo-900"><?= $scopeLabel ?></strong>)</span>
+            </span>
+            <span class="text-[10px] text-slate-400 italic">Nhấp vào từng ô để lọc nhanh danh sách</span>
+        </div>
+
+        <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
+            <!-- 1. CV đã hoàn thành -->
+            <a href="<?= $urlCompleted ?>" class="p-3 rounded-xl border transition shadow-sm flex items-center gap-3 group <?= $filters['status'] === 'HOAN_THANH' ? 'bg-emerald-100 border-emerald-400 ring-2 ring-emerald-400/50' : 'bg-emerald-50/60 hover:bg-emerald-100/80 border-emerald-200' ?>">
+                <div class="w-10 h-10 rounded-lg bg-emerald-500 text-white flex items-center justify-center text-lg shrink-0 group-hover:scale-110 transition">
+                    <i class="fa-solid fa-circle-check"></i>
+                </div>
+                <div>
+                    <div class="text-[11px] font-semibold text-emerald-800">CV đã hoàn thành</div>
+                    <div class="text-lg font-black text-emerald-950 leading-tight"><?= $kpiStats['completed'] ?> <span class="text-xs font-normal text-emerald-700">công việc</span></div>
+                </div>
+            </a>
+
+            <!-- 2. CV đang thực hiện -->
+            <a href="<?= $urlInProgress ?>" class="p-3 rounded-xl border transition shadow-sm flex items-center gap-3 group <?= $filters['status'] === 'DANG_THUC_HIEN' ? 'bg-sky-100 border-sky-400 ring-2 ring-sky-400/50' : 'bg-sky-50/60 hover:bg-sky-100/80 border-sky-200' ?>">
+                <div class="w-10 h-10 rounded-lg bg-sky-500 text-white flex items-center justify-center text-lg shrink-0 group-hover:scale-110 transition">
+                    <i class="fa-solid fa-spinner"></i>
+                </div>
+                <div>
+                    <div class="text-[11px] font-semibold text-sky-800">CV đang thực hiện</div>
+                    <div class="text-lg font-black text-sky-950 leading-tight"><?= $kpiStats['in_progress'] ?> <span class="text-xs font-normal text-sky-700">công việc</span></div>
+                </div>
+            </a>
+
+            <!-- 3. CV quá hạn (Nổi bật / Nhấp nháy màu đỏ) -->
+            <a href="<?= $urlOverdue ?>" class="p-3 rounded-xl border transition shadow-sm flex items-center gap-3 group <?= $filters['status'] === 'OVERDUE' ? 'bg-rose-200 border-rose-500 ring-2 ring-rose-500/50' : 'bg-rose-50 hover:bg-rose-100 border-rose-300' ?>">
+                <div class="w-10 h-10 rounded-lg bg-rose-600 text-white flex items-center justify-center text-lg shrink-0 group-hover:scale-110 transition <?= $kpiStats['overdue'] > 0 ? 'animate-pulse' : '' ?>">
+                    <i class="fa-solid fa-triangle-exclamation"></i>
+                </div>
+                <div>
+                    <div class="text-[11px] font-bold text-rose-800 flex items-center gap-1">
+                        <span>CV QUÁ HẠN</span>
+                        <?php if ($kpiStats['overdue'] > 0): ?>
+                            <span class="inline-block w-2 h-2 rounded-full bg-rose-600 animate-ping"></span>
+                        <?php endif; ?>
+                    </div>
+                    <div class="text-lg font-black text-rose-700 leading-tight"><?= $kpiStats['overdue'] ?> <span class="text-xs font-bold text-rose-800">công việc</span></div>
+                </div>
+            </a>
+
+            <!-- 4. CV đang chờ duyệt -->
+            <a href="<?= $urlPending ?>" class="p-3 rounded-xl border transition shadow-sm flex items-center gap-3 group <?= $filters['status'] === 'CHO_DUYET_ALL' ? 'bg-amber-100 border-amber-400 ring-2 ring-amber-400/50' : 'bg-amber-50/60 hover:bg-amber-100/80 border-amber-200' ?>">
+                <div class="w-10 h-10 rounded-lg bg-amber-500 text-white flex items-center justify-center text-lg shrink-0 group-hover:scale-110 transition">
+                    <i class="fa-solid fa-hourglass-half"></i>
+                </div>
+                <div>
+                    <div class="text-[11px] font-semibold text-amber-800">CV đang chờ duyệt</div>
+                    <div class="text-lg font-black text-amber-950 leading-tight"><?= $kpiStats['pending'] ?> <span class="text-xs font-normal text-amber-700">công việc</span></div>
+                </div>
+            </a>
+        </div>
+    </div>
 </div>
 
 <!-- Task Table Section -->
@@ -378,6 +463,20 @@ if ($currentUser['role'] === 'BGD') {
                                 <div class="font-bold text-sm leading-snug <?= $titleColorClass ?>">
                                     <?= htmlspecialchars($t['title']) ?>
                                 </div>
+
+                                <!-- BADGE NGƯỜI GIAO VIỆC DÀNH CHO CÔNG VIỆC TRỰC TIẾP -->
+                                <?php
+                                $isDirectAssignment = in_array($t['creator_role'], ['TRUONG_PHONG', 'BGD', 'SUPER_ADMIN']);
+                                ?>
+                                <?php if ($isDirectAssignment): ?>
+                                    <div class="mt-1">
+                                        <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-semibold bg-indigo-50 text-indigo-800 border border-indigo-200" title="Công việc do Lãnh đạo giao trực tiếp">
+                                            <i class="fa-solid fa-user-tie text-indigo-600"></i>
+                                            <span>Giao bởi: <strong><?= htmlspecialchars($t['creator_name']) ?></strong></span>
+                                        </span>
+                                    </div>
+                                <?php endif; ?>
+
                                 <?php if (!empty($t['description'])): ?>
                                     <div class="text-slate-500 text-xs mt-1 line-clamp-2">
                                         <?= htmlspecialchars($t['description']) ?>
@@ -481,19 +580,24 @@ if ($currentUser['role'] === 'BGD') {
                                     $isBgd = ($currentUser['role'] === 'BGD');
                                     ?>
 
+                                    <!-- View Detail & Timeline Log Modal Button -->
+                                    <button onclick='openTaskDetailModal(<?= htmlspecialchars(json_encode($t), ENT_QUOTES, "UTF-8") ?>)' class="p-1.5 bg-blue-50 hover:bg-blue-600 text-blue-600 hover:text-white rounded-lg transition" title="Xem chi tiết & Lịch sử thao tác (Timeline)">
+                                        <i class="fa-solid fa-clock-rotate-left text-xs"></i>
+                                    </button>
+
                                     <!-- Progress & Proof Update Button (Trưởng phòng không hiển thị nút này theo yêu cầu) -->
                                     <?php
                                     $canUpdateProgress = ($isAssignee || $isCreator || $isBgd) && ($currentUser['role'] !== 'TRUONG_PHONG');
                                     ?>
                                     <?php if ($canUpdateProgress): ?>
-                                        <button onclick='openProgressModal(<?= json_encode($t) ?>)' class="p-1.5 bg-indigo-50 hover:bg-indigo-600 text-indigo-600 hover:text-white rounded-lg transition" title="Cập nhật tiến độ & minh chứng">
+                                        <button onclick='openProgressModal(<?= htmlspecialchars(json_encode($t), ENT_QUOTES, "UTF-8") ?>)' class="p-1.5 bg-indigo-50 hover:bg-indigo-600 text-indigo-600 hover:text-white rounded-lg transition" title="Cập nhật tiến độ & minh chứng">
                                             <i class="fa-solid fa-sliders text-xs"></i>
                                         </button>
                                     <?php endif; ?>
 
                                     <!-- Approval & Directive Comment Button for Leaders (Trưởng phòng & BGD) -->
                                     <?php if ($isLeaderOfDept || $isBgd): ?>
-                                        <button onclick='openLeaderModal(<?= json_encode($t) ?>)' class="px-2 py-1 bg-emerald-50 hover:bg-emerald-600 text-emerald-700 hover:text-white border border-emerald-200 rounded-lg text-[11px] font-bold transition flex items-center gap-1 shadow-sm" title="Duyệt / Cho ý kiến chỉ đạo">
+                                        <button onclick='openLeaderModal(<?= htmlspecialchars(json_encode($t), ENT_QUOTES, "UTF-8") ?>)' class="px-2 py-1 bg-emerald-50 hover:bg-emerald-600 text-emerald-700 hover:text-white border border-emerald-200 rounded-lg text-[11px] font-bold transition flex items-center gap-1 shadow-sm" title="Duyệt / Cho ý kiến chỉ đạo">
                                             <i class="fa-solid fa-clipboard-check text-xs"></i>
                                             <span>Duyệt / Ý kiến</span>
                                         </button>
@@ -501,7 +605,7 @@ if ($currentUser['role'] === 'BGD') {
 
                                     <!-- Edit Button (Cá nhân được quyền sửa công việc do chính mình đã tạo/đăng ký) -->
                                     <?php if ($isCreator || $currentUser['role'] === 'SUPER_ADMIN'): ?>
-                                        <button onclick='openTaskModal(<?= json_encode($t) ?>)' class="p-1.5 bg-amber-50 hover:bg-amber-600 text-amber-600 hover:text-white rounded-lg transition" title="Chỉnh sửa nội dung">
+                                        <button onclick='openTaskModal(<?= htmlspecialchars(json_encode($t), ENT_QUOTES, "UTF-8") ?>)' class="p-1.5 bg-amber-50 hover:bg-amber-600 text-amber-600 hover:text-white rounded-lg transition" title="Chỉnh sửa nội dung">
                                             <i class="fa-solid fa-pen-to-square text-xs"></i>
                                         </button>
                                     <?php endif; ?>
@@ -898,6 +1002,53 @@ if ($currentUser['role'] === 'BGD') {
     </div>
 </div>
 
+<!-- ==================== MODAL: TASK DETAIL & TIMELINE LOG HISTORY ==================== -->
+<div id="taskDetailModal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm hidden items-center justify-center p-4 z-50">
+    <div class="bg-white rounded-2xl shadow-2xl max-w-2xl w-full p-6 border border-slate-200 max-h-[90vh] overflow-y-auto">
+        <div class="flex items-center justify-between pb-3 border-b border-slate-100 mb-4">
+            <h3 class="font-bold text-slate-900 text-base flex items-center gap-2">
+                <i class="fa-solid fa-circle-info text-blue-600"></i>
+                <span id="detailModalTitle">Chi Tiết Công Việc & Lịch Sử Xử Lý</span>
+            </h3>
+            <button onclick="closeTaskDetailModal()" class="text-slate-400 hover:text-slate-600"><i class="fa-solid fa-xmark text-lg"></i></button>
+        </div>
+
+        <div class="space-y-4 text-xs">
+            <!-- Task Info Card -->
+            <div class="bg-slate-50 p-4 rounded-xl border border-slate-200 space-y-2">
+                <div class="flex items-center justify-between">
+                    <span id="detailDeptBadge"></span>
+                    <span id="detailStatusBadge"></span>
+                </div>
+                <h4 id="detailTitle" class="text-sm font-bold text-slate-900"></h4>
+                <p id="detailDesc" class="text-slate-600 leading-relaxed"></p>
+                <div class="grid grid-cols-2 gap-2 text-slate-500 pt-2 border-t border-slate-200/60">
+                    <div><i class="fa-solid fa-user text-slate-400 mr-1"></i>Người đăng ký: <strong id="detailCreator" class="text-slate-800"></strong></div>
+                    <div><i class="fa-regular fa-calendar-check text-slate-400 mr-1"></i>Hạn chót: <strong id="detailDueDate" class="text-slate-800"></strong></div>
+                </div>
+            </div>
+
+            <!-- Timeline Log Section -->
+            <div>
+                <h4 class="font-bold text-slate-800 text-xs mb-3 flex items-center gap-1.5 uppercase tracking-wider">
+                    <i class="fa-solid fa-clock-rotate-left text-indigo-600"></i>
+                    <span>Lịch Sử Thao Tác Công Việc (Timeline Log)</span>
+                </h4>
+
+                <div id="timelineContainer" class="space-y-3 relative pl-4 border-l-2 border-indigo-200 ml-2">
+                    <!-- Dynamic timeline logs injected here -->
+                </div>
+            </div>
+        </div>
+
+        <div class="flex justify-end pt-4 border-t border-slate-100 mt-5">
+            <button type="button" onclick="closeTaskDetailModal()" class="px-5 py-2 bg-slate-800 hover:bg-slate-900 text-white text-xs font-bold rounded-xl shadow">
+                Đóng
+            </button>
+        </div>
+    </div>
+</div>
+
 <!-- ==================== MODAL: BATCH APPROVAL FOR LEADERS (TRƯỞNG PHÒNG & BGD) ==================== -->
 <?php if (in_array($currentUser['role'], ['TRUONG_PHONG', 'BGD', 'SUPER_ADMIN'])): ?>
 <div id="batchApprovalModal" class="fixed inset-0 bg-slate-900/70 backdrop-blur-md hidden items-center justify-center p-4 z-50">
@@ -1015,6 +1166,54 @@ if ($currentUser['role'] === 'BGD') {
 <?php endif; ?>
 
 <script>
+function openTaskDetailModal(task) {
+    document.getElementById('detailModalTitle').innerText = 'Chi Tiết Công Việc #' + task.id;
+    document.getElementById('detailTitle').innerText = task.title;
+    document.getElementById('detailDesc').innerText = task.description || 'Không có mô tả chi tiết.';
+    document.getElementById('detailCreator').innerText = task.creator_name || 'Hệ thống';
+    document.getElementById('detailDueDate').innerText = task.due_date ? new Date(task.due_date).toLocaleDateString('vi-VN') : 'Không quy định';
+    document.getElementById('detailDeptBadge').innerText = '[' + (task.dept_code || '') + '] ' + (task.dept_name || '');
+
+    const container = document.getElementById('timelineContainer');
+    container.innerHTML = '';
+
+    if (task.timeline_logs && task.timeline_logs.length > 0) {
+        task.timeline_logs.forEach(log => {
+            const timeStr = new Date(log.created_at).toLocaleString('vi-VN');
+            const userStr = log.fullname ? (log.fullname + (log.department_code ? ' (' + log.department_code + ')' : '')) : 'Hệ thống';
+
+            let dotColor = 'bg-blue-500';
+            if (log.action.includes('APPROVE') || log.action.includes('ACCEPT')) dotColor = 'bg-emerald-500';
+            else if (log.action.includes('REJECT') || log.action.includes('DELETE')) dotColor = 'bg-rose-500';
+
+            const item = document.createElement('div');
+            item.className = 'relative group';
+            item.innerHTML = `
+                <div class="absolute -left-[21px] top-1 w-3 h-3 rounded-full ${dotColor} border-2 border-white shadow-sm"></div>
+                <div class="bg-slate-50 p-3 rounded-xl border border-slate-200">
+                    <div class="flex items-center justify-between text-[11px] text-slate-500 font-medium mb-1">
+                        <span><i class="fa-solid fa-user text-slate-400 mr-1"></i><strong>${userStr}</strong></span>
+                        <span><i class="fa-regular fa-clock text-slate-400 mr-1"></i>${timeStr}</span>
+                    </div>
+                    <div class="text-xs text-slate-800 font-semibold mb-0.5">${log.action}</div>
+                    <div class="text-[11px] text-slate-600 leading-snug">${log.description || ''}</div>
+                </div>
+            `;
+            container.appendChild(item);
+        });
+    } else {
+        container.innerHTML = '<div class="text-xs text-slate-400 italic p-2">Chưa có lịch sử thao tác ghi nhận.</div>';
+    }
+
+    document.getElementById('taskDetailModal').classList.remove('hidden');
+    document.getElementById('taskDetailModal').classList.add('flex');
+}
+
+function closeTaskDetailModal() {
+    document.getElementById('taskDetailModal').classList.add('hidden');
+    document.getElementById('taskDetailModal').classList.remove('flex');
+}
+
 function openBatchApprovalModal() {
     const modal = document.getElementById('batchApprovalModal');
     if (modal) {

@@ -17,5 +17,28 @@
     </div>
 </footer>
 
+<!-- Idle Session Timeout Tracker (60 minutes = 3600 seconds) -->
+<script>
+(function() {
+    const IDLE_TIMEOUT_MS = 60 * 60 * 1000; // 60 minutes in milliseconds
+    let idleTimer;
+
+    function resetIdleTimer() {
+        clearTimeout(idleTimer);
+        idleTimer = setTimeout(function() {
+            window.location.href = 'logout.php?timeout=1';
+        }, IDLE_TIMEOUT_MS);
+    }
+
+    // Monitor user interaction events
+    const events = ['mousemove', 'keydown', 'click', 'scroll', 'touchstart'];
+    events.forEach(function(eventName) {
+        document.addEventListener(eventName, resetIdleTimer, { passive: true });
+    });
+
+    resetIdleTimer();
+})();
+</script>
+
 </body>
 </html>

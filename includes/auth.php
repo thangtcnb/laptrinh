@@ -24,12 +24,21 @@ function isLoggedIn() {
     return isset($_SESSION['user_id']);
 }
 
-// Redirect if not logged in
+// Redirect if not logged in & Check Session Timeout (1 hour = 3600 seconds)
 function requireLogin() {
     if (!isLoggedIn()) {
         header("Location: login.php");
         exit;
     }
+
+    $timeout = 3600; // 1 hour idle session timeout
+    if (isset($_SESSION['last_activity']) && (time() - $_SESSION['last_activity'] > $timeout)) {
+        session_unset();
+        session_destroy();
+        header("Location: login.php?timeout=1");
+        exit;
+    }
+    $_SESSION['last_activity'] = time();
 }
 
 // Check user role authorization

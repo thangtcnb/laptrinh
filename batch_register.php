@@ -68,6 +68,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             ]);
             $newTaskId = $pdo->lastInsertId();
 
+            logTaskTimeline($pdo, $newTaskId, $currentUser['id'], 'BATCH_REGISTER', "Đăng ký công việc hàng loạt");
+
             // Insert MAIN Assignee
             if ($mainAssignee > 0) {
                 $stmtAssignee->execute([$newTaskId, $mainAssignee, 'MAIN']);

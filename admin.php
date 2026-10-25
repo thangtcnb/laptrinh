@@ -111,12 +111,61 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }
         }
     }
+
+    // 5. UPDATE LOGIN BACKGROUND IMAGE
+    elseif ($action === 'update_login_bg') {
+        if (isset($_FILES['login_bg_file']) && $_FILES['login_bg_file']['error'] === UPLOAD_ERR_OK) {
+            $fileTmp = $_FILES['login_bg_file']['tmp_name'];
+            $fileName = $_FILES['login_bg_file']['name'];
+            $fileExt = strtolower(pathinfo($fileName, PATHINFO_EXTENSION));
+
+            $allowed = ['jpg', 'jpeg', 'png', 'webp'];
+            if (!in_array($fileExt, $allowed)) {
+                $errorMsg = "Chỉ chấp nhận định dạng ảnh .jpg, .png, .webp";
+            } else {
+                $uploadDir = __DIR__ . '/uploads/';
+                if (!is_dir($uploadDir)) {
+                    mkdir($uploadDir, 0777, true);
+                }
+                $newFileName = 'login_bg_' . time() . '.' . $fileExt;
+                $targetFile = $uploadDir . $newFileName;
+
+                if (move_uploaded_file($fileTmp, $targetFile)) {
+                    $relPath = 'uploads/' . $newFileName;
+                    $stmt = $pdo->prepare("INSERT INTO system_settings (setting_key, setting_value) VALUES ('login_bg', ?) ON DUPLICATE KEY UPDATE setting_value = ?");
+                    $stmt->execute([$relPath, $relPath]);
+                    logActivity($pdo, $currentUser['id'], 'UPDATE_LOGIN_BG', "Thay đổi hình nền trang đăng nhập thành: $relPath");
+                    $successMsg = "Tải lên và thay đổi hình nền Login thành công!";
+                } else {
+                    $errorMsg = "Không thể lưu tệp hình ảnh vào thư mục uploads.";
+                }
+            }
+        } elseif (isset($_POST['reset_bg'])) {
+            $stmt = $pdo->prepare("INSERT INTO system_settings (setting_key, setting_value) VALUES ('login_bg', '') ON DUPLICATE KEY UPDATE setting_value = ''");
+            $stmt->execute();
+            logActivity($pdo, $currentUser['id'], 'RESET_LOGIN_BG', "Đặt lại hình nền trang đăng nhập về mặc định");
+            $successMsg = "Đã đặt lại hình nền trang đăng nhập về mặc định!";
+        } else {
+            $errorMsg = "Vui lòng chọn hình ảnh hợp lệ để tải lên.";
+        }
+    }
 }
 
 // Fetch data
 $allUsers = $pdo->query("SELECT u.*, d.name AS department_name, d.code AS department_code FROM users u JOIN departments d ON u.department_id = d.id ORDER BY u.id ASC")->fetchAll();
 $allDepartments = getDepartments($pdo);
 $auditLogs = $pdo->query("SELECT l.*, u.fullname, u.email FROM audit_logs l LEFT JOIN users u ON l.user_id = u.id ORDER BY l.id DESC LIMIT 100")->fetchAll();
+
+// Fetch current login_bg setting
+$currentLoginBg = '';
+try {
+    $stmtBg = $pdo->query("SELECT setting_value FROM system_settings WHERE setting_key = 'login_bg'");
+    if ($rowBg = $stmtBg->fetch()) {
+        $currentLoginBg = $rowBg['setting_value'];
+    }
+} catch (\PDOException $e) {
+    $currentLoginBg = '';
+}
 ?>
 
 <div class="w-full">
@@ -475,6 +524,63 @@ $auditLogs = $pdo->query("SELECT l.*, u.fullname, u.email FROM audit_logs l LEFT
     <!-- TAB 4: BACKUP & SYSTEM CONFIG -->
     <?php if ($tab === 'backup'): ?>
         <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <!-- Login Background Configuration -->
+            <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 md:col-span-2">
+                <div class="flex items-center gap-3 mb-4 pb-3 border-b border-slate-100">
+                    <div class="w-10 h-10 bg-indigo-50 text-indigo-600 rounded-xl flex items-center justify-center">
+                        <i class="fa-solid fa-image text-lg"></i>
+                    </div>
+                    <div>
+                        <h3 class="font-bold text-slate-900 text-base">Tùy Chỉnh Hình Nền Trang Đăng Nhập (Login Background)</h3>
+                        <p class="text-xs text-slate-500">Tải lên hình nền mới (.jpg, .png, .webp) áp dụng cho trang đăng nhập với hiệu ứng mờ kính (Glassmorphism).</p>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-6 items-start">
+                    <!-- Preview Current Background -->
+                    <div class="space-y-2">
+                        <label class="block text-xs font-bold text-slate-700">Hình nền hiện tại:</label>
+                        <div class="w-full h-44 rounded-xl border border-slate-200 overflow-hidden bg-slate-900 relative flex items-center justify-center shadow-inner">
+                            <?php if (!empty($currentLoginBg) && file_exists(__DIR__ . '/' . $currentLoginBg)): ?>
+                                <img src="<?= htmlspecialchars($currentLoginBg) ?>" class="w-full h-full object-cover">
+                                <span class="absolute bottom-2 left-2 bg-slate-900/80 backdrop-blur-md text-white text-[10px] px-2 py-0.5 rounded font-mono">Custom BG</span>
+                            <?php else: ?>
+                                <div class="bg-gradient-to-br from-slate-900 via-indigo-950 to-blue-900 w-full h-full flex flex-col items-center justify-center text-white text-xs p-4 text-center">
+                                    <i class="fa-solid fa-palette text-2xl text-blue-300 mb-2"></i>
+                                    <span class="font-semibold">Gradient Mặc Định System</span>
+                                </div>
+                            <?php endif; ?>
+                        </div>
+                    </div>
+
+                    <!-- Upload Form -->
+                    <div class="md:col-span-2 space-y-4">
+                        <form method="POST" action="admin.php?tab=backup" enctype="multipart/form-data" class="space-y-3 bg-slate-50 p-4 rounded-xl border border-slate-200">
+                            <input type="hidden" name="action" value="update_login_bg">
+
+                            <div>
+                                <label class="block text-xs font-bold text-slate-700 mb-1">Chọn tệp hình ảnh mới (.jpg, .png, .webp):</label>
+                                <input type="file" name="login_bg_file" accept=".jpg,.jpeg,.png,.webp" class="block w-full text-xs text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-semibold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100 cursor-pointer">
+                            </div>
+
+                            <div class="flex items-center gap-3 pt-2">
+                                <button type="submit" class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold px-4 py-2 rounded-xl text-xs transition shadow flex items-center gap-1.5">
+                                    <i class="fa-solid fa-cloud-arrow-up"></i>
+                                    <span>Tải Lên & Áp Dụng</span>
+                                </button>
+
+                                <?php if (!empty($currentLoginBg)): ?>
+                                    <button type="submit" name="reset_bg" value="1" onclick="return confirm('Khôi phục hình nền đăng nhập về mặc định?');" class="bg-rose-50 hover:bg-rose-600 text-rose-700 hover:text-white border border-rose-200 px-3 py-2 rounded-xl text-xs font-semibold transition flex items-center gap-1">
+                                        <i class="fa-solid fa-rotate-left"></i>
+                                        <span>Đặt Lại Mặc Định</span>
+                                    </button>
+                                <?php endif; ?>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+
             <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
                 <div class="w-12 h-12 bg-indigo-50 text-indigo-600 rounded-xl flex items-center justify-center mb-3">
                     <i class="fa-solid fa-database text-xl"></i>

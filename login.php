@@ -7,7 +7,21 @@ if (isset($_SESSION['user_id'])) {
     exit;
 }
 
+// Fetch custom login_bg from system_settings
+$loginBg = '';
+try {
+    $stmtBg = $pdo->query("SELECT setting_value FROM system_settings WHERE setting_key = 'login_bg'");
+    if ($rowBg = $stmtBg->fetch()) {
+        $loginBg = $rowBg['setting_value'];
+    }
+} catch (\PDOException $e) {
+    $loginBg = '';
+}
+
 $error = '';
+if (isset($_GET['timeout']) && $_GET['timeout'] == '1') {
+    $error = 'Phiên làm việc đã hết hạn do không thao tác trong 60 phút. Vui lòng đăng nhập lại.';
+}
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $email = trim($_POST['email'] ?? '');
@@ -41,11 +55,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
 </head>
-<body class="bg-gradient-to-br from-slate-900 via-indigo-950 to-blue-900 min-h-screen flex items-center justify-center p-4">
+<body class="min-h-screen flex items-center justify-center p-4 relative overflow-hidden bg-gradient-to-br from-slate-900 via-indigo-950 to-blue-900">
 
-<div class="max-w-lg w-full bg-white rounded-2xl shadow-2xl overflow-hidden border border-slate-200 my-6">
-    <div class="bg-gradient-to-r from-blue-900 to-indigo-900 p-6 text-center text-white relative">
-        <div class="w-16 h-16 bg-white/10 rounded-full flex items-center justify-center mx-auto mb-3 backdrop-blur-md border border-white/20">
+<?php if (!empty($loginBg) && file_exists(__DIR__ . '/' . $loginBg)): ?>
+    <!-- Custom Background Image with overlay -->
+    <div class="absolute inset-0 bg-cover bg-center z-0 transition-all duration-700 scale-105" style="background-image: url('<?= htmlspecialchars($loginBg) ?>');"></div>
+    <div class="absolute inset-0 bg-slate-950/60 backdrop-blur-sm z-0"></div>
+<?php endif; ?>
+
+<div class="max-w-lg w-full bg-white/80 backdrop-blur-xl rounded-3xl shadow-2xl overflow-hidden border border-white/30 relative z-10 my-6">
+    <div class="bg-gradient-to-r from-blue-900/90 via-indigo-900/90 to-slate-900/90 p-6 text-center text-white relative border-b border-white/10">
+        <div class="w-16 h-16 bg-white/10 rounded-2xl flex items-center justify-center mx-auto mb-3 backdrop-blur-md border border-white/20 shadow-lg">
             <i class="fa-solid fa-graduation-cap text-3xl text-blue-200"></i>
         </div>
         <h2 class="text-xl font-bold uppercase tracking-wide">TRƯỜNG ĐẠI HỌC TÀI CHÍNH - MARKETING</h2>
@@ -53,7 +73,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         <p class="text-sm font-semibold text-indigo-100 mt-2">HỆ THỐNG QUẢN LÝ CÔNG VIỆC</p>
     </div>
 
-    <div class="p-6">
+    <div class="p-6 sm:p-8">
         <?php if (!empty($error)): ?>
             <div class="mb-4 bg-rose-50 border-l-4 border-rose-600 p-3 rounded text-rose-700 text-xs font-medium flex items-center gap-2">
                 <i class="fa-solid fa-circle-exclamation text-rose-500"></i>
