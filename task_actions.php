@@ -108,7 +108,19 @@ if ($action === 'save_task') {
     $description = trim($_POST['description'] ?? '');
     $departmentId = (int)($_POST['department_id'] ?? $currentUser['department_id']);
     $priority = $_POST['priority'] ?? 'TRUNG_BINH';
-    $status = $_POST['status'] ?? (in_array($currentUser['role'], ['NHAN_VIEN', 'HO_TRO']) ? 'CHO_DUYET' : 'DANG_THUC_HIEN');
+
+    // Default status logic:
+    // - TRUONG_PHONG or BGD: CHO_BGD_DUYET
+    // - NHAN_VIEN or HO_TRO: CHO_DUYET
+    $defaultStatus = in_array($currentUser['role'], ['TRUONG_PHONG', 'BGD']) ? 'CHO_BGD_DUYET' : 'CHO_DUYET';
+    $status = $_POST['status'] ?? $defaultStatus;
+
+    if (in_array($currentUser['role'], ['NHAN_VIEN', 'HO_TRO'])) {
+        $status = 'CHO_DUYET';
+    } elseif (in_array($currentUser['role'], ['TRUONG_PHONG', 'BGD']) && $taskId === 0) {
+        $status = 'CHO_BGD_DUYET';
+    }
+
     $startDate = $_POST['start_date'] ?: null;
     $dueDate = $_POST['due_date'] ?: null;
     $mainAssignee = (int)($_POST['main_assignee'] ?? 0);

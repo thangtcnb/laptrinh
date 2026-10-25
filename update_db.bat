@@ -14,16 +14,19 @@ if exist "%MYSQL_PATH%" (
     set MYSQL_CMD=mysql
 )
 
-echo [1/3] Dang thuc thi Migration 20261023_comments (database\update_20261023_comments.sql)...
+echo [1/4] Dang thuc thi Migration 20261023_comments (database\update_20261023_comments.sql)...
 %MYSQL_CMD% -h localhost -P 3306 -u root < database\update_20261023_comments.sql >nul 2>&1
 
-echo [2/3] Dang thuc thi Migration update_v2.sql (database\migrations\update_v2.sql)...
+echo [2/4] Dang thuc thi Migration update_v2.sql (database\migrations\update_v2.sql)...
 %MYSQL_CMD% -h localhost -P 3306 -u root < database\migrations\update_v2.sql
 
-echo [3/3] Dang thuc thi Migration Lich hop BGD (database\migrations\update_bgd_schedules.sql)...
+echo [3/4] Dang thuc thi Migration Lich hop BGD (database\migrations\update_bgd_schedules.sql)...
 %MYSQL_CMD% -h localhost -P 3306 -u root < database\migrations\update_bgd_schedules.sql
+
+echo [4/4] Dang thuc thi Migration Approval & Priority (database\migrations\update_20261025_approval_priority.sql)...
+%MYSQL_CMD% -h localhost -P 3306 -u root < database\migrations\update_20261025_approval_priority.sql
 if %ERRORLEVEL% NEQ 0 (
-    echo [LOI] Khong the thuc thi database\migrations\update_bgd_schedules.sql. Vui long kiem tra XAMPP MySQL.
+    echo [LOI] Khong the thuc thi database\migrations\update_20261025_approval_priority.sql. Vui long kiem tra XAMPP MySQL.
     pause
     exit /b %ERRORLEVEL%
 )
