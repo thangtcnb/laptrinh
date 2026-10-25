@@ -1,3 +1,5 @@
+USE laptrinh_db;
+
 -- Migration: Cap nhat CSDL ho tro Phe duyet hang loat (Batch Approval)
 -- File: database/migrations/update_20261026_batch_approval.sql
 
