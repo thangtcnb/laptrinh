@@ -185,6 +185,59 @@ function formatLeaderComment($t) {
     return $comment;
 }
 
+// Get KPI stats based on user role and scope
+// Role permissions:
+// - NHAN_VIEN / HO_TRO: Personal tasks (Cá nhân)
+// - TRUONG_PHONG: Department tasks (Toàn Phòng)
+// - BGD / SUPER_ADMIN: Campus-wide tasks (Toàn Phân hiệu)
+function getKpiStats($pdo, $currentUser) {
+    if (!$currentUser) {
+        return ['completed' => 0, 'in_progress' => 0, 'overdue' => 0, 'pending' => 0];
+    }
+
+    $where = ["1=1"];
+    $params = [];
+
+    // Role-based scoping
+    if ($currentUser['role'] === 'NHAN_VIEN' || $currentUser['role'] === 'HO_TRO') {
+        $where[] = "(t.created_by = ? OR t.id IN (SELECT task_id FROM task_assignees WHERE user_id = ?))";
+        $params[] = $currentUser['id'];
+        $params[] = $currentUser['id'];
+    } elseif ($currentUser['role'] === 'TRUONG_PHONG') {
+        $where[] = "t.department_id = ?";
+        $params[] = $currentUser['department_id'];
+    }
+    // For BGD and SUPER_ADMIN, default to all campus tasks
+
+    // Internal BGD Security Restriction
+    if (!in_array($currentUser['role'], ['BGD', 'SUPER_ADMIN'])) {
+        $where[] = "(t.department_id != 1 AND t.created_by NOT IN (SELECT id FROM users WHERE role = 'BGD'))";
+    }
+
+    $whereSql = implode(" AND ", $where);
+
+    $sql = "
+        SELECT
+            SUM(CASE WHEN t.status = 'HOAN_THANH' THEN 1 ELSE 0 END) AS completed_count,
+            SUM(CASE WHEN t.status = 'DANG_THUC_HIEN' THEN 1 ELSE 0 END) AS in_progress_count,
+            SUM(CASE WHEN t.status IN ('CHO_DUYET', 'CHO_BGD_DUYET') THEN 1 ELSE 0 END) AS pending_count,
+            SUM(CASE WHEN (t.due_date IS NOT NULL AND t.due_date < CURDATE() AND t.status != 'HOAN_THANH') THEN 1 ELSE 0 END) AS overdue_count
+        FROM tasks t
+        WHERE $whereSql
+    ";
+
+    $stmt = $pdo->prepare($sql);
+    $stmt->execute($params);
+    $row = $stmt->fetch();
+
+    return [
+        'completed' => (int)($row['completed_count'] ?? 0),
+        'in_progress' => (int)($row['in_progress_count'] ?? 0),
+        'pending' => (int)($row['pending_count'] ?? 0),
+        'overdue' => (int)($row['overdue_count'] ?? 0),
+    ];
+}
+
 // Helper function to record audit logs
 function logActivity($pdo, $userId, $action, $description = null) {
     try {
@@ -192,6 +245,34 @@ function logActivity($pdo, $userId, $action, $description = null) {
         $stmt->execute([$userId, $action, $description]);
     } catch (\PDOException $e) {
         // ignore log error
+    }
+}
+
+// Helper function to record task timeline log (Lịch sử thao tác xử lý công việc)
+function logTaskTimeline($pdo, $taskId, $userId, $action, $description = null) {
+    try {
+        $stmt = $pdo->prepare("INSERT INTO task_logs (task_id, user_id, action, description) VALUES (?, ?, ?, ?)");
+        $stmt->execute([$taskId, $userId, $action, $description]);
+    } catch (\PDOException $e) {
+        // ignore log error
+    }
+}
+
+// Get task timeline logs for a specific task
+function getTaskTimelineLogs($pdo, $taskId) {
+    try {
+        $stmt = $pdo->prepare("
+            SELECT tl.*, u.fullname, u.role, d.code AS department_code
+            FROM task_logs tl
+            LEFT JOIN users u ON tl.user_id = u.id
+            LEFT JOIN departments d ON u.department_id = d.id
+            WHERE tl.task_id = ?
+            ORDER BY tl.id ASC
+        ");
+        $stmt->execute([$taskId]);
+        return $stmt->fetchAll();
+    } catch (\PDOException $e) {
+        return [];
     }
 }
 
@@ -250,8 +331,14 @@ function getTasksFiltered($pdo, $filters = [], $limit = 15, $offset = 0, $curren
 
     // Filter by status
     if (!empty($filters['status']) && $filters['status'] !== 'ALL') {
-        $where[] = "t.status = ?";
-        $params[] = $filters['status'];
+        if ($filters['status'] === 'OVERDUE') {
+            $where[] = "(t.due_date IS NOT NULL AND t.due_date < CURDATE() AND t.status != 'HOAN_THANH')";
+        } elseif ($filters['status'] === 'CHO_DUYET_ALL') {
+            $where[] = "t.status IN ('CHO_DUYET', 'CHO_BGD_DUYET')";
+        } else {
+            $where[] = "t.status = ?";
+            $params[] = $filters['status'];
+        }
     }
 
     $whereSql = implode(" AND ", $where);
@@ -266,7 +353,7 @@ function getTasksFiltered($pdo, $filters = [], $limit = 15, $offset = 0, $curren
     $dataSql = "
         SELECT t.*,
                d.code AS dept_code, d.name AS dept_name, d.color_theme AS dept_color, d.icon AS dept_icon,
-               u.fullname AS creator_name,
+               u.fullname AS creator_name, u.role AS creator_role,
                lc.fullname AS lc_fullname, lc.role AS lc_role
         FROM tasks t
         JOIN departments d ON t.department_id = d.id
@@ -280,10 +367,11 @@ function getTasksFiltered($pdo, $filters = [], $limit = 15, $offset = 0, $curren
     $stmtData->execute($params);
     $tasks = $stmtData->fetchAll();
 
-    // Populate assignees & formatted leader comment for each task
+    // Populate assignees & formatted leader comment & timeline logs for each task
     foreach ($tasks as &$task) {
         $task['assignees'] = getTaskAssignees($pdo, $task['id']);
         $task['formatted_leader_comment'] = formatLeaderComment($task);
+        $task['timeline_logs'] = getTaskTimelineLogs($pdo, $task['id']);
     }
 
     return [

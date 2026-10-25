@@ -28,6 +28,8 @@ if ($action === 'update_progress') {
     $stmtUpdate = $pdo->prepare("UPDATE tasks SET progress = ?, proof_link = ?, status = ? WHERE id = ?");
     $stmtUpdate->execute([$progress, $proofLink ?: null, $newStatus, $taskId]);
 
+    logTaskTimeline($pdo, $taskId, $currentUser['id'], 'UPDATE_PROGRESS', "Cập nhật tiến độ $progress%" . ($proofLink ? " kèm link minh chứng" : ""));
+
     $_SESSION['flash_success'] = "Đã cập nhật tiến độ (" . $progress . "%) và minh chứng thành công!";
     header("Location: index.php");
     exit;
@@ -60,6 +62,10 @@ if ($action === 'save_leader_comment' || $action === 'approve') {
     if ($canApprove) {
         $stmtUpdate = $pdo->prepare("UPDATE tasks SET status = ?, leader_comments = ?, leader_comment_user_id = ? WHERE id = ?");
         $stmtUpdate->execute([$newStatus, $leaderComment ?: null, $currentUser['id'], $taskId]);
+
+        $statusName = $newStatus === 'DANG_THUC_HIEN' ? 'Đã duyệt' : ($newStatus === 'CHO_BGD_DUYET' ? 'Trình BGD duyệt' : 'Yêu cầu chỉnh sửa');
+        logTaskTimeline($pdo, $taskId, $currentUser['id'], 'LEADER_APPROVAL', "Cập nhật trạng thái: $statusName" . ($leaderComment ? ". Ý kiến: $leaderComment" : ""));
+
         $_SESSION['flash_success'] = "Đã lưu ý kiến chỉ đạo và cập nhật phê duyệt!";
     } else {
         $_SESSION['flash_error'] = "Bạn chỉ có quyền cho ý kiến/duyệt các công việc thuộc phòng ban của mình!";
@@ -161,6 +167,7 @@ if ($action === 'save_task') {
 
         // Reassign assignees
         $pdo->prepare("DELETE FROM task_assignees WHERE task_id = ?")->execute([$taskId]);
+        logTaskTimeline($pdo, $taskId, $currentUser['id'], 'UPDATE_TASK', "Chỉnh sửa thông tin công việc");
     } else {
         // Insert new task
         $stmt = $pdo->prepare("
@@ -169,6 +176,8 @@ if ($action === 'save_task') {
         ");
         $stmt->execute([$title, $description, $departmentId, $status, $priority, $startDate, $dueDate, $currentUser['id']]);
         $taskId = $pdo->lastInsertId();
+
+        logTaskTimeline($pdo, $taskId, $currentUser['id'], 'CREATE_TASK', "Đăng ký/Tạo mới công việc");
     }
 
     // Insert MAIN assignee
@@ -299,6 +308,7 @@ if ($action === 'batch_approve_tasks') {
                 $stmtUpdateKeepComment->execute([$currentUser['id'], $taskId]);
             }
             $approvedCount++;
+            logTaskTimeline($pdo, $taskId, $currentUser['id'], 'BATCH_APPROVE', "Phê duyệt hàng loạt" . ($generalComment ? ". Ý kiến: $generalComment" : ""));
             logActivity($pdo, $currentUser['id'], 'BATCH_APPROVE_TASK', "Đã phê duyệt công việc ID #$taskId: {$task['title']}");
         }
     }
