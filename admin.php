@@ -123,7 +123,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             if (!in_array($fileExt, $allowed)) {
                 $errorMsg = "Chỉ chấp nhận định dạng ảnh .jpg, .png, .webp";
             } else {
-                $uploadDir = __DIR__ . '/uploads/';
+                $uploadDir = __DIR__ . '/uploads/bg/';
                 if (!is_dir($uploadDir)) {
                     mkdir($uploadDir, 0777, true);
                 }
@@ -131,7 +131,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $targetFile = $uploadDir . $newFileName;
 
                 if (move_uploaded_file($fileTmp, $targetFile)) {
-                    $relPath = 'uploads/' . $newFileName;
+                    $relPath = 'uploads/bg/' . $newFileName;
                     $stmt = $pdo->prepare("INSERT INTO system_settings (setting_key, setting_value) VALUES ('login_bg', ?) ON DUPLICATE KEY UPDATE setting_value = ?");
                     $stmt->execute([$relPath, $relPath]);
                     logActivity($pdo, $currentUser['id'], 'UPDATE_LOGIN_BG', "Thay đổi hình nền trang đăng nhập thành: $relPath");

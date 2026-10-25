@@ -7,6 +7,11 @@ if (isset($_SESSION['user_id'])) {
     exit;
 }
 
+// Auto check and create background upload directory if not exists
+if (!file_exists(__DIR__ . '/uploads/bg/')) {
+    mkdir(__DIR__ . '/uploads/bg/', 0777, true);
+}
+
 // Fetch custom login_bg from system_settings
 $loginBg = '';
 try {
@@ -16,6 +21,10 @@ try {
     }
 } catch (\PDOException $e) {
     $loginBg = '';
+}
+
+if ((empty($loginBg) || !file_exists(__DIR__ . '/' . $loginBg)) && file_exists(__DIR__ . '/uploads/bg/default_bg.jpg')) {
+    $loginBg = 'uploads/bg/default_bg.jpg';
 }
 
 $error = '';
