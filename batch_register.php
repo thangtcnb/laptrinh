@@ -261,7 +261,7 @@ function createRowHtml(index) {
 
                 <!-- Due date (2 cols) -->
                 <div class="md:col-span-2">
-                    <label class="block text-[11px] font-semibold text-slate-600 mb-1">Hạn chót</label>
+                    <label class="block text-[11px] font-semibold text-slate-600 mb-1">Hạn chót (dd/mm/yyyy)</label>
                     <input type="date" name="tasks[${index}][due_date]" value="<?= htmlspecialchars($defaultEndDate) ?>" class="w-full p-2 border border-slate-300 rounded-xl text-xs focus:ring-2 focus:ring-indigo-500 outline-none bg-white font-medium">
                 </div>
             </div>

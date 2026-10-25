@@ -154,6 +154,7 @@ if ($exportType === 'excel') {
     $statusMap = [
         'CHO_DUYET' => 'Chờ Trưởng phòng duyệt',
         'CHO_BGD_DUYET' => 'Chờ BGD duyệt',
+        'YEU_CAU_CHINH_SUA' => 'Yêu cầu chỉnh sửa',
         'CHO_XAC_NHAN' => 'Chờ NV xác nhận',
         'TU_CHOI_CHO_TP_XAC_NHAN' => 'Từ chối - Chờ TP xác nhận',
         'DANG_THUC_HIEN' => 'Đang thực hiện',
@@ -391,6 +392,7 @@ require_once __DIR__ . '/includes/header.php';
                 <option value="HOAN_THANH" <?= $status === 'HOAN_THANH' ? 'selected' : '' ?>>Hoàn thành</option>
                 <option value="CHO_DUYET" <?= $status === 'CHO_DUYET' ? 'selected' : '' ?>>Chờ Trưởng phòng duyệt</option>
                 <option value="CHO_BGD_DUYET" <?= $status === 'CHO_BGD_DUYET' ? 'selected' : '' ?>>Chờ BGD duyệt</option>
+                <option value="YEU_CAU_CHINH_SUA" <?= $status === 'YEU_CAU_CHINH_SUA' ? 'selected' : '' ?>>Yêu cầu chỉnh sửa</option>
             </select>
         </div>
 
@@ -450,7 +452,15 @@ require_once __DIR__ . '/includes/header.php';
                                 #<?= $stt++ ?>
                             </td>
                             <td class="py-3.5 px-4 border-r border-slate-100">
-                                <div class="font-bold text-slate-900 text-sm leading-snug">
+                                <?php
+                                $titleColorClass = 'text-slate-900';
+                                if ($t['priority'] === 'CAO') {
+                                    $titleColorClass = 'text-pink-600';
+                                } elseif ($t['priority'] === 'KHAN_CAP') {
+                                    $titleColorClass = 'text-red-600 font-bold';
+                                }
+                                ?>
+                                <div class="font-bold text-sm leading-snug <?= $titleColorClass ?>">
                                     <?= htmlspecialchars($t['title']) ?>
                                 </div>
                                 <?php if (!empty($t['description'])): ?>

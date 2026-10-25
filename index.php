@@ -85,7 +85,51 @@ if ($currentUser['role'] === 'TRUONG_PHONG') {
     $stmtDeptPending->execute([$currentUser['department_id'], $currentUser['id']]);
     $pendingApprovalTasksForDept = $stmtDeptPending->fetchAll();
 }
+
+// Check if current logged-in user (Ban Giám đốc) has pending approval tasks (CHO_BGD_DUYET)
+$pendingApprovalTasksForBgd = [];
+if ($currentUser['role'] === 'BGD') {
+    $stmtBgdPending = $pdo->prepare("
+        SELECT t.*, d.name AS dept_name, u.fullname AS creator_name
+        FROM tasks t
+        JOIN departments d ON t.department_id = d.id
+        JOIN users u ON t.created_by = u.id
+        WHERE t.status = 'CHO_BGD_DUYET'
+        ORDER BY t.id DESC
+    ");
+    $stmtBgdPending->execute();
+    $pendingApprovalTasksForBgd = $stmtBgdPending->fetchAll();
+}
 ?>
+
+<!-- WORKFLOW NOTIFICATION BANNER FOR BAN GIÁM ĐỐC: PENDING APPROVAL TASKS -->
+<?php if (count($pendingApprovalTasksForBgd) > 0): ?>
+    <div class="mb-6 bg-gradient-to-r from-amber-600 via-rose-700 to-purple-900 rounded-2xl p-5 text-white shadow-xl relative overflow-hidden border border-amber-300">
+        <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
+            <div class="flex items-start gap-3">
+                <div class="w-12 h-12 rounded-xl bg-white/20 backdrop-blur-md flex items-center justify-center shrink-0 text-amber-300">
+                    <i class="fa-solid fa-crown text-2xl animate-pulse"></i>
+                </div>
+                <div>
+                    <span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-amber-400/30 text-amber-200 text-xs font-bold uppercase tracking-wider mb-1">
+                        <i class="fa-solid fa-bell"></i> THÔNG BÁO BAN GIÁM ĐỐC PHÊ DUYỆT
+                    </span>
+                    <h3 class="text-base md:text-lg font-bold text-white">
+                        Kính trình Ban Giám đốc: Có <span class="underline underline-offset-4 decoration-2 decoration-amber-300 font-extrabold text-amber-200"><?= count($pendingApprovalTasksForBgd) ?> công việc</span> đang chờ Ban Giám đốc phê duyệt!
+                    </h3>
+                    <p class="text-xs text-amber-100 mt-0.5">Vui lòng xem chi tiết nội dung và thực hiện Duyệt / Cho ý kiến chỉ đạo.</p>
+                </div>
+            </div>
+
+            <div>
+                <a href="index.php?status=CHO_BGD_DUYET" class="bg-white text-purple-950 hover:bg-amber-50 font-bold px-5 py-2.5 rounded-xl text-xs shadow-lg transition flex items-center gap-2 transform hover:scale-105">
+                    <i class="fa-solid fa-clipboard-check text-purple-700 text-sm"></i>
+                    <span>Xem danh sách trình BGD duyệt</span>
+                </a>
+            </div>
+        </div>
+    </div>
+<?php endif; ?>
 
 <!-- WORKFLOW NOTIFICATION BANNER FOR TRƯỞNG/PHÓ PHÒNG: PENDING APPROVAL TASKS REGISTERED BY EMPLOYEES -->
 <?php if (count($pendingApprovalTasksForDept) > 0): ?>
@@ -219,6 +263,7 @@ if ($currentUser['role'] === 'TRUONG_PHONG') {
                 <option value="ALL">-- Tất cả trạng thái --</option>
                 <option value="CHO_BGD_DUYET" <?= $filters['status'] === 'CHO_BGD_DUYET' ? 'selected' : '' ?>>Chờ BGD duyệt</option>
                 <option value="CHO_DUYET" <?= $filters['status'] === 'CHO_DUYET' ? 'selected' : '' ?>>Chờ Trưởng phòng duyệt</option>
+                <option value="YEU_CAU_CHINH_SUA" <?= $filters['status'] === 'YEU_CAU_CHINH_SUA' ? 'selected' : '' ?>>Yêu cầu chỉnh sửa</option>
                 <option value="DANG_THUC_HIEN" <?= $filters['status'] === 'DANG_THUC_HIEN' ? 'selected' : '' ?>>Đang thực hiện</option>
                 <option value="HOAN_THANH" <?= $filters['status'] === 'HOAN_THANH' ? 'selected' : '' ?>>Hoàn thành</option>
             </select>
@@ -293,7 +338,15 @@ if ($currentUser['role'] === 'TRUONG_PHONG') {
 
                             <!-- 2. TÊN CÔNG VIỆC / NỘI DUNG -->
                             <td class="py-3.5 px-4 border-r border-slate-100">
-                                <div class="font-bold text-slate-900 text-sm leading-snug">
+                                <?php
+                                $titleColorClass = 'text-slate-900';
+                                if ($t['priority'] === 'CAO') {
+                                    $titleColorClass = 'text-pink-600';
+                                } elseif ($t['priority'] === 'KHAN_CAP') {
+                                    $titleColorClass = 'text-red-600 font-bold';
+                                }
+                                ?>
+                                <div class="font-bold text-sm leading-snug <?= $titleColorClass ?>">
                                     <?= htmlspecialchars($t['title']) ?>
                                 </div>
                                 <?php if (!empty($t['description'])): ?>
@@ -613,9 +666,8 @@ if ($currentUser['role'] === 'TRUONG_PHONG') {
                 <label class="block text-xs font-semibold text-slate-700 mb-1">Cập nhật Trạng thái Phê duyệt</label>
                 <select name="status" id="leader_status" class="w-full p-2.5 border border-slate-300 rounded-xl text-xs font-semibold focus:ring-2 focus:ring-indigo-500 outline-none bg-white">
                     <option value="DANG_THUC_HIEN">Đã duyệt - Đang thực hiện</option>
-                    <option value="HOAN_THANH">Hoàn thành</option>
-                    <option value="CHO_BGD_DUYET">Trình BGD duyệt</option>
-                    <option value="CHO_DUYET">Yêu cầu chỉnh sửa / Chờ duyệt</option>
+                    <option value="CHO_BGD_DUYET">Trình BGD phê duyệt</option>
+                    <option value="YEU_CAU_CHINH_SUA">Yêu cầu chỉnh sửa</option>
                 </select>
             </div>
 
@@ -755,13 +807,14 @@ if ($currentUser['role'] === 'TRUONG_PHONG') {
                     <select name="status" id="form_status" class="w-full p-2.5 border border-slate-300 rounded-xl text-xs focus:ring-2 focus:ring-indigo-500 outline-none bg-white">
                         <option value="CHO_DUYET">Chờ Trưởng phòng duyệt</option>
                         <option value="CHO_BGD_DUYET">Chờ BGD duyệt</option>
+                        <option value="YEU_CAU_CHINH_SUA">Yêu cầu chỉnh sửa</option>
                         <option value="DANG_THUC_HIEN">Đang thực hiện</option>
                         <option value="HOAN_THANH">Hoàn thành</option>
                     </select>
                 </div>
 
                 <div>
-                    <label class="block text-xs font-semibold text-slate-700 mb-1">Hạn chót hoàn thành</label>
+                    <label class="block text-xs font-semibold text-slate-700 mb-1">Hạn chót hoàn thành (dd/mm/yyyy)</label>
                     <input type="date" name="due_date" id="form_due_date" class="w-full p-2.5 border border-slate-300 rounded-xl text-xs focus:ring-2 focus:ring-indigo-500 outline-none">
                 </div>
             </div>
@@ -883,8 +936,30 @@ function closeProgressModal() {
 function openLeaderModal(task) {
     document.getElementById('leader_task_id').value = task.id;
     document.getElementById('leader_task_title').innerText = task.title;
-    document.getElementById('leader_status').value = task.status;
     document.getElementById('leader_comments').value = task.leader_comments || '';
+
+    const userRole = '<?= $currentUser['role'] ?>';
+    const statusSelect = document.getElementById('leader_status');
+    statusSelect.innerHTML = '';
+
+    if (userRole === 'BGD') {
+        statusSelect.innerHTML = `
+            <option value="DANG_THUC_HIEN">Đã duyệt - Đang thực hiện</option>
+            <option value="YEU_CAU_CHINH_SUA">Yêu cầu chỉnh sửa</option>
+        `;
+    } else {
+        // TRUONG_PHONG / SUPER_ADMIN
+        statusSelect.innerHTML = `
+            <option value="DANG_THUC_HIEN">Đã duyệt - Đang thực hiện</option>
+            <option value="CHO_BGD_DUYET">Trình BGD phê duyệt</option>
+            <option value="YEU_CAU_CHINH_SUA">Yêu cầu chỉnh sửa</option>
+        `;
+    }
+
+    statusSelect.value = task.status;
+    if (!statusSelect.value) {
+        statusSelect.selectedIndex = 0;
+    }
 
     document.getElementById('leaderCommentModal').classList.remove('hidden');
     document.getElementById('leaderCommentModal').classList.add('flex');

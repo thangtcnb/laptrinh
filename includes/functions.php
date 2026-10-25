@@ -110,6 +110,10 @@ function renderStatusBadge($status) {
             return '<span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800 border border-yellow-200">
                         <i class="fa-solid fa-hourglass-half"></i> Chờ Trưởng phòng duyệt
                     </span>';
+        case 'YEU_CAU_CHINH_SUA':
+            return '<span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium bg-orange-100 text-orange-800 border border-orange-300">
+                        <i class="fa-solid fa-pen-to-square"></i> Yêu cầu chỉnh sửa
+                    </span>';
         case 'CHO_XAC_NHAN':
             return '<span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800 border border-blue-200">
                         <i class="fa-solid fa-envelope-open-text"></i> Chờ NV xác nhận
