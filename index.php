@@ -76,13 +76,14 @@ if ($currentUser['role'] === 'NHAN_VIEN' || $currentUser['role'] === 'HO_TRO') {
 $pendingApprovalTasksForDept = [];
 if ($currentUser['role'] === 'TRUONG_PHONG') {
     $stmtDeptPending = $pdo->prepare("
-        SELECT t.*, u.fullname AS creator_name
+        SELECT t.*, u.fullname AS creator_name, d.name AS dept_name, d.code AS dept_code
         FROM tasks t
         JOIN users u ON t.created_by = u.id
-        WHERE t.department_id = ? AND t.status = 'CHO_DUYET' AND t.created_by != ?
+        JOIN departments d ON t.department_id = d.id
+        WHERE t.department_id = ? AND t.status = 'CHO_DUYET'
         ORDER BY t.id DESC
     ");
-    $stmtDeptPending->execute([$currentUser['department_id'], $currentUser['id']]);
+    $stmtDeptPending->execute([$currentUser['department_id']]);
     $pendingApprovalTasksForDept = $stmtDeptPending->fetchAll();
 }
 
@@ -90,7 +91,7 @@ if ($currentUser['role'] === 'TRUONG_PHONG') {
 $pendingApprovalTasksForBgd = [];
 if ($currentUser['role'] === 'BGD') {
     $stmtBgdPending = $pdo->prepare("
-        SELECT t.*, d.name AS dept_name, u.fullname AS creator_name
+        SELECT t.*, d.name AS dept_name, d.code AS dept_code, u.fullname AS creator_name
         FROM tasks t
         JOIN departments d ON t.department_id = d.id
         JOIN users u ON t.created_by = u.id
@@ -99,6 +100,25 @@ if ($currentUser['role'] === 'BGD') {
     ");
     $stmtBgdPending->execute();
     $pendingApprovalTasksForBgd = $stmtBgdPending->fetchAll();
+}
+
+// Unified list of pending tasks waiting for batch approval depending on user role
+$pendingApprovalTasks = [];
+if ($currentUser['role'] === 'BGD') {
+    $pendingApprovalTasks = $pendingApprovalTasksForBgd;
+} elseif ($currentUser['role'] === 'TRUONG_PHONG') {
+    $pendingApprovalTasks = $pendingApprovalTasksForDept;
+} elseif ($currentUser['role'] === 'SUPER_ADMIN') {
+    $stmtAdminPending = $pdo->prepare("
+        SELECT t.*, d.name AS dept_name, d.code AS dept_code, u.fullname AS creator_name
+        FROM tasks t
+        JOIN departments d ON t.department_id = d.id
+        JOIN users u ON t.created_by = u.id
+        WHERE t.status IN ('CHO_DUYET', 'CHO_BGD_DUYET')
+        ORDER BY t.id DESC
+    ");
+    $stmtAdminPending->execute();
+    $pendingApprovalTasks = $stmtAdminPending->fetchAll();
 }
 ?>
 
@@ -117,15 +137,15 @@ if ($currentUser['role'] === 'BGD') {
                     <h3 class="text-base md:text-lg font-bold text-white">
                         Kính trình Ban Giám đốc: Có <span class="underline underline-offset-4 decoration-2 decoration-amber-300 font-extrabold text-amber-200"><?= count($pendingApprovalTasksForBgd) ?> công việc</span> đang chờ Ban Giám đốc phê duyệt!
                     </h3>
-                    <p class="text-xs text-amber-100 mt-0.5">Vui lòng xem chi tiết nội dung và thực hiện Duyệt / Cho ý kiến chỉ đạo.</p>
+                    <p class="text-xs text-amber-100 mt-0.5">Vui lòng xem chi tiết nội dung và thực hiện Phê duyệt hàng loạt hoặc Cho ý kiến chỉ đạo.</p>
                 </div>
             </div>
 
             <div>
-                <a href="index.php?status=CHO_BGD_DUYET" class="bg-white text-purple-950 hover:bg-amber-50 font-bold px-5 py-2.5 rounded-xl text-xs shadow-lg transition flex items-center gap-2 transform hover:scale-105">
+                <button onclick="openBatchApprovalModal()" class="bg-white text-purple-950 hover:bg-amber-50 font-bold px-5 py-2.5 rounded-xl text-xs shadow-lg transition flex items-center gap-2 transform hover:scale-105">
                     <i class="fa-solid fa-clipboard-check text-purple-700 text-sm"></i>
                     <span>Xem danh sách trình BGD duyệt</span>
-                </a>
+                </button>
             </div>
         </div>
     </div>
@@ -146,15 +166,15 @@ if ($currentUser['role'] === 'BGD') {
                     <h3 class="text-base md:text-lg font-bold text-white">
                         Phòng bạn có <span class="underline underline-offset-4 decoration-2 decoration-amber-300 font-extrabold text-amber-200"><?= count($pendingApprovalTasksForDept) ?> công việc mới</span> do nhân viên đăng ký đang chờ phê duyệt!
                     </h3>
-                    <p class="text-xs text-indigo-100 mt-0.5">Vui lòng xem chi tiết nội dung và thực hiện Duyệt / Cho ý kiến chỉ đạo.</p>
+                    <p class="text-xs text-indigo-100 mt-0.5">Vui lòng xem chi tiết nội dung và thực hiện Phê duyệt hàng loạt hoặc Cho ý kiến chỉ đạo.</p>
                 </div>
             </div>
 
             <div>
-                <a href="index.php?dept_filter=<?= $currentUser['department_id'] ?>&status=CHO_DUYET" class="bg-white text-indigo-900 hover:bg-indigo-50 font-bold px-5 py-2.5 rounded-xl text-xs shadow-lg transition flex items-center gap-2 transform hover:scale-105">
+                <button onclick="openBatchApprovalModal()" class="bg-white text-indigo-900 hover:bg-indigo-50 font-bold px-5 py-2.5 rounded-xl text-xs shadow-lg transition flex items-center gap-2 transform hover:scale-105">
                     <i class="fa-solid fa-list-check text-indigo-600 text-sm"></i>
                     <span>Xem danh sách cần duyệt</span>
-                </a>
+                </button>
             </div>
         </div>
     </div>
@@ -220,6 +240,15 @@ if ($currentUser['role'] === 'BGD') {
             <h3 class="font-bold text-slate-800 text-base">Bộ Lọc Thông Minh & Tìm Kiếm</h3>
         </div>
         <div class="flex items-center gap-2">
+            <?php if (in_array($currentUser['role'], ['TRUONG_PHONG', 'BGD', 'SUPER_ADMIN'])): ?>
+                <button onclick="openBatchApprovalModal()" class="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-xl text-xs font-semibold transition flex items-center gap-1.5 shadow-md shadow-emerald-100 relative">
+                    <i class="fa-solid fa-clipboard-check"></i>
+                    <span>Xem danh sách cần duyệt</span>
+                    <?php if (count($pendingApprovalTasks) > 0): ?>
+                        <span class="bg-rose-500 text-white text-[10px] font-extrabold px-1.5 py-0.5 rounded-full ml-0.5 animate-pulse"><?= count($pendingApprovalTasks) ?></span>
+                    <?php endif; ?>
+                </button>
+            <?php endif; ?>
             <button onclick="openTaskModal()" class="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-xl text-xs font-semibold transition flex items-center gap-1.5 shadow-md shadow-indigo-100">
                 <i class="fa-solid fa-plus"></i>
                 <span>Thêm công việc</span>
@@ -869,7 +898,184 @@ if ($currentUser['role'] === 'BGD') {
     </div>
 </div>
 
+<!-- ==================== MODAL: BATCH APPROVAL FOR LEADERS (TRƯỞNG PHÒNG & BGD) ==================== -->
+<?php if (in_array($currentUser['role'], ['TRUONG_PHONG', 'BGD', 'SUPER_ADMIN'])): ?>
+<div id="batchApprovalModal" class="fixed inset-0 bg-slate-900/70 backdrop-blur-md hidden items-center justify-center p-4 z-50">
+    <div class="bg-white rounded-2xl shadow-2xl max-w-4xl w-full p-6 border border-slate-200 transform transition-all max-h-[90vh] flex flex-col">
+        <!-- Modal Header -->
+        <div class="flex items-center justify-between pb-3 border-b border-slate-100 mb-4 shrink-0">
+            <h3 class="font-bold text-slate-900 text-base flex items-center gap-2">
+                <i class="fa-solid fa-clipboard-check text-emerald-600 text-xl"></i>
+                <span>
+                    <?php if ($currentUser['role'] === 'BGD'): ?>
+                        Danh Sách Công Việc Kính Trình Ban Giám Đốc Phê Duyệt
+                    <?php elseif ($currentUser['role'] === 'TRUONG_PHONG'): ?>
+                        Danh Sách Công Việc Chờ Trưởng Phòng Phê Duyệt
+                    <?php else: ?>
+                        Danh Sách Công Việc Chờ Phê Duyệt Hàng Loạt
+                    <?php endif; ?>
+                </span>
+                <span class="bg-amber-100 text-amber-800 text-xs font-extrabold px-2.5 py-0.5 rounded-full border border-amber-300 ml-1">
+                    <?= count($pendingApprovalTasks) ?> công việc
+                </span>
+            </h3>
+            <button onclick="closeBatchApprovalModal()" class="text-slate-400 hover:text-slate-600"><i class="fa-solid fa-xmark text-lg"></i></button>
+        </div>
+
+        <!-- Modal Body / Form -->
+        <form method="POST" action="task_actions.php" id="batchApprovalForm" onsubmit="return validateBatchApprovalForm()" class="flex flex-col flex-1 overflow-hidden">
+            <input type="hidden" name="action" value="batch_approve_tasks">
+
+            <!-- Directive Comment Box (Optional) -->
+            <div class="mb-4 shrink-0">
+                <label class="block text-xs font-bold text-slate-700 mb-1 flex items-center gap-1.5">
+                    <i class="fa-solid fa-comment-dots text-amber-600"></i>
+                    <span>Ý kiến chỉ đạo chung (Áp dụng cho các công việc được chọn phê duyệt - Không bắt buộc):</span>
+                </label>
+                <textarea name="leader_comments_general" rows="2" placeholder="Nhập ý kiến chỉ đạo, hướng dẫn chung cho các công việc được duyệt..." class="w-full p-2.5 border border-slate-300 rounded-xl text-xs focus:ring-2 focus:ring-emerald-500 outline-none font-medium bg-slate-50/50"></textarea>
+            </div>
+
+            <!-- Task List Table -->
+            <div class="flex-1 overflow-y-auto border border-slate-200 rounded-xl mb-4">
+                <table class="w-full text-left border-collapse text-xs">
+                    <thead class="sticky top-0 bg-slate-900 text-white font-bold uppercase text-[11px] z-10">
+                        <tr>
+                            <th scope="col" class="py-3 px-3 text-center border-r border-slate-800 w-12">
+                                <input type="checkbox" id="selectAllApprovalTasks" onclick="toggleSelectAllApproval(this)" class="w-4 h-4 accent-emerald-600 rounded cursor-pointer" title="Chọn tất cả">
+                            </th>
+                            <th scope="col" class="py-3 px-3 text-center border-r border-slate-800 w-12">STT</th>
+                            <th scope="col" class="py-3 px-4 border-r border-slate-800">TÊN CÔNG VIỆC / NỘI DUNG</th>
+                            <th scope="col" class="py-3 px-3 border-r border-slate-800 w-36 text-center">ĐƠN VỊ / NGƯỜI TRÌNH</th>
+                            <th scope="col" class="py-3 px-3 border-r border-slate-800 w-28 text-center">HẠN CHÓT</th>
+                            <th scope="col" class="py-3 px-3 text-center w-32">TRẠNG THÁI</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-slate-200 bg-white">
+                        <?php if (count($pendingApprovalTasks) > 0): ?>
+                            <?php $bStt = 1; foreach ($pendingApprovalTasks as $pt): ?>
+                                <tr class="hover:bg-amber-50/50 transition cursor-pointer" onclick="toggleRowCheckbox(event, 'approval_check_<?= $pt['id'] ?>')">
+                                    <td class="py-3 px-3 text-center border-r border-slate-100" onclick="event.stopPropagation()">
+                                        <input type="checkbox" name="task_ids[]" value="<?= $pt['id'] ?>" id="approval_check_<?= $pt['id'] ?>" onchange="updateBatchApproveCount()" class="batch-approval-checkbox w-4 h-4 accent-emerald-600 rounded cursor-pointer">
+                                    </td>
+                                    <td class="py-3 px-3 text-center font-bold text-slate-500 border-r border-slate-100">
+                                        #<?= $bStt++ ?>
+                                    </td>
+                                    <td class="py-3 px-4 border-r border-slate-100">
+                                        <div class="font-bold text-slate-900 text-xs leading-snug">
+                                            <?= htmlspecialchars($pt['title']) ?>
+                                        </div>
+                                        <?php if (!empty($pt['description'])): ?>
+                                            <div class="text-slate-500 text-[11px] mt-0.5 line-clamp-2">
+                                                <?= htmlspecialchars($pt['description']) ?>
+                                            </div>
+                                        <?php endif; ?>
+                                    </td>
+                                    <td class="py-3 px-3 text-center border-r border-slate-100">
+                                        <div class="font-semibold text-slate-800 text-[11px]"><?= htmlspecialchars($pt['dept_name'] ?? '') ?></div>
+                                        <div class="text-[10px] text-slate-500"><i class="fa-solid fa-user text-slate-400 mr-0.5"></i><?= htmlspecialchars($pt['creator_name'] ?? '') ?></div>
+                                    </td>
+                                    <td class="py-3 px-3 text-center border-r border-slate-100 font-medium">
+                                        <?= !empty($pt['due_date']) ? date('d/m/Y', strtotime($pt['due_date'])) : '<span class="text-slate-400">---</span>' ?>
+                                    </td>
+                                    <td class="py-3 px-3 text-center">
+                                        <?= renderStatusBadge($pt['status']) ?>
+                                    </td>
+                                </tr>
+                            <?php endforeach; ?>
+                        <?php else: ?>
+                            <tr>
+                                <td colspan="6" class="py-12 text-center text-slate-400">
+                                    <i class="fa-solid fa-circle-check text-4xl mb-2 text-emerald-400"></i>
+                                    <p class="font-medium text-slate-600">Hiện tại không có công việc nào đang chờ phê duyệt.</p>
+                                </td>
+                            </tr>
+                        <?php endif; ?>
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Modal Footer / Action Bar -->
+            <div class="pt-3 border-t border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shrink-0">
+                <div class="text-xs text-slate-600 font-medium">
+                    <span id="batchApproveSelectedInfo">Đã chọn: <strong class="text-emerald-700 font-bold" id="batchApproveCount">0</strong> / <?= count($pendingApprovalTasks) ?> công việc</span>
+                </div>
+                <div class="flex items-center justify-end gap-2">
+                    <button type="button" onclick="closeBatchApprovalModal()" class="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold rounded-xl transition">Đóng</button>
+                    <?php if (count($pendingApprovalTasks) > 0): ?>
+                        <button type="submit" id="batchApproveSubmitBtn" class="bg-emerald-600 hover:bg-emerald-700 text-white font-bold px-6 py-2.5 rounded-xl text-xs shadow-md shadow-emerald-200 transition flex items-center gap-2 transform hover:scale-102">
+                            <i class="fa-solid fa-check-double text-sm"></i>
+                            <span id="batchApproveBtnText">Phê duyệt các mục đã chọn (0)</span>
+                        </button>
+                    <?php endif; ?>
+                </div>
+            </div>
+        </form>
+    </div>
+</div>
+<?php endif; ?>
+
 <script>
+function openBatchApprovalModal() {
+    const modal = document.getElementById('batchApprovalModal');
+    if (modal) {
+        modal.classList.remove('hidden');
+        modal.classList.add('flex');
+        updateBatchApproveCount();
+    }
+}
+
+function closeBatchApprovalModal() {
+    const modal = document.getElementById('batchApprovalModal');
+    if (modal) {
+        modal.classList.add('hidden');
+        modal.classList.remove('flex');
+    }
+}
+
+function toggleSelectAllApproval(master) {
+    const checkboxes = document.querySelectorAll('.batch-approval-checkbox');
+    checkboxes.forEach(cb => {
+        cb.checked = master.checked;
+    });
+    updateBatchApproveCount();
+}
+
+function updateBatchApproveCount() {
+    const checkboxes = document.querySelectorAll('.batch-approval-checkbox');
+    const checkedCount = document.querySelectorAll('.batch-approval-checkbox:checked').length;
+    const countEl = document.getElementById('batchApproveCount');
+    if (countEl) {
+        countEl.innerText = checkedCount;
+    }
+    const btnText = document.getElementById('batchApproveBtnText');
+    if (btnText) {
+        btnText.innerText = `Phê duyệt các mục đã chọn (${checkedCount})`;
+    }
+
+    const selectAll = document.getElementById('selectAllApprovalTasks');
+    if (selectAll && checkboxes.length > 0) {
+        selectAll.checked = (checkedCount === checkboxes.length);
+    }
+}
+
+function toggleRowCheckbox(event, checkboxId) {
+    if (event.target.tagName.toLowerCase() === 'input') return;
+    const cb = document.getElementById(checkboxId);
+    if (cb) {
+        cb.checked = !cb.checked;
+        updateBatchApproveCount();
+    }
+}
+
+function validateBatchApprovalForm() {
+    const checkedCount = document.querySelectorAll('.batch-approval-checkbox:checked').length;
+    if (checkedCount === 0) {
+        alert('Vui lòng tích chọn ít nhất một công việc để phê duyệt!');
+        return false;
+    }
+    return confirm(`Bạn có chắc chắn muốn phê duyệt ${checkedCount} công việc đã chọn không?`);
+}
+
 function openPendingTaskModal() {
     const modal = document.getElementById('pendingTaskModal');
     if (modal) {
