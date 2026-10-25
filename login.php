@@ -84,10 +84,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 <?php if (!empty($loginBg) && file_exists(__DIR__ . '/' . $loginBg)): ?>
     <!-- Custom Background Image with overlay -->
     <div class="absolute inset-0 bg-cover bg-center z-0 transition-all duration-700 scale-105" style="background-image: url('<?= htmlspecialchars($loginBg) ?>');"></div>
-    <div class="absolute inset-0 bg-slate-950/60 backdrop-blur-sm z-0"></div>
+    <div class="absolute inset-0 bg-black/20 z-0"></div>
 <?php endif; ?>
 
-<div class="max-w-lg w-full bg-white/80 backdrop-blur-xl rounded-3xl shadow-2xl overflow-hidden border border-white/30 relative z-10 my-6">
+<div class="max-w-lg w-full bg-white/85 backdrop-blur-xl rounded-3xl shadow-2xl overflow-hidden border border-white/40 relative z-10 my-6">
     <div class="bg-gradient-to-r from-blue-900/90 via-indigo-900/90 to-slate-900/90 p-6 text-center text-white relative border-b border-white/10">
         <div class="w-16 h-16 bg-white/10 rounded-2xl flex items-center justify-center mx-auto mb-3 backdrop-blur-md border border-white/20 shadow-lg">
             <i class="fa-solid fa-graduation-cap text-3xl text-blue-200"></i>
