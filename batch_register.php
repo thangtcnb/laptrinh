@@ -39,7 +39,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     if ($currentUser['role'] === 'TRUONG_PHONG') {
         $defaultStatus = 'CHO_TIEP_NHAN';
-        $targetStatus = 'CHO_BGD_DUYET';
+        $targetStatus = 'DANG_THUC_HIEN';
     } elseif ($currentUser['role'] === 'BGD') {
         $defaultStatus = 'CHO_TIEP_NHAN';
         $targetStatus = 'DANG_THUC_HIEN';

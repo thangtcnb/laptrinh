@@ -141,7 +141,7 @@ if ($action === 'save_task') {
         $targetStatus = null;
     } elseif ($currentUser['role'] === 'TRUONG_PHONG') {
         $status = 'CHO_TIEP_NHAN';
-        $targetStatus = 'CHO_BGD_DUYET';
+        $targetStatus = 'DANG_THUC_HIEN';
     } elseif ($currentUser['role'] === 'BGD') {
         $status = 'CHO_TIEP_NHAN';
         $targetStatus = 'DANG_THUC_HIEN';
