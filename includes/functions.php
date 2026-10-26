@@ -99,44 +99,66 @@ function renderDepartmentBadge($code, $name, $colorTheme, $icon) {
             </span>';
 }
 
-// Render status badge
-function renderStatusBadge($status) {
+// Render status badge (including prominent "Quá hạn" warning badge when overdue)
+function renderStatusBadge($status, $dueDate = null) {
+    $html = '';
     switch ($status) {
         case 'CHO_BGD_DUYET':
-            return '<span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium bg-amber-100 text-amber-800 border border-amber-200">
+            $html = '<span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium bg-amber-100 text-amber-800 border border-amber-200">
                         <i class="fa-solid fa-clock-rotate-left"></i> Chờ BGD duyệt
                     </span>';
+            break;
         case 'CHO_DUYET':
-            return '<span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800 border border-yellow-200">
+            $html = '<span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800 border border-yellow-200">
                         <i class="fa-solid fa-hourglass-half"></i> Chờ Trưởng phòng duyệt
                     </span>';
+            break;
         case 'CHO_TIEP_NHAN':
-            return '<span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium bg-cyan-100 text-cyan-800 border border-cyan-200">
+            $html = '<span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium bg-cyan-100 text-cyan-800 border border-cyan-200">
                         <i class="fa-solid fa-clock"></i> Chờ tiếp nhận
                     </span>';
+            break;
         case 'YEU_CAU_CHINH_SUA':
-            return '<span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium bg-orange-100 text-orange-800 border border-orange-300">
+            $html = '<span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium bg-orange-100 text-orange-800 border border-orange-300">
                         <i class="fa-solid fa-pen-to-square"></i> Yêu cầu chỉnh sửa
                     </span>';
+            break;
         case 'CHO_XAC_NHAN':
-            return '<span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800 border border-blue-200">
+            $html = '<span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800 border border-blue-200">
                         <i class="fa-solid fa-envelope-open-text"></i> Chờ NV xác nhận
                     </span>';
+            break;
         case 'TU_CHOI_CHO_TP_XAC_NHAN':
-            return '<span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium bg-rose-100 text-rose-800 border border-rose-200">
+            $html = '<span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium bg-rose-100 text-rose-800 border border-rose-200">
                         <i class="fa-solid fa-circle-xmark"></i> Từ chối - Chờ TP xác nhận
                     </span>';
+            break;
         case 'DANG_THUC_HIEN':
-            return '<span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium bg-sky-100 text-sky-800 border border-sky-200">
+            $html = '<span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium bg-sky-100 text-sky-800 border border-sky-200">
                         <i class="fa-solid fa-spinner fa-spin text-xs"></i> Đang thực hiện
                     </span>';
+            break;
         case 'HOAN_THANH':
-            return '<span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium bg-emerald-100 text-emerald-800 border border-emerald-200">
+            $html = '<span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium bg-emerald-100 text-emerald-800 border border-emerald-200">
                         <i class="fa-solid fa-circle-check"></i> Hoàn thành
                     </span>';
+            break;
         default:
-            return '<span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-800">' . htmlspecialchars($status) . '</span>';
+            $html = '<span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-800">' . htmlspecialchars($status) . '</span>';
+            break;
     }
+
+    if (!empty($dueDate) && $status !== 'HOAN_THANH') {
+        $today = date('Y-m-d');
+        $due = date('Y-m-d', strtotime($dueDate));
+        if ($due < $today) {
+            $html .= ' <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold bg-rose-600 text-white shadow-sm border border-rose-700 animate-pulse" title="Công việc đã quá hạn">
+                        <i class="fa-solid fa-triangle-exclamation text-xs"></i> Quá hạn
+                    </span>';
+        }
+    }
+
+    return $html;
 }
 
 // Render priority badge
