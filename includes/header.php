@@ -152,10 +152,10 @@ if ($roleLabel === 'TRUONG_PHONG') {
                 <span>Đăng Ký Công Việc</span>
             </a>
 
-            <!-- Tab 3: Lịch họp BGD (Tím) -->
+            <!-- Tab 3: Lịch công tác (Tím) -->
             <a href="bgd_schedule.php" class="px-3.5 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition flex items-center gap-1.5 <?= $currentPage === 'bgd_schedule.php' ? 'bg-purple-600 text-white shadow-md shadow-purple-900/50' : 'bg-purple-950/40 text-purple-200 hover:bg-purple-800/50 border border-purple-800/40' ?>">
                 <i class="fa-solid fa-calendar-days"></i>
-                <span>Lịch Họp BGD</span>
+                <span>Lịch Công Tác</span>
             </a>
 
             <!-- Tab 4: Xuất báo cáo (Cam) -->
