@@ -1,9 +1,10 @@
 USE `laptrinh_db`;
+SET SQL_MODE = '';
 
 -- Create bgd_schedules table for BGD Weekly Schedule module if not exists
 CREATE TABLE IF NOT EXISTS `bgd_schedules` (
   `id` INT AUTO_INCREMENT PRIMARY KEY,
-  `schedule_date` DATE NOT NULL UNIQUE,
+  `schedule_date` DATE NULL DEFAULT NULL,
   `content` TEXT DEFAULT NULL,
   `participants` TEXT DEFAULT NULL,
   `chairperson` VARCHAR(255) DEFAULT NULL,
@@ -45,7 +46,7 @@ SET @columnname = "schedule_date";
 SET @preparedStatement = (SELECT IF(
   (SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = @dbname AND TABLE_NAME = @tablename AND COLUMN_NAME = @columnname) > 0,
   "SELECT 1",
-  "ALTER TABLE bgd_schedules ADD COLUMN schedule_date DATE NOT NULL AFTER id;"
+  "ALTER TABLE bgd_schedules ADD COLUMN schedule_date DATE NULL DEFAULT NULL AFTER id;"
 ));
 PREPARE stmt FROM @preparedStatement;
 EXECUTE stmt;
