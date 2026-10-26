@@ -63,14 +63,20 @@ if (!$currentUser || !in_array($currentUser['role'], ['BGD', 'SUPER_ADMIN'])) {
 }
 
 if (!empty($dateFrom)) {
-    $where[] = "(t.start_date >= ? OR t.due_date >= ?)";
-    $params[] = $dateFrom;
-    $params[] = $dateFrom;
+    $dateFromVal = $dateFrom;
+    if (strlen($dateFromVal) === 10) {
+        $dateFromVal .= ' 00:00:00';
+    }
+    $where[] = "t.due_date >= ?";
+    $params[] = $dateFromVal;
 }
 if (!empty($dateTo)) {
-    $where[] = "(t.start_date <= ? OR t.due_date <= ?)";
-    $params[] = $dateTo;
-    $params[] = $dateTo;
+    $dateToVal = $dateTo;
+    if (strlen($dateToVal) === 10) {
+        $dateToVal .= ' 23:59:59';
+    }
+    $where[] = "t.due_date <= ?";
+    $params[] = $dateToVal;
 }
 
 if (!empty($status) && $status !== 'ALL') {

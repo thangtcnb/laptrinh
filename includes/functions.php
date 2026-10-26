@@ -285,16 +285,22 @@ function getTasksFiltered($pdo, $filters = [], $limit = 15, $offset = 0, $curren
     $where = ["1=1"];
     $params = [];
 
-    // Filter by date range
+    // Filter by due date range
     if (!empty($filters['date_from'])) {
-        $where[] = "(t.start_date >= ? OR t.due_date >= ?)";
-        $params[] = $filters['date_from'];
-        $params[] = $filters['date_from'];
+        $dateFromVal = $filters['date_from'];
+        if (strlen($dateFromVal) === 10) {
+            $dateFromVal .= ' 00:00:00';
+        }
+        $where[] = "t.due_date >= ?";
+        $params[] = $dateFromVal;
     }
     if (!empty($filters['date_to'])) {
-        $where[] = "(t.start_date <= ? OR t.due_date <= ?)";
-        $params[] = $filters['date_to'];
-        $params[] = $filters['date_to'];
+        $dateToVal = $filters['date_to'];
+        if (strlen($dateToVal) === 10) {
+            $dateToVal .= ' 23:59:59';
+        }
+        $where[] = "t.due_date <= ?";
+        $params[] = $dateToVal;
     }
 
     // Filter by department or "📌 Công việc của tôi"
