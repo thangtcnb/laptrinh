@@ -89,9 +89,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
 <div class="max-w-lg w-full bg-white/85 backdrop-blur-xl rounded-3xl shadow-2xl overflow-hidden border border-white/40 relative z-10 my-6">
     <div class="bg-gradient-to-r from-blue-900/90 via-indigo-900/90 to-slate-900/90 p-6 text-center text-white relative border-b border-white/10">
-        <div class="w-16 h-16 bg-white/10 rounded-2xl flex items-center justify-center mx-auto mb-3 backdrop-blur-md border border-white/20 shadow-lg">
-            <i class="fa-solid fa-graduation-cap text-3xl text-blue-200"></i>
-        </div>
+        <img src="assets/images/logo_ufm.png" alt="UFM Logo" class="h-20 w-auto mx-auto mb-3 object-contain">
         <h2 class="text-sm sm:text-base font-bold uppercase tracking-wide text-white">TRƯỜNG ĐẠI HỌC TÀI CHÍNH - MARKETING</h2>
         <p class="text-sm sm:text-base font-bold uppercase tracking-wide text-blue-200 mt-1">PHÂN HIỆU TỈNH QUẢNG NGÃI</p>
         <p class="text-lg sm:text-xl font-extrabold uppercase tracking-wider text-amber-300 mt-3 drop-shadow-sm">HỆ THỐNG QUẢN LÝ CÔNG VIỆC</p>
