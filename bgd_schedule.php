@@ -36,12 +36,12 @@ if ($year < 2000) $year = (int)date('o');
 $dto = new DateTime();
 $dto->setISODate($year, $week);
 $mondayStr = $dto->format('Y-m-d');
-$mondayDisplay = $dto->format('d/m');
+$mondayDisplay = $dto->format('d/m/Y');
 
 $dtoSunday = clone $dto;
 $dtoSunday->modify('+6 days');
 $sundayStr = $dtoSunday->format('Y-m-d');
-$sundayDisplay = $dtoSunday->format('d/m');
+$sundayDisplay = $dtoSunday->format('d/m/Y');
 
 // Previous and Next week navigation
 $prevDto = (clone $dto)->modify('-1 week');
@@ -133,6 +133,28 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         header("Location: bgd_schedule.php?week=$week&year=$year");
         exit;
     }
+
+    if ($action === 'save_weekly_note') {
+        $noteContent = trim($_POST['note_content'] ?? '');
+
+        $stmtCheckNote = $pdo->prepare("SELECT id FROM bgd_weekly_notes WHERE week_number = ? AND year = ?");
+        $stmtCheckNote->execute([$week, $year]);
+        $existingNote = $stmtCheckNote->fetch();
+
+        if ($existingNote) {
+            $stmtUpdateNote = $pdo->prepare("UPDATE bgd_weekly_notes SET note_content = ?, created_by = ? WHERE id = ?");
+            $stmtUpdateNote->execute([$noteContent, $currentUser['id'], $existingNote['id']]);
+            logActivity($pdo, $currentUser['id'], 'UPDATE_WEEKLY_NOTE', "Đã cập nhật ghi chú tuần $week/$year");
+        } else {
+            $stmtInsertNote = $pdo->prepare("INSERT INTO bgd_weekly_notes (week_number, year, note_content, created_by) VALUES (?, ?, ?, ?)");
+            $stmtInsertNote->execute([$week, $year, $noteContent, $currentUser['id']]);
+            logActivity($pdo, $currentUser['id'], 'CREATE_WEEKLY_NOTE', "Đã tạo mới ghi chú tuần $week/$year");
+        }
+
+        $_SESSION['flash_success'] = "Đã lưu Ghi chú trong tuần $week/$year thành công!";
+        header("Location: bgd_schedule.php?week=$week&year=$year");
+        exit;
+    }
 }
 
 // Flash messages
@@ -158,6 +180,15 @@ foreach ($schedulesList as $s) {
     $schedulesByDate[$s['schedule_date']] = $s;
 }
 
+// Fetch Weekly Note for this week and year
+$weeklyNoteContent = '';
+$stmtNote = $pdo->prepare("SELECT note_content FROM bgd_weekly_notes WHERE week_number = ? AND year = ?");
+$stmtNote->execute([$week, $year]);
+$weeklyNote = $stmtNote->fetch();
+if ($weeklyNote && !empty($weeklyNote['note_content'])) {
+    $weeklyNoteContent = $weeklyNote['note_content'];
+}
+
 $daysOfWeekNames = [
     1 => 'Thứ Hai',
     2 => 'Thứ Ba',
@@ -179,9 +210,9 @@ require_once __DIR__ . '/includes/header.php';
                 <i class="fa-solid fa-calendar-days text-purple-300"></i>
                 <span>Phân Hệ Lịch Công Tác Tuần Ban Giám Đốc</span>
             </div>
-            <!-- Title mẫu chuẩn: LỊCH CÔNG TÁC TUẦN [Số tuần] NĂM [Năm] ([dd/mm] - [dd/mm]) -->
+            <!-- Title mẫu chuẩn: BẢNG LỊCH CÔNG TÁC TUẦN [Số tuần]/[Năm] ([dd/mm/yyyy] – [dd/mm/yyyy]) -->
             <h2 class="text-xl md:text-2xl font-black tracking-tight text-amber-300">
-                LỊCH CÔNG TÁC TUẦN <?= $week ?> NĂM <?= $year ?> (<?= $mondayDisplay ?> - <?= $sundayDisplay ?>)
+                BẢNG LỊCH CÔNG TÁC TUẦN <?= $week ?>/<?= $year ?> (<?= $mondayDisplay ?> – <?= $sundayDisplay ?>)
             </h2>
             <p class="text-xs text-purple-200 mt-1">
                 Lịch làm việc, họp giao ban và công tác tuần của Ban Giám đốc Phân hiệu Quảng Ngãi.
@@ -242,28 +273,22 @@ require_once __DIR__ . '/includes/header.php';
             <div class="flex items-center gap-2">
                 <i class="fa-solid fa-calendar-check text-purple-700 text-lg"></i>
                 <h3 class="text-sm font-bold text-slate-900 uppercase tracking-wide">
-                    BẢNG LỊCH CÔNG TÁC TUẦN <?= $week ?>/<?= $year ?>
+                    BẢNG LỊCH CÔNG TÁC TUẦN <?= $week ?>/<?= $year ?> (<?= $mondayDisplay ?> – <?= $sundayDisplay ?>)
                 </h3>
             </div>
-            <?php if (!$canManageSchedule): ?>
-                <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-slate-200 text-slate-700 text-xs font-bold border border-slate-300">
-                    <i class="fa-solid fa-eye text-slate-500"></i>
-                    <span>Giao diện chỉ xem (Read-only)</span>
-                </span>
-            <?php endif; ?>
         </div>
 
         <div class="overflow-x-auto">
             <table class="w-full text-left border-collapse text-xs">
                 <thead>
                     <tr class="bg-purple-950 text-white font-bold uppercase tracking-wider text-[11px] border-b border-purple-900">
-                        <th scope="col" class="py-3.5 px-4 border-r border-purple-900 w-52">1. THỨ & NGÀY</th>
-                        <th scope="col" class="py-3.5 px-4 border-r border-purple-900 min-w-[260px]">2. NỘI DUNG CÔNG VIỆC</th>
-                        <th scope="col" class="py-3.5 px-4 border-r border-purple-900 w-52">3. THÀNH PHẦN THAM DỰ</th>
-                        <th scope="col" class="py-3.5 px-4 border-r border-purple-900 w-44">4. CHỦ TRÌ</th>
-                        <th scope="col" class="py-3.5 px-4 border-r border-purple-900 w-48">5. ĐỊA ĐIỂM</th>
+                        <th scope="col" class="py-3.5 px-4 border-r border-purple-900 w-[14%] min-w-[130px]">1. THỨ & NGÀY</th>
+                        <th scope="col" class="py-3.5 px-4 border-r border-purple-900 w-[32%] min-w-[260px]">2. NỘI DUNG CÔNG VIỆC</th>
+                        <th scope="col" class="py-3.5 px-4 border-r border-purple-900 w-[32%] min-w-[260px]">3. THÀNH PHẦN THAM DỰ</th>
+                        <th scope="col" class="py-3.5 px-4 border-r border-purple-900 w-[11%] min-w-[120px]">4. CHỦ TRÌ</th>
+                        <th scope="col" class="py-3.5 px-4 border-r border-purple-900 w-[11%] min-w-[120px]">5. ĐỊA ĐIỂM</th>
                         <?php if ($canManageSchedule): ?>
-                            <th scope="col" class="py-3.5 px-3 text-center w-28">THAO TÁC</th>
+                            <th scope="col" class="py-3.5 px-3 text-center w-[100px]">THAO TÁC</th>
                         <?php endif; ?>
                     </tr>
                 </thead>
@@ -276,11 +301,20 @@ require_once __DIR__ . '/includes/header.php';
                             $fullDayLabel = $dayName . ', ngày ' . $dayDate->format('d/m/Y');
                             $sData = $schedulesByDate[$dateStr] ?? null;
                             $isToday = ($dateStr === date('Y-m-d'));
+
+                            // Parse multi-line content and participants for item row alignment
+                            $cRaw = $sData['content'] ?? '';
+                            $pRaw = $sData['participants'] ?? '';
+
+                            $cLines = array_values(array_filter(array_map('trim', explode("\n", str_replace("\r", "", $cRaw))), 'strlen'));
+                            $pLines = array_values(array_filter(array_map('trim', explode("\n", str_replace("\r", "", $pRaw))), 'strlen'));
+
+                            $maxItems = max(count($cLines), count($pLines));
                         ?>
                         <tr class="<?= $isToday ? 'bg-amber-50/60' : 'hover:bg-slate-50' ?> transition">
                             <!-- Cột 1: Thứ & Ngày -->
-                            <td class="py-4 px-4 font-bold border-r border-slate-100 text-slate-900">
-                                <div class="flex items-start gap-2">
+                            <td class="py-3 px-4 font-bold border-r border-slate-100 text-slate-900 align-top">
+                                <div class="flex items-start gap-2 pt-1">
                                     <div class="mt-0.5 text-purple-700">
                                         <i class="fa-regular fa-calendar text-sm"></i>
                                     </div>
@@ -294,55 +328,82 @@ require_once __DIR__ . '/includes/header.php';
                                 </div>
                             </td>
 
-                            <!-- Cột 2: Nội dung công việc (cho phép xuống dòng / nhiều mục) -->
-                            <td class="py-4 px-4 border-r border-slate-100 text-slate-800 leading-relaxed font-medium">
-                                <?php if ($sData && !empty(trim($sData['content']))): ?>
-                                    <div class="text-xs space-y-1">
-                                        <?= nl2br(htmlspecialchars($sData['content'])) ?>
+                            <!-- Cột 2: Nội dung công việc (Căn hàng ngang với Cột 3) -->
+                            <td class="py-3 px-4 border-r border-slate-100 text-slate-800 font-medium align-top">
+                                <?php if ($maxItems > 0): ?>
+                                    <div class="grid grid-cols-1 h-full divide-y divide-slate-100" style="grid-template-rows: repeat(<?= $maxItems ?>, minmax(max-content, 1fr));">
+                                        <?php for ($k = 0; $k < $maxItems; $k++): ?>
+                                            <div class="py-1.5 flex items-start gap-2">
+                                                <?php if (isset($cLines[$k])): ?>
+                                                    <span class="inline-block w-1.5 h-1.5 rounded-full bg-purple-600 mt-1.5 shrink-0"></span>
+                                                    <span class="text-xs leading-relaxed text-slate-800 font-semibold"><?= htmlspecialchars($cLines[$k]) ?></span>
+                                                <?php else: ?>
+                                                    <span class="text-slate-300 italic text-xs">-</span>
+                                                <?php endif; ?>
+                                            </div>
+                                        <?php endfor; ?>
                                     </div>
                                 <?php else: ?>
-                                    <span class="text-slate-400 italic text-xs">Chưa có lịch công tác</span>
+                                    <div class="pt-1">
+                                        <span class="text-slate-400 italic text-xs">Chưa có lịch công tác</span>
+                                    </div>
                                 <?php endif; ?>
                             </td>
 
-                            <!-- Cột 3: Thành phần tham dự -->
-                            <td class="py-4 px-4 border-r border-slate-100 text-slate-700 font-medium">
-                                <?php if ($sData && !empty(trim($sData['participants']))): ?>
-                                    <div class="text-xs leading-relaxed">
-                                        <?= nl2br(htmlspecialchars($sData['participants'])) ?>
+                            <!-- Cột 3: Thành phần tham dự (Căn hàng ngang tương ứng Cột 2) -->
+                            <td class="py-3 px-4 border-r border-slate-100 text-slate-700 font-medium align-top">
+                                <?php if ($maxItems > 0): ?>
+                                    <div class="grid grid-cols-1 h-full divide-y divide-slate-100" style="grid-template-rows: repeat(<?= $maxItems ?>, minmax(max-content, 1fr));">
+                                        <?php for ($k = 0; $k < $maxItems; $k++): ?>
+                                            <div class="py-1.5 flex items-start gap-2">
+                                                <?php if (isset($pLines[$k])): ?>
+                                                    <span class="inline-block w-1.5 h-1.5 rounded-full bg-indigo-500 mt-1.5 shrink-0"></span>
+                                                    <span class="text-xs leading-relaxed text-slate-700 font-medium"><?= htmlspecialchars($pLines[$k]) ?></span>
+                                                <?php else: ?>
+                                                    <span class="text-slate-300 italic text-xs">-</span>
+                                                <?php endif; ?>
+                                            </div>
+                                        <?php endfor; ?>
                                     </div>
                                 <?php else: ?>
-                                    <span class="text-slate-400 italic text-xs">-</span>
+                                    <div class="pt-1">
+                                        <span class="text-slate-400 italic text-xs">-</span>
+                                    </div>
                                 <?php endif; ?>
                             </td>
 
                             <!-- Cột 4: Chủ trì -->
-                            <td class="py-4 px-4 border-r border-slate-100 font-bold text-slate-900">
-                                <?php if ($sData && !empty(trim($sData['chairperson']))): ?>
-                                    <span class="inline-flex items-center gap-1 text-purple-900 font-bold">
-                                        <i class="fa-solid fa-user-tie text-purple-600"></i>
-                                        <?= htmlspecialchars($sData['chairperson']) ?>
-                                    </span>
-                                <?php else: ?>
-                                    <span class="text-slate-400 italic font-normal text-xs">-</span>
-                                <?php endif; ?>
+                            <td class="py-3 px-4 border-r border-slate-100 font-bold text-slate-900 align-top">
+                                <div class="pt-1">
+                                    <?php if ($sData && !empty(trim($sData['chairperson']))): ?>
+                                        <span class="inline-flex items-start gap-1 text-purple-900 font-bold leading-relaxed">
+                                            <i class="fa-solid fa-user-tie text-purple-600 mt-0.5 shrink-0"></i>
+                                            <span><?= htmlspecialchars($sData['chairperson']) ?></span>
+                                        </span>
+                                    <?php else: ?>
+                                        <span class="text-slate-400 italic font-normal text-xs">-</span>
+                                    <?php endif; ?>
+                                </div>
                             </td>
 
                             <!-- Cột 5: Địa điểm -->
-                            <td class="py-4 px-4 border-r border-slate-100 font-medium text-slate-700">
-                                <?php if ($sData && !empty(trim($sData['location']))): ?>
-                                    <span class="inline-flex items-center gap-1.5 text-rose-700 font-semibold">
-                                        <i class="fa-solid fa-location-dot text-rose-500"></i>
-                                        <?= htmlspecialchars($sData['location']) ?>
-                                    </span>
-                                <?php else: ?>
-                                    <span class="text-slate-400 italic text-xs">-</span>
-                                <?php endif; ?>
+                            <td class="py-3 px-4 border-r border-slate-100 font-medium text-slate-700 align-top">
+                                <div class="pt-1">
+                                    <?php if ($sData && !empty(trim($sData['location']))): ?>
+                                        <span class="inline-flex items-start gap-1.5 text-rose-700 font-semibold leading-relaxed">
+                                            <i class="fa-solid fa-location-dot text-rose-500 mt-0.5 shrink-0"></i>
+                                            <span><?= htmlspecialchars($sData['location']) ?></span>
+                                        </span>
+                                    <?php else: ?>
+                                        <span class="text-slate-400 italic text-xs">-</span>
+                                    <?php endif; ?>
+                                </div>
                             </td>
 
                             <!-- Thao tác: Chỉ dành cho cấp có quyền -->
                             <?php if ($canManageSchedule): ?>
-                                <td class="py-4 px-3 text-center">
+                                <td class="py-3 px-3 text-center align-top">
+                                    <div class="pt-1">
                                     <div class="flex items-center justify-center gap-1">
                                         <?php
                                             $modalPayload = [
@@ -376,7 +437,80 @@ require_once __DIR__ . '/includes/header.php';
             </table>
         </div>
     </div>
+
+    <!-- KHUNG GHI CHÚ TRONG TUẦN -->
+    <div class="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden mb-6">
+        <div class="p-4 sm:p-5 border-b border-slate-200 flex items-center justify-between gap-3 bg-amber-50/50">
+            <div class="flex items-center gap-2">
+                <i class="fa-solid fa-note-sticky text-amber-600 text-lg"></i>
+                <h3 class="text-sm font-bold text-slate-900 uppercase tracking-wide">
+                    GHI CHÚ TRONG TUẦN <?= $week ?>/<?= $year ?>
+                </h3>
+            </div>
+            <?php if ($canManageSchedule): ?>
+                <button onclick="openNoteModal()" class="px-3.5 py-1.5 bg-amber-500 hover:bg-amber-600 text-slate-950 font-extrabold text-xs rounded-xl transition shadow-sm flex items-center gap-1.5 border border-amber-400">
+                    <i class="fa-solid fa-pen-to-square"></i>
+                    <span>Cập nhật Ghi chú</span>
+                </button>
+            <?php endif; ?>
+        </div>
+        <div class="p-5 text-xs leading-relaxed text-slate-800">
+            <?php if (!empty(trim($weeklyNoteContent))): ?>
+                <div class="bg-slate-50/80 rounded-xl p-4 border border-slate-200/80 font-medium text-slate-800 leading-relaxed">
+                    <?= nl2br(htmlspecialchars($weeklyNoteContent)) ?>
+                </div>
+            <?php else: ?>
+                <div class="text-slate-400 italic flex items-center gap-2 py-2">
+                    <i class="fa-regular fa-circle-info text-slate-400"></i>
+                    <span>Chưa có ghi chú nào trong tuần này.</span>
+                </div>
+            <?php endif; ?>
+        </div>
+    </div>
 </div>
+
+<!-- ==================== MODAL: THÊM / CHỈNH SỬA GHI CHÚ TRONG TUẦN ==================== -->
+<?php if ($canManageSchedule): ?>
+<div id="noteModal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm hidden items-center justify-center p-4 z-50">
+    <div class="bg-white rounded-2xl shadow-2xl max-w-lg w-full p-6 border border-slate-200 transform transition-all">
+        <div class="flex items-center justify-between pb-3 border-b border-slate-100 mb-4">
+            <h3 class="font-bold text-slate-900 text-base flex items-center gap-2">
+                <i class="fa-solid fa-note-sticky text-amber-600"></i>
+                <span>Cập Nhật Ghi Chú Tuần <?= $week ?>/<?= $year ?></span>
+            </h3>
+            <button onclick="closeNoteModal()" class="text-slate-400 hover:text-slate-600"><i class="fa-solid fa-xmark text-lg"></i></button>
+        </div>
+
+        <form method="POST" action="bgd_schedule.php?week=<?= $week ?>&year=<?= $year ?>" class="space-y-4">
+            <input type="hidden" name="action" value="save_weekly_note">
+
+            <div>
+                <label class="block text-xs font-bold text-slate-700 mb-1">Nội dung Ghi chú trong tuần</label>
+                <textarea name="note_content" rows="6" placeholder="Nhập nội dung ghi chú trong tuần (cho phép xuống dòng nhiều mục)..." class="w-full p-3 border border-slate-300 rounded-xl text-xs focus:ring-2 focus:ring-amber-500 outline-none font-medium"><?= htmlspecialchars($weeklyNoteContent) ?></textarea>
+            </div>
+
+            <div class="flex justify-end gap-2 pt-3 border-t border-slate-100">
+                <button type="button" onclick="closeNoteModal()" class="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold rounded-xl">Hủy</button>
+                <button type="submit" class="px-5 py-2 bg-amber-500 hover:bg-amber-600 text-slate-950 text-xs font-extrabold rounded-xl shadow-md transition flex items-center gap-1.5 border border-amber-400">
+                    <i class="fa-solid fa-floppy-disk"></i>
+                    <span>Lưu ghi chú tuần</span>
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+function openNoteModal() {
+    document.getElementById('noteModal').classList.remove('hidden');
+    document.getElementById('noteModal').classList.add('flex');
+}
+function closeNoteModal() {
+    document.getElementById('noteModal').classList.add('hidden');
+    document.getElementById('noteModal').classList.remove('flex');
+}
+</script>
+<?php endif; ?>
 
 <!-- ==================== MODAL: THÊM / CHỈNH SỬA LỊCH CÔNG TÁC BGD ==================== -->
 <?php if ($canManageSchedule): ?>

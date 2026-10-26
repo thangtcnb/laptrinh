@@ -63,10 +63,18 @@ if %ERRORLEVEL% NEQ 0 (
     exit /b %ERRORLEVEL%
 )
 
-echo "[9/9] Dang thuc thi Migration BGD Weekly Schedule (database\migrations\update_20261026_bgd_weekly_schedule.sql)..."
+echo "[9/10] Dang thuc thi Migration BGD Weekly Schedule (database\migrations\update_20261026_bgd_weekly_schedule.sql)..."
 %MYSQL_CMD% -h localhost -P 3306 -u root laptrinh_db < "database\migrations\update_20261026_bgd_weekly_schedule.sql"
 if %ERRORLEVEL% NEQ 0 (
     echo "[LOI] Khong the thuc thi database\migrations\update_20261026_bgd_weekly_schedule.sql. Vui long kiem tra XAMPP MySQL."
+    pause
+    exit /b %ERRORLEVEL%
+)
+
+echo "[10/10] Dang thuc thi Migration BGD Weekly Schedule Notes (database\migrations\update_20261026_bgd_schedule_notes.sql)..."
+%MYSQL_CMD% -h localhost -P 3306 -u root laptrinh_db < "database\migrations\update_20261026_bgd_schedule_notes.sql"
+if %ERRORLEVEL% NEQ 0 (
+    echo "[LOI] Khong the thuc thi database\migrations\update_20261026_bgd_schedule_notes.sql. Vui long kiem tra XAMPP MySQL."
     pause
     exit /b %ERRORLEVEL%
 )
