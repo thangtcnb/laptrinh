@@ -309,9 +309,9 @@ require_once __DIR__ . '/includes/header.php';
                         <?php if ($itemCount > 0): ?>
                             <?php foreach ($dayItems as $idx => $sItem):
                                 $globalRowCounter++;
-                                $zebraClass = ($globalRowCounter % 2 === 0) ? 'bg-slate-50/90' : 'bg-white';
+                                $zebraClass = ($idx % 2 === 0) ? 'bg-white' : 'bg-slate-50';
                                 if ($isToday) {
-                                    $zebraClass = ($globalRowCounter % 2 === 0) ? 'bg-amber-100/50' : 'bg-amber-50/70';
+                                    $zebraClass = ($idx % 2 === 0) ? 'bg-amber-50/60' : 'bg-amber-100/60';
                                 }
                             ?>
                                 <tr class="<?= $zebraClass ?> hover:bg-amber-100/80 transition">
@@ -346,7 +346,7 @@ require_once __DIR__ . '/includes/header.php';
                                     <td class="py-3 px-4 border-r border-slate-200 text-slate-800 font-medium align-top">
                                         <div class="flex items-start gap-2">
                                             <span class="inline-block w-2 h-2 rounded-full bg-purple-600 mt-1.5 shrink-0"></span>
-                                            <span class="text-xs leading-relaxed text-slate-900 font-semibold"><?= htmlspecialchars($sItem['content']) ?></span>
+                                            <span class="text-xs leading-relaxed text-slate-900 font-semibold"><?= nl2br(htmlspecialchars($sItem['content'])) ?></span>
                                         </div>
                                     </td>
 
@@ -355,7 +355,7 @@ require_once __DIR__ . '/includes/header.php';
                                         <?php if (!empty(trim($sItem['participants']))): ?>
                                             <div class="flex items-start gap-1.5">
                                                 <i class="fa-solid fa-users text-indigo-500 text-xs mt-1 shrink-0"></i>
-                                                <span class="text-xs leading-relaxed text-slate-700"><?= htmlspecialchars($sItem['participants']) ?></span>
+                                                <span class="text-xs leading-relaxed text-slate-700"><?= nl2br(htmlspecialchars($sItem['participants'])) ?></span>
                                             </div>
                                         <?php else: ?>
                                             <span class="text-slate-300 italic text-xs">-</span>
