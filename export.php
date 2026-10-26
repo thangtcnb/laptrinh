@@ -10,8 +10,19 @@ use Shuchkin\SimpleXLSXGen;
 requireLogin();
 $currentUser = getCurrentUser($pdo);
 
-$dateFrom = $_GET['date_from'] ?? date('Y-m-01');
-$dateTo = $_GET['date_to'] ?? date('Y-m-t');
+$timeFrame = $_GET['time_frame'] ?? '';
+$timeDetail = $_GET['time_detail'] ?? '';
+$dateFrom = $_GET['date_from'] ?? '';
+$dateTo = $_GET['date_to'] ?? '';
+
+if (!empty($timeDetail) && strpos($timeDetail, '|') !== false) {
+    list($df, $dt) = explode('|', $timeDetail, 2);
+    if (empty($dateFrom)) $dateFrom = $df;
+    if (empty($dateTo)) $dateTo = $dt;
+}
+
+if (empty($dateFrom) && empty($timeFrame)) $dateFrom = date('Y-m-01');
+if (empty($dateTo) && empty($timeFrame)) $dateTo = date('Y-m-t');
 $requestedScope = $_GET['scope'] ?? 'ALL';
 $status = $_GET['status'] ?? 'ALL';
 $exportType = $_GET['export_type'] ?? '';
@@ -331,14 +342,28 @@ require_once __DIR__ . '/includes/header.php';
     </div>
 
     <form method="GET" action="export.php" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <!-- Hidden inputs for date range -->
+        <input type="hidden" name="date_from" id="filter_date_from" value="<?= htmlspecialchars($dateFrom) ?>">
+        <input type="hidden" name="date_to" id="filter_date_to" value="<?= htmlspecialchars($dateTo) ?>">
+
+        <!-- COMBOBOX 1: Khung thời gian -->
         <div>
-            <label class="block text-xs font-semibold text-slate-600 mb-1">Từ ngày</label>
-            <input type="date" name="date_from" value="<?= htmlspecialchars($dateFrom) ?>" class="w-full p-2.5 border border-slate-300 rounded-xl text-xs outline-none focus:ring-2 focus:ring-indigo-500">
+            <label class="block text-xs font-semibold text-slate-600 mb-1">Khung thời gian</label>
+            <select name="time_frame" id="filter_time_frame" onchange="onTimeFrameChange()" class="w-full p-2.5 border border-slate-300 rounded-xl text-xs outline-none focus:ring-2 focus:ring-indigo-500 bg-white font-medium">
+                <option value="">-- Tất cả thời gian --</option>
+                <option value="week" <?= $timeFrame === 'week' ? 'selected' : '' ?>>Tuần</option>
+                <option value="month" <?= $timeFrame === 'month' ? 'selected' : '' ?>>Tháng</option>
+                <option value="quarter" <?= $timeFrame === 'quarter' ? 'selected' : '' ?>>Quý</option>
+                <option value="year" <?= $timeFrame === 'year' ? 'selected' : '' ?>>Năm</option>
+            </select>
         </div>
 
+        <!-- COMBOBOX 2: Chi tiết thời gian -->
         <div>
-            <label class="block text-xs font-semibold text-slate-600 mb-1">Đến ngày</label>
-            <input type="date" name="date_to" value="<?= htmlspecialchars($dateTo) ?>" class="w-full p-2.5 border border-slate-300 rounded-xl text-xs outline-none focus:ring-2 focus:ring-indigo-500">
+            <label class="block text-xs font-semibold text-slate-600 mb-1">Chi tiết thời gian</label>
+            <select name="time_detail" id="filter_time_detail" onchange="onTimeDetailChange()" class="w-full p-2.5 border border-slate-300 rounded-xl text-xs outline-none focus:ring-2 focus:ring-indigo-500 bg-white font-medium">
+                <option value="">-- Tất cả --</option>
+            </select>
         </div>
 
         <div>
@@ -455,9 +480,7 @@ require_once __DIR__ . '/includes/header.php';
                             <td class="py-3.5 px-4 border-r border-slate-100">
                                 <?php
                                 $titleColorClass = 'text-slate-900';
-                                if ($t['priority'] === 'CAO') {
-                                    $titleColorClass = 'text-pink-600';
-                                } elseif ($t['priority'] === 'KHAN_CAP') {
+                                if ($t['priority'] === 'URGENT' || $t['priority'] === 'KHAN_CAP') {
                                     $titleColorClass = 'text-red-600 font-bold';
                                 }
                                 ?>
@@ -520,5 +543,180 @@ require_once __DIR__ . '/includes/header.php';
         </div>
     <?php endif; ?>
 </div>
+
+<script>
+// SMART TIME FILTER REDESIGN (Combobox 1 & Combobox 2)
+function generateTimeOptions(timeFrame) {
+    const options = [];
+    const now = new Date();
+
+    if (timeFrame === 'week') {
+        for (let i = 0; i < 10; i++) {
+            const d = new Date();
+            const day = d.getDay();
+            const diffToMonday = d.getDate() - day + (day === 0 ? -6 : 1) - (i * 7);
+            const monday = new Date(d.setDate(diffToMonday));
+            monday.setHours(0, 0, 0, 0);
+
+            const sunday = new Date(monday);
+            sunday.setDate(monday.getDate() + 6);
+            sunday.setHours(23, 59, 59, 999);
+
+            const targetDate = new Date(monday.valueOf());
+            const dayNr = (monday.getDay() + 6) % 7;
+            targetDate.setDate(targetDate.getDate() - dayNr + 3);
+            const firstThursday = targetDate.valueOf();
+            targetDate.setMonth(0, 1);
+            if (targetDate.getDay() !== 4) {
+                targetDate.setMonth(0, 1 + ((4 - targetDate.getDay() + 7) % 7));
+            }
+            const weekNum = 1 + Math.round((firstThursday - targetDate.valueOf()) / 604800000);
+
+            const formatDdMm = (dt) => {
+                const dd = String(dt.getDate()).padStart(2, '0');
+                const mm = String(dt.getMonth() + 1).padStart(2, '0');
+                return `${dd}/${mm}`;
+            };
+
+            const formatYmd = (dt) => {
+                const yyyy = dt.getFullYear();
+                const mm = String(dt.getMonth() + 1).padStart(2, '0');
+                const dd = String(dt.getDate()).padStart(2, '0');
+                return `${yyyy}-${mm}-${dd}`;
+            };
+
+            const label = `Tuần ${weekNum} (${formatDdMm(monday)} - ${formatDdMm(sunday)})`;
+            const val = `${formatYmd(monday)}|${formatYmd(sunday)}`;
+            options.push({ label, val });
+        }
+    } else if (timeFrame === 'month') {
+        for (let i = 0; i < 12; i++) {
+            const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+            const year = d.getFullYear();
+            const month = d.getMonth() + 1;
+            const lastDay = new Date(year, month, 0);
+
+            const mm = String(month).padStart(2, '0');
+            const lastDd = String(lastDay.getDate()).padStart(2, '0');
+
+            const label = `Tháng ${month}/${year}`;
+            const val = `${year}-${mm}-01|${year}-${mm}-${lastDd}`;
+            options.push({ label, val });
+        }
+    } else if (timeFrame === 'quarter') {
+        const curYear = now.getFullYear();
+        const curQuarter = Math.floor(now.getMonth() / 3) + 1;
+
+        for (let i = 0; i < 8; i++) {
+            let q = curQuarter - i;
+            let y = curYear;
+            while (q <= 0) {
+                q += 4;
+                y -= 1;
+            }
+
+            let startMm, endMm, endDd;
+            if (q === 1) { startMm = '01'; endMm = '03'; endDd = '31'; }
+            else if (q === 2) { startMm = '04'; endMm = '06'; endDd = '30'; }
+            else if (q === 3) { startMm = '07'; endMm = '09'; endDd = '30'; }
+            else { startMm = '10'; endMm = '12'; endDd = '31'; }
+
+            const label = `Quý ${q}/${y}`;
+            const val = `${y}-${startMm}-01|${y}-${endMm}-${endDd}`;
+            options.push({ label, val });
+        }
+    } else if (timeFrame === 'year') {
+        const curYear = now.getFullYear();
+        for (let i = 0; i < 2; i++) {
+            const y = curYear - i;
+            const label = `Năm ${y}`;
+            const val = `${y}-01-01|${y}-12-31`;
+            options.push({ label, val });
+        }
+    }
+
+    return options;
+}
+
+function onTimeFrameChange(isInit = false) {
+    const frameSelect = document.getElementById('filter_time_frame');
+    const detailSelect = document.getElementById('filter_time_detail');
+    if (!frameSelect || !detailSelect) return;
+
+    const frameVal = frameSelect.value;
+    detailSelect.innerHTML = '';
+
+    if (!frameVal) {
+        detailSelect.innerHTML = '<option value="">-- Tất cả --</option>';
+        onTimeDetailChange();
+        return;
+    }
+
+    const options = generateTimeOptions(frameVal);
+    options.forEach((opt) => {
+        const optionEl = document.createElement('option');
+        optionEl.value = opt.val;
+        optionEl.textContent = opt.label;
+        detailSelect.appendChild(optionEl);
+    });
+
+    if (!isInit) {
+        if (options.length > 0) {
+            detailSelect.selectedIndex = 0;
+        }
+        onTimeDetailChange();
+    }
+}
+
+function onTimeDetailChange() {
+    const detailSelect = document.getElementById('filter_time_detail');
+    const dateFromInput = document.getElementById('filter_date_from');
+    const dateToInput = document.getElementById('filter_date_to');
+
+    if (!detailSelect || !dateFromInput || !dateToInput) return;
+
+    const val = detailSelect.value;
+    if (val && val.includes('|')) {
+        const parts = val.split('|');
+        dateFromInput.value = parts[0] || '';
+        dateToInput.value = parts[1] || '';
+    } else {
+        dateFromInput.value = '';
+        dateToInput.value = '';
+    }
+}
+
+function initSmartTimeFilter(savedTimeDetail, savedDateFrom, savedDateTo) {
+    const frameSelect = document.getElementById('filter_time_frame');
+    const detailSelect = document.getElementById('filter_time_detail');
+
+    if (!frameSelect || !detailSelect) return;
+
+    if (frameSelect.value) {
+        onTimeFrameChange(true);
+
+        const targetVal = savedTimeDetail || (savedDateFrom && savedDateTo ? `${savedDateFrom}|${savedDateTo}` : '');
+        if (targetVal) {
+            detailSelect.value = targetVal;
+        }
+
+        if (!detailSelect.value && detailSelect.options.length > 0) {
+            detailSelect.selectedIndex = 0;
+        }
+
+        onTimeDetailChange();
+    } else {
+        detailSelect.innerHTML = '<option value="">-- Tất cả --</option>';
+    }
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+    initSmartTimeFilter(
+        <?= json_encode($timeDetail) ?>,
+        <?= json_encode($dateFrom) ?>,
+        <?= json_encode($dateTo) ?>
+    );
+});
+</script>
 
 <?php require_once __DIR__ . '/includes/footer.php'; ?>
