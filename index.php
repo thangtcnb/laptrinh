@@ -9,13 +9,13 @@ unset($_SESSION['flash_success'], $_SESSION['flash_error']);
 
 // Filters parameters - Default homepage view based on user role:
 // For TRUONG_PHONG: Default to their department ID ("DANH SÁCH CÔNG VIỆC PHÒNG [TÊN PHÒNG]")
-// For BGD: Default to '' ("TẤT CẢ CÔNG VIỆC PHÂN HIỆU QUẢNG NGÃI")
+// For BGD and SUPER_ADMIN (thangtcnb@gmail.com): Default to '' ("TẤT CẢ CÔNG VIỆC PHÂN HIỆU QUẢNG NGÃI")
 // For others: Default to 'MY_TASKS'
 $defaultDeptFilter = 'MY_TASKS';
 if (isset($currentUser['role'])) {
     if ($currentUser['role'] === 'TRUONG_PHONG') {
         $defaultDeptFilter = $currentUser['department_id'];
-    } elseif ($currentUser['role'] === 'BGD') {
+    } elseif (in_array($currentUser['role'], ['BGD', 'SUPER_ADMIN']) || ($currentUser['email'] ?? '') === 'thangtcnb@gmail.com') {
         $defaultDeptFilter = '';
     }
 }
@@ -667,8 +667,7 @@ $kpiStats = getKpiStats($pdo, $currentUser);
             <button onclick="closePendingTaskModal()" class="text-slate-400 hover:text-slate-600"><i class="fa-solid fa-xmark text-lg"></i></button>
         </div>
 
-        <?php if (count($pendingAssignedTasks) >= 2): ?>
-            <!-- BATCH ACCEPTANCE UI FOR 2 OR MORE TASKS -->
+            <!-- TASK ACCEPTANCE UI WITH TOP "TIẾP NHẬN TẤT CẢ" & INDIVIDUAL ROW "TIẾP NHẬN" BUTTONS -->
             <form method="POST" action="task_actions.php" id="batchAcceptForm">
                 <input type="hidden" name="action" value="respond_all_assigned_tasks">
 
@@ -676,19 +675,19 @@ $kpiStats = getKpiStats($pdo, $currentUser);
                     <div>
                         <div class="font-bold text-emerald-900 text-sm flex items-center gap-1.5">
                             <i class="fa-solid fa-list-check text-emerald-600"></i>
-                            <span>Tiếp nhận hàng loạt (<?= count($pendingAssignedTasks) ?> công việc)</span>
+                            <span>Tiếp nhận toàn bộ (<?= count($pendingAssignedTasks) ?> công việc)</span>
                         </div>
-                        <p class="text-xs text-emerald-700 mt-0.5">Bạn có thể nhập ý kiến chung hoặc riêng cho từng việc và nhấn "Chấp nhận tất cả".</p>
+                        <p class="text-xs text-emerald-700 mt-0.5">Bấm 01 lần để tiếp nhận tất cả các công việc đang chờ hoặc bấm nút "Tiếp nhận" riêng ở từng dòng.</p>
                     </div>
                     <button type="submit" class="bg-emerald-600 hover:bg-emerald-700 text-white font-bold px-5 py-2.5 rounded-xl text-xs shadow-md transition flex items-center justify-center gap-2 shrink-0">
                         <i class="fa-solid fa-check-double text-sm"></i>
-                        <span>Chấp nhận tất cả</span>
+                        <span>Tiếp nhận tất cả</span>
                     </button>
                 </div>
 
                 <div class="mb-4">
-                    <label class="block text-xs font-bold text-slate-700 mb-1">Ý kiến khác chung (Áp dụng cho toàn bộ danh sách nếu không nhập riêng):</label>
-                    <textarea name="general_comment" rows="2" placeholder="Nhập thêm ý kiến, đề xuất chung khi tiếp nhận hàng loạt..." class="w-full p-2.5 border border-slate-300 rounded-xl text-xs focus:ring-2 focus:ring-indigo-500 outline-none font-medium bg-white"></textarea>
+                    <label class="block text-xs font-bold text-slate-700 mb-1">Ý kiến khác chung (Áp dụng cho toàn bộ danh sách khi bấm "Tiếp nhận tất cả"):</label>
+                    <textarea name="general_comment" rows="2" placeholder="Nhập thêm ý kiến, đề xuất chung khi tiếp nhận tất cả..." class="w-full p-2.5 border border-slate-300 rounded-xl text-xs focus:ring-2 focus:ring-indigo-500 outline-none font-medium bg-white"></textarea>
                 </div>
 
                 <div class="space-y-4">
@@ -713,9 +712,17 @@ $kpiStats = getKpiStats($pdo, $currentUser);
                                 <div><i class="fa-regular fa-calendar-check text-slate-400 mr-1"></i>Hạn chót: <strong class="text-slate-800"><?= $pt['due_date'] ? date('d/m/Y', strtotime($pt['due_date'])) : 'Không quy định' ?></strong></div>
                             </div>
 
-                            <div>
+                            <div class="mb-3">
                                 <label class="block text-xs font-bold text-slate-700 mb-1">Ý kiến riêng cho việc này (Không bắt buộc):</label>
-                                <textarea name="comments[<?= $pt['id'] ?>]" rows="2" placeholder="Nhập ý kiến / phản hồi cá nhân riêng cho công việc này..." class="w-full p-2.5 border border-slate-300 rounded-xl text-xs focus:ring-2 focus:ring-indigo-500 outline-none font-medium bg-white"></textarea>
+                                <textarea name="comments[<?= $pt['id'] ?>]" id="single_comment_<?= $pt['id'] ?>" rows="2" placeholder="Nhập ý kiến / phản hồi cá nhân riêng cho công việc này..." class="w-full p-2.5 border border-slate-300 rounded-xl text-xs focus:ring-2 focus:ring-indigo-500 outline-none font-medium bg-white"></textarea>
+                            </div>
+
+                            <!-- Single Row Acceptance Button -->
+                            <div class="flex justify-end pt-2 border-t border-slate-200">
+                                <button type="button" onclick="acceptSingleTaskDirect(<?= $pt['id'] ?>)" class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold px-4 py-2 rounded-xl text-xs shadow transition flex items-center gap-1.5">
+                                    <i class="fa-solid fa-check text-sm"></i>
+                                    <span>Tiếp nhận dòng này</span>
+                                </button>
                             </div>
                         </div>
                     <?php endforeach; ?>
@@ -724,54 +731,18 @@ $kpiStats = getKpiStats($pdo, $currentUser);
                 <div class="mt-5 pt-4 border-t border-slate-200 flex justify-end">
                     <button type="submit" class="bg-emerald-600 hover:bg-emerald-700 text-white font-bold px-6 py-2.5 rounded-xl text-xs shadow-md transition flex items-center gap-2">
                         <i class="fa-solid fa-check-double text-sm"></i>
-                        <span>Chấp nhận tất cả</span>
+                        <span>Tiếp nhận tất cả</span>
                     </button>
                 </div>
             </form>
-        <?php else: ?>
-            <!-- SINGLE TASK ACCEPTANCE UI -->
-            <div class="space-y-6">
-                <?php foreach ($pendingAssignedTasks as $pt): ?>
-                    <div class="bg-slate-50 border border-slate-200 rounded-2xl p-4 shadow-sm">
-                        <div class="flex items-center justify-between gap-2 mb-2">
-                            <span class="text-[11px] font-bold text-indigo-700 bg-indigo-50 border border-indigo-200 px-2.5 py-0.5 rounded-full">
-                                Mã công việc #<?= $pt['id'] ?>
-                            </span>
-                            <span class="text-xs text-slate-500 font-medium">
-                                <i class="fa-solid fa-user-tie text-slate-400 mr-1"></i>Người giao: <strong class="text-slate-700"><?= htmlspecialchars($pt['assigner_name']) ?></strong>
-                            </span>
-                        </div>
 
-                        <h4 class="font-bold text-slate-900 text-sm mb-1"><?= htmlspecialchars($pt['title']) ?></h4>
-                        <?php if (!empty($pt['description'])): ?>
-                            <p class="text-xs text-slate-600 mb-3 bg-white p-2.5 rounded-xl border border-slate-200 leading-relaxed"><?= htmlspecialchars($pt['description']) ?></p>
-                        <?php endif; ?>
-
-                        <div class="flex items-center gap-4 text-xs text-slate-500 font-medium mb-4">
-                            <div><i class="fa-regular fa-calendar-check text-slate-400 mr-1"></i>Hạn chót: <strong class="text-slate-800"><?= $pt['due_date'] ? date('d/m/Y', strtotime($pt['due_date'])) : 'Không quy định' ?></strong></div>
-                        </div>
-
-                        <!-- Action form for single task -->
-                        <form method="POST" action="task_actions.php" class="space-y-3 pt-3 border-t border-slate-200">
-                            <input type="hidden" name="action" value="respond_assigned_task">
-                            <input type="hidden" name="task_id" value="<?= $pt['id'] ?>">
-
-                            <div>
-                                <label class="block text-xs font-bold text-slate-700 mb-1">Ý kiến khác (Không bắt buộc):</label>
-                                <textarea name="comment_feedback" rows="2" placeholder="Nhập thêm ý kiến, đề xuất hoặc phản hồi cá nhân khi tiếp nhận công việc..." class="w-full p-2.5 border border-slate-300 rounded-xl text-xs focus:ring-2 focus:ring-indigo-500 outline-none font-medium"></textarea>
-                            </div>
-
-                            <div class="flex items-center justify-end">
-                                <button type="submit" name="response" value="ACCEPT" class="px-6 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold shadow-md transition flex items-center gap-1.5">
-                                    <i class="fa-solid fa-check text-sm"></i>
-                                    <span>Đồng ý</span>
-                                </button>
-                            </div>
-                        </form>
-                    </div>
-                <?php endforeach; ?>
-            </div>
-        <?php endif; ?>
+            <!-- Hidden Form for Individual Row Acceptance -->
+            <form method="POST" action="task_actions.php" id="singleAcceptForm" class="hidden">
+                <input type="hidden" name="action" value="respond_assigned_task">
+                <input type="hidden" name="task_id" id="single_accept_task_id" value="0">
+                <input type="hidden" name="comment_feedback" id="single_accept_feedback" value="">
+                <input type="hidden" name="response" value="ACCEPT">
+            </form>
     </div>
 </div>
 <?php endif; ?>
@@ -1233,6 +1204,15 @@ function closeBatchApprovalModal() {
         modal.classList.add('hidden');
         modal.classList.remove('flex');
     }
+}
+
+function acceptSingleTaskDirect(taskId) {
+    const commentInput = document.getElementById(`single_comment_${taskId}`);
+    const feedback = commentInput ? commentInput.value.trim() : '';
+
+    document.getElementById('single_accept_task_id').value = taskId;
+    document.getElementById('single_accept_feedback').value = feedback;
+    document.getElementById('singleAcceptForm').submit();
 }
 
 function toggleSelectAllApproval(master) {

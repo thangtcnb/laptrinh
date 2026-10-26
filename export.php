@@ -47,7 +47,8 @@ $params = [];
 
 // Internal BGD Security Restriction for Export
 if (!$currentUser || !in_array($currentUser['role'], ['BGD', 'SUPER_ADMIN'])) {
-    $where[] = "(t.department_id != 1 AND t.created_by NOT IN (SELECT id FROM users WHERE role = 'BGD'))";
+    $where[] = "((t.department_id != 1 AND t.created_by NOT IN (SELECT id FROM users WHERE role = 'BGD')) OR t.id IN (SELECT task_id FROM task_assignees WHERE user_id = ?))";
+    $params[] = $currentUser['id'];
 }
 
 if (!empty($dateFrom)) {

@@ -213,9 +213,10 @@ function getKpiStats($pdo, $currentUser) {
     }
     // For BGD and SUPER_ADMIN, default to all campus tasks
 
-    // Internal BGD Security Restriction
+    // Internal BGD Security Restriction (Allow assigned users to see tasks assigned to them by BGD)
     if (!in_array($currentUser['role'], ['BGD', 'SUPER_ADMIN'])) {
-        $where[] = "(t.department_id != 1 AND t.created_by NOT IN (SELECT id FROM users WHERE role = 'BGD'))";
+        $where[] = "((t.department_id != 1 AND t.created_by NOT IN (SELECT id FROM users WHERE role = 'BGD')) OR t.id IN (SELECT task_id FROM task_assignees WHERE user_id = ?))";
+        $params[] = $currentUser['id'];
     }
 
     $whereSql = implode(" AND ", $where);
@@ -310,9 +311,10 @@ function getTasksFiltered($pdo, $filters = [], $limit = 15, $offset = 0, $curren
     }
 
     // Internal BGD Security Restriction:
-    // Tasks registered/hosted by BGD (department_id = 1 or created by BGD) can ONLY be seen by BGD or SUPER_ADMIN users.
+    // Internal BGD tasks are restricted unless assigned to the user
     if (!$currentUser || !in_array($currentUser['role'], ['BGD', 'SUPER_ADMIN'])) {
-        $where[] = "(t.department_id != 1 AND t.created_by NOT IN (SELECT id FROM users WHERE role = 'BGD'))";
+        $where[] = "((t.department_id != 1 AND t.created_by NOT IN (SELECT id FROM users WHERE role = 'BGD')) OR t.id IN (SELECT task_id FROM task_assignees WHERE user_id = ?))";
+        $params[] = $currentUser['id'];
     }
 
     // Role-based visibility restriction for Pending Approval (CHO_DUYET) tasks:

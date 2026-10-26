@@ -47,10 +47,18 @@ if %ERRORLEVEL% NEQ 0 (
     exit /b %ERRORLEVEL%
 )
 
-echo "[7/7] Dang thuc thi Migration Workflow Redesign va Decision Workflow (database\migrations\update_20261026_workflow_redesign.sql)..."
+echo "[7/8] Dang thuc thi Migration Workflow Redesign va Decision Workflow (database\migrations\update_20261026_workflow_redesign.sql)..."
 %MYSQL_CMD% -h localhost -P 3306 -u root laptrinh_db < "database\migrations\update_20261026_workflow_redesign.sql"
 if %ERRORLEVEL% NEQ 0 (
     echo "[LOI] Khong the thuc thi database\migrations\update_20261026_workflow_redesign.sql. Vui long kiem tra XAMPP MySQL."
+    pause
+    exit /b %ERRORLEVEL%
+)
+
+echo "[8/8] Dang thuc thi Migration BGD & TP Workflow Adjustments (database\migrations\update_20261026_bgd_tp_workflow.sql)..."
+%MYSQL_CMD% -h localhost -P 3306 -u root laptrinh_db < "database\migrations\update_20261026_bgd_tp_workflow.sql"
+if %ERRORLEVEL% NEQ 0 (
+    echo "[LOI] Khong the thuc thi database\migrations\update_20261026_bgd_tp_workflow.sql. Vui long kiem tra XAMPP MySQL."
     pause
     exit /b %ERRORLEVEL%
 )
