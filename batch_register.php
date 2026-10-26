@@ -62,7 +62,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             if (empty($title)) continue; // skip blank rows
 
             $description = trim($tData['description'] ?? '');
-            $priority = $tData['priority'] ?? 'TRUNG_BINH';
+            $priority = $tData['priority'] ?? 'NORMAL';
+            if (!in_array($priority, ['NORMAL', 'URGENT'])) {
+                $priority = 'NORMAL';
+            }
             $dueDate = !empty($tData['due_date']) ? $tData['due_date'] : $batchEndDate;
             $mainAssignee = (int)($tData['main_assignee'] ?? $currentUser['id']);
             $coopAssignees = $tData['coop_assignees'] ?? [];
@@ -275,8 +278,8 @@ function createRowHtml(index) {
                     <input type="text" name="tasks[${index}][description]" placeholder="Ghi chú chi tiết..." class="w-full p-2 border border-slate-300 rounded-xl text-xs focus:ring-2 focus:ring-indigo-500 outline-none bg-white">
                 </div>
 
-                <!-- Priority (hidden input TRUNG_BINH for DB compatibility) -->
-                <input type="hidden" name="tasks[${index}][priority]" value="TRUNG_BINH">
+                <!-- Priority (hidden input NORMAL for DB compatibility) -->
+                <input type="hidden" name="tasks[${index}][priority]" value="NORMAL">
 
                 <!-- Due date (2 cols) -->
                 <div class="md:col-span-2">

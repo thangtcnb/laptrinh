@@ -142,18 +142,17 @@ function renderStatusBadge($status) {
 // Render priority badge
 function renderPriorityBadge($priority) {
     switch ($priority) {
-        case 'THAP':
-            return '<span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-slate-100 text-slate-700">Thấp</span>';
-        case 'TRUNG_BINH':
-            return '<span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-50 text-blue-700 border border-blue-200">Trung bình</span>';
-        case 'CAO':
-            return '<span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-orange-100 text-orange-800 font-semibold">Cao</span>';
+        case 'URGENT':
         case 'KHAN_CAP':
-            return '<span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-rose-100 text-rose-800 font-bold border border-rose-300 animate-pulse">
+            return '<span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-bold bg-rose-100 text-rose-800 border border-rose-300 animate-pulse">
                         <i class="fa-solid fa-triangle-exclamation mr-1 text-rose-600"></i> Khẩn cấp
                     </span>';
+        case 'NORMAL':
+        case 'TRUNG_BINH':
+        case 'THAP':
+        case 'CAO':
         default:
-            return '<span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-700">' . htmlspecialchars($priority) . '</span>';
+            return '<span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-slate-100 text-slate-700">Bình thường</span>';
     }
 }
 

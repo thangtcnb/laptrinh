@@ -132,7 +132,10 @@ if ($action === 'save_task') {
     $departmentId = in_array($currentUser['role'], ['TRUONG_PHONG', 'NHAN_VIEN', 'HO_TRO'])
         ? $currentUser['department_id']
         : (int)($_POST['department_id'] ?? $currentUser['department_id']);
-    $priority = $_POST['priority'] ?? 'TRUNG_BINH';
+    $priority = $_POST['priority'] ?? 'NORMAL';
+    if (!in_array($priority, ['NORMAL', 'URGENT'])) {
+        $priority = 'NORMAL';
+    }
 
     // Default status logic by role:
     $targetStatus = null;
