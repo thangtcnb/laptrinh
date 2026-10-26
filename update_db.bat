@@ -79,10 +79,18 @@ if %ERRORLEVEL% NEQ 0 (
     exit /b %ERRORLEVEL%
 )
 
-echo "[11/11] Dang thuc thi Migration Filter va Priority 2 muc (database\migrations\update_20261026_filter_and_priority.sql)..."
+echo "[11/12] Dang thuc thi Migration Filter va Priority 2 muc (database\migrations\update_20261026_filter_and_priority.sql)..."
 %MYSQL_CMD% -h localhost -P 3306 -u root laptrinh_db < "database\migrations\update_20261026_filter_and_priority.sql"
 if %ERRORLEVEL% NEQ 0 (
     echo "[LOI] Khong the thuc thi database\migrations\update_20261026_filter_and_priority.sql. Vui long kiem tra XAMPP MySQL."
+    pause
+    exit /b %ERRORLEVEL%
+)
+
+echo "[12/12] Dang thuc thi Migration Nhan Canh Bao Qua Han va Toi Uu Form Lich Cong Tac (database\migrations\update_20261026_overdue_and_schedule_form.sql)..."
+%MYSQL_CMD% -h localhost -P 3306 -u root laptrinh_db < "database\migrations\update_20261026_overdue_and_schedule_form.sql"
+if %ERRORLEVEL% NEQ 0 (
+    echo "[LOI] Khong the thuc thi database\migrations\update_20261026_overdue_and_schedule_form.sql. Vui long kiem tra XAMPP MySQL."
     pause
     exit /b %ERRORLEVEL%
 )

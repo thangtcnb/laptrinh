@@ -506,7 +506,7 @@ require_once __DIR__ . '/includes/header.php';
                                 <?= formatAssigneesHtml($t['assignees']) ?>
                             </td>
                             <td class="py-3.5 px-3 text-center border-r border-slate-100">
-                                <?= renderStatusBadge($t['status']) ?>
+                                <?= renderStatusBadge($t['status'], $t['due_date']) ?>
                             </td>
                             <td class="py-3.5 px-3 text-center border-r border-slate-100 font-bold text-indigo-700">
                                 <?= (int)$t['progress'] ?>%

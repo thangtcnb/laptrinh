@@ -1,6 +1,6 @@
 <?php
 session_start();
-define('PAGE_TITLE', 'Lịch Họp BGD');
+define('PAGE_TITLE', 'Lịch Công Tác');
 require_once __DIR__ . '/config.php';
 require_once __DIR__ . '/includes/auth.php';
 require_once __DIR__ . '/includes/functions.php';
@@ -61,7 +61,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $action = $_POST['action'] ?? '';
 
     if (!$canManageSchedule) {
-        $_SESSION['flash_error'] = "Bạn không có quyền thực hiện thao tác quản lý lịch họp BGD!";
+            $_SESSION['flash_error'] = "Bạn không có quyền thực hiện thao tác quản lý lịch công tác!";
         header("Location: bgd_schedule.php?week=$week&year=$year");
         exit;
     }
@@ -73,6 +73,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $participants = trim($_POST['participants'] ?? '');
         $chairperson = trim($_POST['chairperson'] ?? '');
         $location = trim($_POST['location'] ?? '');
+        $submitMode = trim($_POST['submit_mode'] ?? 'add_new');
 
         if (empty($scheduleDate)) {
             $_SESSION['flash_error'] = "Vui lòng chọn ngày công tác!";
@@ -86,31 +87,26 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             exit;
         }
 
-        // Check if an entry already exists for this date
-        $stmtCheck = $pdo->prepare("SELECT id FROM bgd_schedules WHERE schedule_date = ?");
-        $stmtCheck->execute([$scheduleDate]);
-        $existing = $stmtCheck->fetch();
-
-        if ($existing) {
-            // Update
+        if ($scheduleId > 0) {
+            // Update existing single schedule item
             $stmtUpdate = $pdo->prepare("
                 UPDATE bgd_schedules
                 SET content = ?, participants = ?, chairperson = ?, location = ?, created_by = ?
                 WHERE id = ?
             ");
-            $stmtUpdate->execute([$content, $participants, $chairperson, $location, $currentUser['id'], $existing['id']]);
-            logActivity($pdo, $currentUser['id'], 'UPDATE_BGD_SCHEDULE', "Đã cập nhật lịch công tác ngày $scheduleDate (ID #{$existing['id']})");
-            $_SESSION['flash_success'] = "Đã cập nhật lịch công tác thành công!";
+            $stmtUpdate->execute([$content, $participants, $chairperson, $location, $currentUser['id'], $scheduleId]);
+            logActivity($pdo, $currentUser['id'], 'UPDATE_BGD_SCHEDULE', "Đã cập nhật mục lịch công tác ID #$scheduleId");
+            $_SESSION['flash_success'] = "Đã cập nhật mục lịch công tác thành công!";
         } else {
-            // Insert
+            // Insert new schedule item
             $stmtInsert = $pdo->prepare("
                 INSERT INTO bgd_schedules (schedule_date, content, participants, chairperson, location, created_by)
                 VALUES (?, ?, ?, ?, ?, ?)
             ");
             $stmtInsert->execute([$scheduleDate, $content, $participants, $chairperson, $location, $currentUser['id']]);
             $newId = $pdo->lastInsertId();
-            logActivity($pdo, $currentUser['id'], 'CREATE_BGD_SCHEDULE', "Đã tạo mới lịch công tác ngày $scheduleDate (ID #$newId)");
-            $_SESSION['flash_success'] = "Đã thêm lịch công tác mới thành công!";
+            logActivity($pdo, $currentUser['id'], 'CREATE_BGD_SCHEDULE', "Đã tạo mới mục lịch công tác ngày $scheduleDate (ID #$newId)");
+            $_SESSION['flash_success'] = "Đã thêm mới mục lịch công tác thành công!";
         }
 
         // Calculate target week and year for the saved date
@@ -118,7 +114,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $targetWeek = (int)$saveDateDto->format('W');
         $targetYear = (int)$saveDateDto->format('o');
 
-        header("Location: bgd_schedule.php?week=$targetWeek&year=$targetYear");
+        if ($submitMode === 'add_new') {
+            // Re-open modal for the same date so user can continue adding items 2, 3...
+            header("Location: bgd_schedule.php?week=$targetWeek&year=$targetYear&open_date=$scheduleDate");
+        } else {
+            header("Location: bgd_schedule.php?week=$targetWeek&year=$targetYear");
+        }
         exit;
     }
 
@@ -168,16 +169,16 @@ $sqlSchedules = "
     FROM bgd_schedules s
     LEFT JOIN users u_cr ON s.created_by = u_cr.id
     WHERE s.schedule_date >= ? AND s.schedule_date <= ?
-    ORDER BY s.schedule_date ASC
+    ORDER BY s.schedule_date ASC, s.id ASC
 ";
 $stmtSched = $pdo->prepare($sqlSchedules);
 $stmtSched->execute([$mondayStr, $sundayStr]);
 $schedulesList = $stmtSched->fetchAll();
 
-// Map schedule entries by schedule_date (YYYY-MM-DD)
+// Map schedule entries by schedule_date (YYYY-MM-DD) -> Array of items
 $schedulesByDate = [];
 foreach ($schedulesList as $s) {
-    $schedulesByDate[$s['schedule_date']] = $s;
+    $schedulesByDate[$s['schedule_date']][] = $s;
 }
 
 // Fetch Weekly Note for this week and year
@@ -293,145 +294,169 @@ require_once __DIR__ . '/includes/header.php';
                     </tr>
                 </thead>
                 <tbody class="divide-y divide-slate-200">
-                    <?php for ($i = 1; $i <= 7; $i++): ?>
-                        <?php
-                            $dayDate = (clone $dto)->modify('+' . ($i - 1) . ' days');
-                            $dateStr = $dayDate->format('Y-m-d');
-                            $dayName = $daysOfWeekNames[$i];
-                            $fullDayLabel = $dayName . ', ngày ' . $dayDate->format('d/m/Y');
-                            $sData = $schedulesByDate[$dateStr] ?? null;
-                            $isToday = ($dateStr === date('Y-m-d'));
+                    <?php
+                    $globalRowCounter = 0;
+                    for ($i = 1; $i <= 7; $i++):
+                        $dayDate = (clone $dto)->modify('+' . ($i - 1) . ' days');
+                        $dateStr = $dayDate->format('Y-m-d');
+                        $dayName = $daysOfWeekNames[$i];
+                        $fullDayLabel = $dayName . ', ngày ' . $dayDate->format('d/m/Y');
+                        $dayItems = $schedulesByDate[$dateStr] ?? [];
+                        $isToday = ($dateStr === date('Y-m-d'));
+                        $itemCount = count($dayItems);
+                        $rowspan = max(1, $itemCount);
+                    ?>
+                        <?php if ($itemCount > 0): ?>
+                            <?php foreach ($dayItems as $idx => $sItem):
+                                $globalRowCounter++;
+                                $zebraClass = ($globalRowCounter % 2 === 0) ? 'bg-slate-50/90' : 'bg-white';
+                                if ($isToday) {
+                                    $zebraClass = ($globalRowCounter % 2 === 0) ? 'bg-amber-100/50' : 'bg-amber-50/70';
+                                }
+                            ?>
+                                <tr class="<?= $zebraClass ?> hover:bg-amber-100/80 transition">
+                                    <?php if ($idx === 0): ?>
+                                        <!-- Cột 1: Thứ & Ngày (span rowspan qua tất cả các dòng trong ngày) -->
+                                        <td rowspan="<?= $rowspan ?>" class="py-3 px-4 font-bold border-r border-slate-200 text-slate-900 align-top bg-white/50">
+                                            <div class="flex items-start gap-2 pt-1 sticky top-2">
+                                                <div class="mt-0.5 text-purple-700">
+                                                    <i class="fa-regular fa-calendar text-sm"></i>
+                                                </div>
+                                                <div>
+                                                    <span class="text-xs font-extrabold text-slate-900 block"><?= $dayName ?></span>
+                                                    <span class="text-[11px] font-semibold text-purple-700 block mt-0.5"><?= $dayDate->format('d/m/Y') ?></span>
+                                                    <?php if ($isToday): ?>
+                                                        <span class="inline-block px-2 py-0.5 text-[10px] font-bold bg-amber-500 text-white rounded mt-1 shadow-sm">Hôm nay</span>
+                                                    <?php endif; ?>
 
-                            // Parse multi-line content and participants for item row alignment
-                            $cRaw = $sData['content'] ?? '';
-                            $pRaw = $sData['participants'] ?? '';
+                                                    <?php if ($canManageSchedule): ?>
+                                                        <div class="mt-2.5">
+                                                            <button onclick='openScheduleModalForDate("<?= $dateStr ?>", "<?= $fullDayLabel ?>")' class="inline-flex items-center gap-1 text-[11px] font-bold text-purple-700 hover:text-purple-900 bg-purple-50 hover:bg-purple-100 px-2 py-1 rounded-lg border border-purple-200 transition" title="Thêm mục công tác mới cho ngày này">
+                                                                <i class="fa-solid fa-plus text-[10px]"></i>
+                                                                <span>Thêm mục</span>
+                                                            </button>
+                                                        </div>
+                                                    <?php endif; ?>
+                                                </div>
+                                            </div>
+                                        </td>
+                                    <?php endif; ?>
 
-                            $cLines = array_values(array_filter(array_map('trim', explode("\n", str_replace("\r", "", $cRaw))), 'strlen'));
-                            $pLines = array_values(array_filter(array_map('trim', explode("\n", str_replace("\r", "", $pRaw))), 'strlen'));
+                                    <!-- Cột 2: Nội dung công việc dòng riêng biệt -->
+                                    <td class="py-3 px-4 border-r border-slate-200 text-slate-800 font-medium align-top">
+                                        <div class="flex items-start gap-2">
+                                            <span class="inline-block w-2 h-2 rounded-full bg-purple-600 mt-1.5 shrink-0"></span>
+                                            <span class="text-xs leading-relaxed text-slate-900 font-semibold"><?= htmlspecialchars($sItem['content']) ?></span>
+                                        </div>
+                                    </td>
 
-                            $maxItems = max(count($cLines), count($pLines));
-                        ?>
-                        <tr class="<?= $isToday ? 'bg-amber-50/60' : 'hover:bg-slate-50' ?> transition">
-                            <!-- Cột 1: Thứ & Ngày -->
-                            <td class="py-3 px-4 font-bold border-r border-slate-100 text-slate-900 align-top">
-                                <div class="flex items-start gap-2 pt-1">
-                                    <div class="mt-0.5 text-purple-700">
-                                        <i class="fa-regular fa-calendar text-sm"></i>
-                                    </div>
-                                    <div>
-                                        <span class="text-xs font-extrabold text-slate-900 block"><?= $dayName ?></span>
-                                        <span class="text-[11px] font-semibold text-purple-700 block mt-0.5"><?= $dayDate->format('d/m/Y') ?></span>
-                                        <?php if ($isToday): ?>
-                                            <span class="inline-block px-2 py-0.5 text-[10px] font-bold bg-amber-500 text-white rounded mt-1 shadow-sm">Hôm nay</span>
+                                    <!-- Cột 3: Thành phần tham dự -->
+                                    <td class="py-3 px-4 border-r border-slate-200 text-slate-700 font-medium align-top">
+                                        <?php if (!empty(trim($sItem['participants']))): ?>
+                                            <div class="flex items-start gap-1.5">
+                                                <i class="fa-solid fa-users text-indigo-500 text-xs mt-1 shrink-0"></i>
+                                                <span class="text-xs leading-relaxed text-slate-700"><?= htmlspecialchars($sItem['participants']) ?></span>
+                                            </div>
+                                        <?php else: ?>
+                                            <span class="text-slate-300 italic text-xs">-</span>
                                         <?php endif; ?>
-                                    </div>
-                                </div>
-                            </td>
+                                    </td>
 
-                            <!-- Cột 2: Nội dung công việc (Căn hàng ngang với Cột 3) -->
-                            <td class="py-3 px-4 border-r border-slate-100 text-slate-800 font-medium align-top">
-                                <?php if ($maxItems > 0): ?>
-                                    <div class="grid grid-cols-1 h-full divide-y divide-slate-100" style="grid-template-rows: repeat(<?= $maxItems ?>, minmax(max-content, 1fr));">
-                                        <?php for ($k = 0; $k < $maxItems; $k++): ?>
-                                            <div class="py-1.5 flex items-start gap-2">
-                                                <?php if (isset($cLines[$k])): ?>
-                                                    <span class="inline-block w-1.5 h-1.5 rounded-full bg-purple-600 mt-1.5 shrink-0"></span>
-                                                    <span class="text-xs leading-relaxed text-slate-800 font-semibold"><?= htmlspecialchars($cLines[$k]) ?></span>
-                                                <?php else: ?>
-                                                    <span class="text-slate-300 italic text-xs">-</span>
-                                                <?php endif; ?>
-                                            </div>
-                                        <?php endfor; ?>
-                                    </div>
-                                <?php else: ?>
-                                    <div class="pt-1">
-                                        <span class="text-slate-400 italic text-xs">Chưa có lịch công tác</span>
-                                    </div>
-                                <?php endif; ?>
-                            </td>
+                                    <!-- Cột 4: Chủ trì -->
+                                    <td class="py-3 px-4 border-r border-slate-200 font-bold text-slate-900 align-top">
+                                        <?php if (!empty(trim($sItem['chairperson']))): ?>
+                                            <span class="inline-flex items-start gap-1 text-purple-900 font-bold leading-relaxed">
+                                                <i class="fa-solid fa-user-tie text-purple-600 mt-0.5 shrink-0"></i>
+                                                <span><?= htmlspecialchars($sItem['chairperson']) ?></span>
+                                            </span>
+                                        <?php else: ?>
+                                            <span class="text-slate-300 italic font-normal text-xs">-</span>
+                                        <?php endif; ?>
+                                    </td>
 
-                            <!-- Cột 3: Thành phần tham dự (Căn hàng ngang tương ứng Cột 2) -->
-                            <td class="py-3 px-4 border-r border-slate-100 text-slate-700 font-medium align-top">
-                                <?php if ($maxItems > 0): ?>
-                                    <div class="grid grid-cols-1 h-full divide-y divide-slate-100" style="grid-template-rows: repeat(<?= $maxItems ?>, minmax(max-content, 1fr));">
-                                        <?php for ($k = 0; $k < $maxItems; $k++): ?>
-                                            <div class="py-1.5 flex items-start gap-2">
-                                                <?php if (isset($pLines[$k])): ?>
-                                                    <span class="inline-block w-1.5 h-1.5 rounded-full bg-indigo-500 mt-1.5 shrink-0"></span>
-                                                    <span class="text-xs leading-relaxed text-slate-700 font-medium"><?= htmlspecialchars($pLines[$k]) ?></span>
-                                                <?php else: ?>
-                                                    <span class="text-slate-300 italic text-xs">-</span>
-                                                <?php endif; ?>
-                                            </div>
-                                        <?php endfor; ?>
-                                    </div>
-                                <?php else: ?>
-                                    <div class="pt-1">
-                                        <span class="text-slate-400 italic text-xs">-</span>
-                                    </div>
-                                <?php endif; ?>
-                            </td>
+                                    <!-- Cột 5: Địa điểm -->
+                                    <td class="py-3 px-4 border-r border-slate-200 font-medium text-slate-700 align-top">
+                                        <?php if (!empty(trim($sItem['location']))): ?>
+                                            <span class="inline-flex items-start gap-1.5 text-rose-700 font-semibold leading-relaxed">
+                                                <i class="fa-solid fa-location-dot text-rose-500 mt-0.5 shrink-0"></i>
+                                                <span><?= htmlspecialchars($sItem['location']) ?></span>
+                                            </span>
+                                        <?php else: ?>
+                                            <span class="text-slate-300 italic text-xs">-</span>
+                                        <?php endif; ?>
+                                    </td>
 
-                            <!-- Cột 4: Chủ trì -->
-                            <td class="py-3 px-4 border-r border-slate-100 font-bold text-slate-900 align-top">
-                                <div class="pt-1">
-                                    <?php if ($sData && !empty(trim($sData['chairperson']))): ?>
-                                        <span class="inline-flex items-start gap-1 text-purple-900 font-bold leading-relaxed">
-                                            <i class="fa-solid fa-user-tie text-purple-600 mt-0.5 shrink-0"></i>
-                                            <span><?= htmlspecialchars($sData['chairperson']) ?></span>
-                                        </span>
-                                    <?php else: ?>
-                                        <span class="text-slate-400 italic font-normal text-xs">-</span>
-                                    <?php endif; ?>
-                                </div>
-                            </td>
-
-                            <!-- Cột 5: Địa điểm -->
-                            <td class="py-3 px-4 border-r border-slate-100 font-medium text-slate-700 align-top">
-                                <div class="pt-1">
-                                    <?php if ($sData && !empty(trim($sData['location']))): ?>
-                                        <span class="inline-flex items-start gap-1.5 text-rose-700 font-semibold leading-relaxed">
-                                            <i class="fa-solid fa-location-dot text-rose-500 mt-0.5 shrink-0"></i>
-                                            <span><?= htmlspecialchars($sData['location']) ?></span>
-                                        </span>
-                                    <?php else: ?>
-                                        <span class="text-slate-400 italic text-xs">-</span>
-                                    <?php endif; ?>
-                                </div>
-                            </td>
-
-                            <!-- Thao tác: Chỉ dành cho cấp có quyền -->
-                            <?php if ($canManageSchedule): ?>
-                                <td class="py-3 px-3 text-center align-top">
-                                    <div class="pt-1">
-                                    <div class="flex items-center justify-center gap-1">
-                                        <?php
-                                            $modalPayload = [
-                                                'schedule_date' => $dateStr,
-                                                'date_display' => $fullDayLabel,
-                                                'content' => $sData['content'] ?? '',
-                                                'participants' => $sData['participants'] ?? '',
-                                                'chairperson' => $sData['chairperson'] ?? '',
-                                                'location' => $sData['location'] ?? '',
-                                                'id' => $sData['id'] ?? 0
-                                            ];
-                                        ?>
-                                        <button onclick='openScheduleModal(<?= json_encode($modalPayload, JSON_HEX_APOS | JSON_HEX_QUOT) ?>)' class="p-1.5 bg-purple-50 hover:bg-purple-600 text-purple-700 hover:text-white rounded-lg transition" title="Nhập / Sửa lịch công tác ngày này">
-                                            <i class="fa-solid fa-pen-to-square text-xs"></i>
-                                        </button>
-                                        <?php if ($sData): ?>
-                                            <form method="POST" action="bgd_schedule.php?week=<?= $week ?>&year=<?= $year ?>" onsubmit="return confirm('Bạn có chắc chắn muốn xóa lịch công tác ngày <?= $dayDate->format('d/m/Y') ?>?');" class="inline">
-                                                <input type="hidden" name="action" value="delete_schedule">
-                                                <input type="hidden" name="schedule_id" value="<?= $sData['id'] ?>">
-                                                <button type="submit" class="p-1.5 bg-rose-50 hover:bg-rose-600 text-rose-600 hover:text-white rounded-lg transition" title="Xóa lịch công tác ngày này">
-                                                    <i class="fa-solid fa-trash text-xs"></i>
+                                    <!-- Thao tác: Sửa / Xóa mục riêng biệt -->
+                                    <?php if ($canManageSchedule): ?>
+                                        <td class="py-3 px-3 text-center align-top">
+                                            <div class="flex items-center justify-center gap-1">
+                                                <?php
+                                                    $itemPayload = [
+                                                        'id' => $sItem['id'],
+                                                        'schedule_date' => $dateStr,
+                                                        'date_display' => $fullDayLabel,
+                                                        'content' => $sItem['content'],
+                                                        'participants' => $sItem['participants'],
+                                                        'chairperson' => $sItem['chairperson'],
+                                                        'location' => $sItem['location']
+                                                    ];
+                                                ?>
+                                                <button onclick='openEditScheduleModal(<?= json_encode($itemPayload, JSON_HEX_APOS | JSON_HEX_QUOT) ?>)' class="p-1.5 bg-purple-50 hover:bg-purple-600 text-purple-700 hover:text-white rounded-lg transition" title="Sửa mục lịch này">
+                                                    <i class="fa-solid fa-pen-to-square text-xs"></i>
                                                 </button>
-                                            </form>
-                                        <?php endif; ?>
+                                                <form method="POST" action="bgd_schedule.php?week=<?= $week ?>&year=<?= $year ?>" onsubmit="return confirm('Bạn có chắc chắn muốn xóa mục lịch công tác này?');" class="inline">
+                                                    <input type="hidden" name="action" value="delete_schedule">
+                                                    <input type="hidden" name="schedule_id" value="<?= $sItem['id'] ?>">
+                                                    <button type="submit" class="p-1.5 bg-rose-50 hover:bg-rose-600 text-rose-600 hover:text-white rounded-lg transition" title="Xóa mục lịch này">
+                                                        <i class="fa-solid fa-trash text-xs"></i>
+                                                    </button>
+                                                </form>
+                                            </div>
+                                        </td>
+                                    <?php endif; ?>
+                                </tr>
+                            <?php endforeach; ?>
+                        <?php else: ?>
+                            <!-- Day without any schedule items -->
+                            <?php
+                            $globalRowCounter++;
+                            $zebraClass = ($globalRowCounter % 2 === 0) ? 'bg-slate-50/90' : 'bg-white';
+                            if ($isToday) {
+                                $zebraClass = 'bg-amber-50/60';
+                            }
+                            ?>
+                            <tr class="<?= $zebraClass ?> hover:bg-slate-100 transition">
+                                <!-- Cột 1: Thứ & Ngày -->
+                                <td class="py-3.5 px-4 font-bold border-r border-slate-200 text-slate-900 align-top">
+                                    <div class="flex items-start gap-2 pt-0.5">
+                                        <div class="mt-0.5 text-purple-700">
+                                            <i class="fa-regular fa-calendar text-sm"></i>
+                                        </div>
+                                        <div>
+                                            <span class="text-xs font-extrabold text-slate-900 block"><?= $dayName ?></span>
+                                            <span class="text-[11px] font-semibold text-purple-700 block mt-0.5"><?= $dayDate->format('d/m/Y') ?></span>
+                                            <?php if ($isToday): ?>
+                                                <span class="inline-block px-2 py-0.5 text-[10px] font-bold bg-amber-500 text-white rounded mt-1 shadow-sm">Hôm nay</span>
+                                            <?php endif; ?>
+                                        </div>
                                     </div>
                                 </td>
-                            <?php endif; ?>
-                        </tr>
+
+                                <td class="py-3.5 px-4 border-r border-slate-200 text-slate-400 italic text-xs align-top">
+                                    Chưa có lịch công tác
+                                </td>
+                                <td class="py-3.5 px-4 border-r border-slate-200 text-slate-300 italic text-xs align-top">-</td>
+                                <td class="py-3.5 px-4 border-r border-slate-200 text-slate-300 italic text-xs align-top">-</td>
+                                <td class="py-3.5 px-4 border-r border-slate-200 text-slate-300 italic text-xs align-top">-</td>
+                                <?php if ($canManageSchedule): ?>
+                                    <td class="py-3.5 px-3 text-center align-top">
+                                        <button onclick='openScheduleModalForDate("<?= $dateStr ?>", "<?= $fullDayLabel ?>")' class="p-1.5 bg-purple-50 hover:bg-purple-600 text-purple-700 hover:text-white rounded-lg transition" title="Thêm lịch công tác mới cho ngày này">
+                                            <i class="fa-solid fa-plus text-xs"></i>
+                                        </button>
+                                    </td>
+                                <?php endif; ?>
+                            </tr>
+                        <?php endif; ?>
                     <?php endfor; ?>
                 </tbody>
             </table>
@@ -512,89 +537,138 @@ function closeNoteModal() {
 </script>
 <?php endif; ?>
 
-<!-- ==================== MODAL: THÊM / CHỈNH SỬA LỊCH CÔNG TÁC BGD ==================== -->
+<!-- ==================== MODAL: THÊM / CHỈNH SỬA LỊCH CÔNG TÁC ==================== -->
 <?php if ($canManageSchedule): ?>
 <div id="scheduleModal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm hidden items-center justify-center p-4 z-50">
-    <div class="bg-white rounded-2xl shadow-2xl max-w-lg w-full p-6 border border-slate-200 transform transition-all">
+    <div class="bg-white rounded-2xl shadow-2xl max-w-xl w-full p-6 border border-slate-200 transform transition-all max-h-[90vh] overflow-y-auto">
         <div class="flex items-center justify-between pb-3 border-b border-slate-100 mb-4">
-            <h3 id="scheduleModalTitle" class="font-bold text-slate-900 text-base flex items-center gap-2">
-                <i class="fa-solid fa-calendar-plus text-purple-600"></i>
-                <span>Cập Nhật Lịch Công Tác BGD</span>
+            <h3 id="scheduleModalDynamicTitle" class="font-extrabold text-purple-900 text-base flex items-center gap-2">
+                <i class="fa-solid fa-calendar-day text-purple-600"></i>
+                <span id="sched_modal_title_text">Lịch công tác</span>
             </h3>
             <button onclick="closeScheduleModal()" class="text-slate-400 hover:text-slate-600"><i class="fa-solid fa-xmark text-lg"></i></button>
         </div>
 
-        <form method="POST" action="bgd_schedule.php?week=<?= $week ?>&year=<?= $year ?>" class="space-y-4">
+        <form method="POST" action="bgd_schedule.php?week=<?= $week ?>&year=<?= $year ?>" id="scheduleForm" class="space-y-4">
             <input type="hidden" name="action" value="save_schedule">
             <input type="hidden" name="schedule_id" id="sched_id" value="0">
+            <input type="hidden" name="schedule_date" id="sched_date" value="<?= $mondayStr ?>">
+            <input type="hidden" name="submit_mode" id="sched_submit_mode" value="add_new">
 
             <div>
-                <label class="block text-xs font-bold text-slate-700 mb-1">Ngày công tác <span class="text-rose-500">*</span></label>
-                <input type="date" name="schedule_date" id="sched_date" required class="w-full p-2.5 border border-slate-300 rounded-xl text-xs font-semibold focus:ring-2 focus:ring-purple-500 outline-none bg-white">
-                <span id="sched_date_display" class="text-[11px] text-purple-700 font-bold block mt-1"></span>
+                <label class="block text-xs font-bold text-slate-700 mb-1">1. Nội dung công việc <span class="text-rose-500">*</span></label>
+                <textarea name="content" id="sched_content" rows="3" required placeholder="Nhập chi tiết nội dung cuộc họp hoặc công việc..." class="w-full p-2.5 border border-slate-300 rounded-xl text-xs focus:ring-2 focus:ring-purple-500 outline-none font-medium"></textarea>
             </div>
 
             <div>
-                <label class="block text-xs font-bold text-slate-700 mb-1">Nội dung công việc <span class="text-rose-500">*</span></label>
-                <textarea name="content" id="sched_content" rows="4" required placeholder="Nhập chi tiết nội dung công việc (cho phép xuống dòng nhiều mục)..." class="w-full p-2.5 border border-slate-300 rounded-xl text-xs focus:ring-2 focus:ring-purple-500 outline-none font-medium"></textarea>
-            </div>
-
-            <div>
-                <label class="block text-xs font-bold text-slate-700 mb-1">Thành phần tham dự</label>
+                <label class="block text-xs font-bold text-slate-700 mb-1">2. Thành phần tham dự</label>
                 <textarea name="participants" id="sched_participants" rows="2" placeholder="Ví dụ: Ban Giám đốc, Trưởng các phòng/khoa..." class="w-full p-2.5 border border-slate-300 rounded-xl text-xs focus:ring-2 focus:ring-purple-500 outline-none font-medium"></textarea>
             </div>
 
-            <div>
-                <label class="block text-xs font-bold text-slate-700 mb-1">Chủ trì</label>
-                <input type="text" name="chairperson" id="sched_chairperson" placeholder="Ví dụ: Đ/c Bùi Thị Yến Linh - Giám đốc..." class="w-full p-2.5 border border-slate-300 rounded-xl text-xs focus:ring-2 focus:ring-purple-500 outline-none font-medium">
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                    <label class="block text-xs font-bold text-slate-700 mb-1">3. Chủ trì</label>
+                    <input type="text" name="chairperson" id="sched_chairperson" placeholder="Ví dụ: Đ/c Bùi Thị Yến Linh..." class="w-full p-2.5 border border-slate-300 rounded-xl text-xs focus:ring-2 focus:ring-purple-500 outline-none font-medium">
+                </div>
+
+                <div>
+                    <label class="block text-xs font-bold text-slate-700 mb-1">4. Địa điểm</label>
+                    <input type="text" name="location" id="sched_location" placeholder="Ví dụ: Phòng họp A..." class="w-full p-2.5 border border-slate-300 rounded-xl text-xs focus:ring-2 focus:ring-purple-500 outline-none font-medium">
+                </div>
             </div>
 
-            <div>
-                <label class="block text-xs font-bold text-slate-700 mb-1">Địa điểm</label>
-                <input type="text" name="location" id="sched_location" placeholder="Ví dụ: Phòng họp A, Cơ sở Quảng Ngãi..." class="w-full p-2.5 border border-slate-300 rounded-xl text-xs focus:ring-2 focus:ring-purple-500 outline-none font-medium">
-            </div>
+            <!-- Modal Footer Controls with "Thêm mới" button -->
+            <div class="flex flex-wrap items-center justify-between gap-2 pt-3 border-t border-slate-100">
+                <button type="button" onclick="closeScheduleModal()" class="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold rounded-xl">Đóng</button>
 
-            <div class="flex justify-end gap-2 pt-3 border-t border-slate-100">
-                <button type="button" onclick="closeScheduleModal()" class="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold rounded-xl">Hủy</button>
-                <button type="submit" class="px-5 py-2 bg-purple-700 hover:bg-purple-800 text-white text-xs font-bold rounded-xl shadow-md transition flex items-center gap-1.5">
-                    <i class="fa-solid fa-floppy-disk"></i>
-                    <span>Lưu lịch công tác</span>
-                </button>
+                <div class="flex items-center gap-2">
+                    <button type="button" onclick="submitScheduleForm('add_new')" id="sched_btn_add_new" class="px-4 py-2 bg-purple-700 hover:bg-purple-800 text-white text-xs font-bold rounded-xl shadow-md transition flex items-center gap-1.5">
+                        <i class="fa-solid fa-plus text-xs"></i>
+                        <span>Thêm mới</span>
+                    </button>
+                    <button type="button" onclick="submitScheduleForm('save_close')" id="sched_btn_save" class="px-4 py-2 bg-amber-500 hover:bg-amber-600 text-slate-950 text-xs font-extrabold rounded-xl shadow-md transition flex items-center gap-1.5 border border-amber-400">
+                        <i class="fa-solid fa-floppy-disk"></i>
+                        <span id="sched_btn_save_text">Lưu & Đóng</span>
+                    </button>
+                </div>
             </div>
         </form>
     </div>
 </div>
 
 <script>
-function openScheduleModal(payload = null) {
-    if (payload) {
-        document.getElementById('scheduleModalTitle').innerText = 'Cập Nhật Lịch Công Tác BGD';
-        document.getElementById('sched_id').value = payload.id || 0;
-        document.getElementById('sched_date').value = payload.schedule_date || '';
-        document.getElementById('sched_date_display').innerText = payload.date_display ? ('(' + payload.date_display + ')') : '';
-        document.getElementById('sched_content').value = payload.content || '';
-        document.getElementById('sched_participants').value = payload.participants || '';
-        document.getElementById('sched_chairperson').value = payload.chairperson || '';
-        document.getElementById('sched_location').value = payload.location || '';
-    } else {
-        document.getElementById('scheduleModalTitle').innerText = 'Thêm Lịch Công Tác BGD Mới';
-        document.getElementById('sched_id').value = 0;
-        document.getElementById('sched_date').value = '<?= $mondayStr ?>';
-        document.getElementById('sched_date_display').innerText = '';
-        document.getElementById('sched_content').value = '';
-        document.getElementById('sched_participants').value = '';
-        document.getElementById('sched_chairperson').value = '';
-        document.getElementById('sched_location').value = '';
-    }
+const daysNamesMap = {
+    1: 'Thứ Hai', 2: 'Thứ Ba', 3: 'Thứ Tư', 4: 'Thứ Năm', 5: 'Thứ Sáu', 6: 'Thứ Bảy', 7: 'Chủ Nhật'
+};
+
+function formatDisplayDateLabel(dateYmd) {
+    if (!dateYmd) return '';
+    const parts = dateYmd.split('-');
+    if (parts.length !== 3) return dateYmd;
+    const dt = new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]));
+    const dayOfWeek = dt.getDay(); // 0 is Sun, 1 is Mon...
+    const dayName = dayOfWeek === 0 ? 'Chủ Nhật' : ('Thứ ' + (dayOfWeek + 1));
+    const formattedDate = String(dt.getDate()).padStart(2, '0') + '/' + String(dt.getMonth() + 1).padStart(2, '0') + '/' + dt.getFullYear();
+    return `Lịch công tác ${dayName}, ngày ${formattedDate}`;
+}
+
+function openScheduleModalForDate(dateStr, dateDisplayLabel = '') {
+    const titleText = dateDisplayLabel ? ('Lịch công tác ' + dateDisplayLabel) : formatDisplayDateLabel(dateStr);
+    document.getElementById('sched_modal_title_text').innerText = titleText;
+    document.getElementById('sched_id').value = 0;
+    document.getElementById('sched_date').value = dateStr;
+    document.getElementById('sched_content').value = '';
+    document.getElementById('sched_participants').value = '';
+    document.getElementById('sched_chairperson').value = '';
+    document.getElementById('sched_location').value = '';
+    document.getElementById('sched_btn_add_new').style.display = '';
+    document.getElementById('sched_btn_save_text').innerText = 'Lưu & Đóng';
 
     document.getElementById('scheduleModal').classList.remove('hidden');
     document.getElementById('scheduleModal').classList.add('flex');
+}
+
+function openEditScheduleModal(payload) {
+    const titleText = payload.date_display ? ('Sửa ' + payload.date_display) : formatDisplayDateLabel(payload.schedule_date);
+    document.getElementById('sched_modal_title_text').innerText = titleText;
+    document.getElementById('sched_id').value = payload.id || 0;
+    document.getElementById('sched_date').value = payload.schedule_date || '';
+    document.getElementById('sched_content').value = payload.content || '';
+    document.getElementById('sched_participants').value = payload.participants || '';
+    document.getElementById('sched_chairperson').value = payload.chairperson || '';
+    document.getElementById('sched_location').value = payload.location || '';
+    document.getElementById('sched_btn_add_new').style.display = 'none'; // Hide "Thêm mới" when editing an existing item
+    document.getElementById('sched_btn_save_text').innerText = 'Cập nhật';
+
+    document.getElementById('scheduleModal').classList.remove('hidden');
+    document.getElementById('scheduleModal').classList.add('flex');
+}
+
+function openScheduleModal() {
+    openScheduleModalForDate('<?= $mondayStr ?>', 'Thứ Hai, ngày <?= $mondayDisplay ?>');
 }
 
 function closeScheduleModal() {
     document.getElementById('scheduleModal').classList.add('hidden');
     document.getElementById('scheduleModal').classList.remove('flex');
 }
+
+function submitScheduleForm(mode) {
+    const content = document.getElementById('sched_content').value.trim();
+    if (!content) {
+        alert('Vui lòng nhập nội dung công việc!');
+        document.getElementById('sched_content').focus();
+        return;
+    }
+    document.getElementById('sched_submit_mode').value = mode;
+    document.getElementById('scheduleForm').submit();
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+    <?php if (isset($_GET['open_date']) && !empty($_GET['open_date'])): ?>
+        openScheduleModalForDate("<?= htmlspecialchars($_GET['open_date']) ?>");
+    <?php endif; ?>
+});
 </script>
 <?php endif; ?>
 

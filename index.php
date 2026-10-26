@@ -545,7 +545,7 @@ $kpiStats = getKpiStats($pdo, $currentUser);
 
                             <!-- 5. TRẠNG THÁI -->
                             <td class="py-3.5 px-3 text-center border-r border-slate-100">
-                                <?= renderStatusBadge($t['status']) ?>
+                                <?= renderStatusBadge($t['status'], $t['due_date']) ?>
                             </td>
 
                             <!-- 7. TIẾN ĐỘ & MINH CHỨNG -->
@@ -1125,7 +1125,7 @@ $kpiStats = getKpiStats($pdo, $currentUser);
                                         <?= !empty($pt['due_date']) ? date('d/m/Y', strtotime($pt['due_date'])) : '<span class="text-slate-400">---</span>' ?>
                                     </td>
                                     <td class="py-3 px-3 text-center">
-                                        <?= renderStatusBadge($pt['status']) ?>
+                                        <?= renderStatusBadge($pt['status'], $pt['due_date']) ?>
                                     </td>
                                 </tr>
                             <?php endforeach; ?>
