@@ -43,6 +43,62 @@ function getTaskAssignees($pdo, $taskId) {
     return $stmt->fetchAll();
 }
 
+// Get task attachments for a given task
+function getTaskAttachments($pdo, $taskId) {
+    try {
+        $stmt = $pdo->prepare("
+            SELECT ta.*, u.fullname AS uploader_name
+            FROM task_attachments ta
+            LEFT JOIN users u ON ta.uploaded_by = u.id
+            WHERE ta.task_id = ?
+            ORDER BY ta.id ASC
+        ");
+        $stmt->execute([$taskId]);
+        return $stmt->fetchAll();
+    } catch (\PDOException $e) {
+        return [];
+    }
+}
+
+// Format file size in human-readable string
+function formatFileSize($bytes) {
+    $bytes = (int)$bytes;
+    if ($bytes >= 1073741824) {
+        return number_format($bytes / 1073741824, 2) . ' GB';
+    } elseif ($bytes >= 1048576) {
+        return number_format($bytes / 1048576, 2) . ' MB';
+    } elseif ($bytes >= 1024) {
+        return number_format($bytes / 1024, 2) . ' KB';
+    } elseif ($bytes > 0) {
+        return $bytes . ' B';
+    }
+    return '0 B';
+}
+
+// Get FontAwesome icon class and color for file extension
+function getFileIconClass($fileName) {
+    $ext = strtolower(pathinfo($fileName, PATHINFO_EXTENSION));
+    switch ($ext) {
+        case 'pdf':
+            return ['icon' => 'fa-file-pdf', 'color' => 'text-rose-600', 'bg' => 'bg-rose-50', 'border' => 'border-rose-200'];
+        case 'doc':
+        case 'docx':
+            return ['icon' => 'fa-file-word', 'color' => 'text-blue-600', 'bg' => 'bg-blue-50', 'border' => 'border-blue-200'];
+        case 'xls':
+        case 'xlsx':
+            return ['icon' => 'fa-file-excel', 'color' => 'text-emerald-600', 'bg' => 'bg-emerald-50', 'border' => 'border-emerald-200'];
+        case 'png':
+        case 'jpg':
+        case 'jpeg':
+            return ['icon' => 'fa-file-image', 'color' => 'text-purple-600', 'bg' => 'bg-purple-50', 'border' => 'border-purple-200'];
+        case 'zip':
+        case 'rar':
+            return ['icon' => 'fa-file-zipper', 'color' => 'text-amber-600', 'bg' => 'bg-amber-50', 'border' => 'border-amber-200'];
+        default:
+            return ['icon' => 'fa-file-lines', 'color' => 'text-slate-600', 'bg' => 'bg-slate-50', 'border' => 'border-slate-200'];
+    }
+}
+
 // Format assignees according to system requirements
 function formatAssigneesHtml($assignees) {
     if (empty($assignees)) {
@@ -400,9 +456,10 @@ function getTasksFiltered($pdo, $filters = [], $limit = 15, $offset = 0, $curren
     $stmtData->execute($params);
     $tasks = $stmtData->fetchAll();
 
-    // Populate assignees & formatted leader comment & timeline logs for each task
+    // Populate assignees, attachments, formatted leader comment & timeline logs for each task
     foreach ($tasks as &$task) {
         $task['assignees'] = getTaskAssignees($pdo, $task['id']);
+        $task['attachments'] = getTaskAttachments($pdo, $task['id']);
         $task['formatted_leader_comment'] = formatLeaderComment($task);
         $task['timeline_logs'] = getTaskTimelineLogs($pdo, $task['id']);
     }
