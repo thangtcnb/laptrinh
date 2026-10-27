@@ -58,8 +58,10 @@ $params = [];
 
 // Internal BGD Security Restriction for Export
 if (!$currentUser || !in_array($currentUser['role'], ['BGD', 'SUPER_ADMIN'])) {
-    $where[] = "((t.department_id != 1 AND t.created_by NOT IN (SELECT id FROM users WHERE role = 'BGD')) OR t.id IN (SELECT task_id FROM task_assignees WHERE user_id = ?))";
+    $where[] = "((t.department_id != 1 AND t.created_by NOT IN (SELECT id FROM users WHERE role = 'BGD')) OR t.id IN (SELECT task_id FROM task_assignees WHERE user_id = ?) OR t.department_id = ? OR t.id IN (SELECT ta.task_id FROM task_assignees ta JOIN users u ON ta.user_id = u.id WHERE u.department_id = ?))";
     $params[] = $currentUser['id'];
+    $params[] = $currentUser['department_id'];
+    $params[] = $currentUser['department_id'];
 }
 
 if (!empty($dateFrom)) {
@@ -660,10 +662,11 @@ function onTimeFrameChange(isInit = false) {
 
     const options = generateTimeOptions(frameVal);
     options.forEach((opt) => {
-        const optionEl = document.createElement('option');
-        optionEl.value = opt.val;
-        optionEl.textContent = opt.label;
-        detailSelect.appendChild(optionEl);
+        const optionEl = document.getElementById('filter_time_detail');
+        const optionElItem = document.createElement('option');
+        optionElItem.value = opt.val;
+        optionElItem.textContent = opt.label;
+        optionEl.appendChild(optionElItem);
     });
 
     if (!isInit) {

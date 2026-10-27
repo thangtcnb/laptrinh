@@ -12,12 +12,15 @@ if (php_sapi_name() !== 'cli' && !defined('ALLOW_WEB_CRON')) {
 
 if (file_exists(__DIR__ . '/config.php')) {
     require_once __DIR__ . '/config.php';
-} else {
-    // Basic PDO fallback for local testing environment without config.php
-    $host = 'localhost';
-    $db   = 'laptrinh_db';
-    $user = 'root';
-    $pass = '';
+} elseif (file_exists(__DIR__ . '/config.php.example')) {
+    require_once __DIR__ . '/config.php.example';
+}
+
+if (!isset($pdo)) {
+    $host = defined('DB_HOST') ? DB_HOST : 'localhost';
+    $db   = defined('DB_NAME') ? DB_NAME : 'laptrinh_db';
+    $user = defined('DB_USER') ? DB_USER : 'root';
+    $pass = defined('DB_PASS') ? DB_PASS : '';
     $charset = 'utf8mb4';
     $dsn = "mysql:host=$host;dbname=$db;charset=$charset";
     $options = [
