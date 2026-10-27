@@ -129,13 +129,14 @@ function checkAndSendOverdueTaskEmails($pdo) {
                 }
 
                 // Construct email content
-                $emailSubject = "[CẢNH BÁO QUÁ HẠN] Công việc: " . $taskTitle;
-                $htmlBody = buildOverdueEmailTemplate([
+                $emailSubject = "[UFM Task] Thông báo công việc quá hạn: " . $taskTitle;
+                $templateData = [
                     'recipient_name' => $recipient['fullname'],
                     'is_creator' => $recipient['is_creator'],
                     'task_id' => $taskId,
                     'task_title' => $taskTitle,
                     'creator_name' => $task['creator_name'],
+                    'creator_email' => $task['creator_email'],
                     'dept_name' => $task['dept_name'],
                     'due_date' => date('d/m/Y', strtotime($dueDateStr)),
                     'overdue_days' => $overdueDays,
@@ -143,13 +144,18 @@ function checkAndSendOverdueTaskEmails($pdo) {
                     'task_url' => $taskDetailUrl,
                     'priority' => $task['priority'],
                     'status' => $task['status']
-                ]);
+                ];
+                $htmlBody = buildOverdueEmailTemplate($templateData);
+                $altBody = buildOverdueEmailText($templateData);
 
                 $sent = sendSystemEmail(
                     $recipient['email'],
                     $recipient['fullname'],
                     $emailSubject,
-                    $htmlBody
+                    $htmlBody,
+                    $altBody,
+                    $task['creator_email'] ?? '',
+                    $task['creator_name'] ?? ''
                 );
 
                 if ($sent) {
@@ -327,4 +333,40 @@ function buildOverdueEmailTemplate($data) {
     </body>
     </html>
     ';
+}
+
+/**
+ * Builds Plain Text template for overdue task warnings.
+ */
+function buildOverdueEmailText($data) {
+    $recipientName = $data['recipient_name'];
+    $taskTitle = $data['task_title'];
+    $creatorName = $data['creator_name'];
+    $deptName = $data['dept_name'];
+    $dueDate = $data['due_date'];
+    $overdueDays = (int)$data['overdue_days'];
+    $taskUrl = $data['task_url'];
+    $isCreator = $data['is_creator'];
+    $priorityLabel = ($data['priority'] === 'URGENT') ? 'Khẩn cấp' : 'Bình thường';
+
+    $roleText = $isCreator ? 'Người giao việc / Quản lý' : 'Người được giao việc';
+    $actionText = $isCreator
+        ? 'Vui lòng kiểm tra, đôn đốc và nhắc nhở nhân sự thực hiện để hoàn thành công việc đúng tiến độ.'
+        : 'Công việc của bạn đã quá hạn hoàn thành. Vui lòng khẩn trương kiểm tra, xử lý và cập nhật tiến độ công việc trên hệ thống.';
+
+    $text = "Kính gửi {$recipientName} ({$roleText}),\n\n";
+    $text .= "Hệ thống ghi nhận công việc dưới đây đã vượt quá thời hạn hoàn thành ban đầu. {$actionText}\n\n";
+    $text .= "--- THÔNG TIN CÔNG VIỆC QUÁ HẠN ---\n";
+    $text .= "• Tên công việc: {$taskTitle}\n";
+    $text .= "• Đơn vị thực hiện: {$deptName}\n";
+    $text .= "• Người giao việc: {$creatorName}\n";
+    $text .= "• Hạn chót ban đầu: {$dueDate}\n";
+    $text .= "• Mức độ ưu tiên: {$priorityLabel}\n";
+    $text .= "• Thời gian trễ hạn: {$overdueDays} ngày\n\n";
+    $text .= "Truy cập trang chi tiết công việc tại:\n{$taskUrl}\n\n";
+    $text .= "Trân trọng cảm ơn,\n";
+    $text .= "Phân hiệu Trường Đại học Tài chính - Marketing tại TP. Quảng Ngãi\n";
+    $text .= "Email: ufmquangngai@ufm.edu.vn | Website: qngai.ufm.edu.vn\n";
+
+    return $text;
 }

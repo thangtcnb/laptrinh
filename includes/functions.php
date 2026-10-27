@@ -282,8 +282,9 @@ function sendDirectTaskAssignmentNotifications($pdo, $taskId, $assignerUser, $ti
         $assigneeIds = array_unique(array_filter(array_map('intval', $assigneeIds)));
         if (empty($assigneeIds)) return;
 
-        // Fetch Assigner Position / Role display
+        // Fetch Assigner Position / Role display & Email
         $assignerName = $assignerUser['fullname'] ?? 'Lãnh đạo';
+        $assignerEmail = $assignerUser['email'] ?? '';
         $assignerRole = $assignerUser['role'] ?? '';
         $assignerDept = $assignerUser['department_name'] ?? '';
 
@@ -338,7 +339,7 @@ function sendDirectTaskAssignmentNotifications($pdo, $taskId, $assignerUser, $ti
                 $notifiedWebUserIds[] = $empUser['id'];
 
                 if (!empty($empUser['email']) && !in_array($empUser['email'], $notifiedEmailAddresses)) {
-                    $emailSubject = "[UFM Quảng Ngãi] THÔNG BÁO CÔNG VIỆC MỚI ĐƯỢC GIAO: " . $title;
+                    $emailSubject = "[UFM Task] Thông báo phân công công việc mới: " . $title;
                     $emailBody = buildTaskAssignmentEmailHtml(
                         $empUser['fullname'],
                         $title,
@@ -349,7 +350,17 @@ function sendDirectTaskAssignmentNotifications($pdo, $taskId, $assignerUser, $ti
                         false,
                         ''
                     );
-                    sendSystemEmail($empUser['email'], $empUser['fullname'], $emailSubject, $emailBody);
+                    $altText = buildTaskAssignmentEmailText(
+                        $empUser['fullname'],
+                        $title,
+                        $assignerDisplay,
+                        $dueDateFormatted,
+                        $description,
+                        $taskDetailUrl,
+                        false,
+                        ''
+                    );
+                    sendSystemEmail($empUser['email'], $empUser['fullname'], $emailSubject, $emailBody, $altText, $assignerEmail, $assignerName);
                     $notifiedEmailAddresses[] = $empUser['email'];
                 }
             }
@@ -367,7 +378,7 @@ function sendDirectTaskAssignmentNotifications($pdo, $taskId, $assignerUser, $ti
                         $notifiedWebUserIds[] = $leader['id'];
 
                         if (!empty($leader['email']) && !in_array($leader['email'], $notifiedEmailAddresses)) {
-                            $emailSubject = "[UFM Quảng Ngãi] BGĐ giao việc cho nhân viên đơn vị: " . $empUser['fullname'] . " - " . $title;
+                            $emailSubject = "[UFM Task] Thông báo BGĐ giao việc cho nhân viên đơn vị: " . $empUser['fullname'] . " - " . $title;
                             $emailBody = buildTaskAssignmentEmailHtml(
                                 $leader['fullname'],
                                 $title,
@@ -378,7 +389,17 @@ function sendDirectTaskAssignmentNotifications($pdo, $taskId, $assignerUser, $ti
                                 true,
                                 $empUser['fullname'] . ' (' . $empUser['department_name'] . ')'
                             );
-                            sendSystemEmail($leader['email'], $leader['fullname'], $emailSubject, $emailBody);
+                            $altText = buildTaskAssignmentEmailText(
+                                $leader['fullname'],
+                                $title,
+                                $assignerDisplay,
+                                $dueDateFormatted,
+                                $description,
+                                $taskDetailUrl,
+                                true,
+                                $empUser['fullname'] . ' (' . $empUser['department_name'] . ')'
+                            );
+                            sendSystemEmail($leader['email'], $leader['fullname'], $emailSubject, $emailBody, $altText, $assignerEmail, $assignerName);
                             $notifiedEmailAddresses[] = $leader['email'];
                         }
                     }
@@ -529,6 +550,33 @@ function buildTaskAssignmentEmailHtml($recipientName, $taskTitle, $assignerDispl
     </body>
     </html>
     ";
+}
+
+/**
+ * Plain Text Email Template Generator for Direct Task Assignment Notifications
+ */
+function buildTaskAssignmentEmailText($recipientName, $taskTitle, $assignerDisplay, $dueDate, $description, $taskUrl, $isForLeader = false, $targetEmployeeName = '') {
+    $descClean = !empty($description) ? trim(strip_tags($description)) : 'Không có ghi chú thêm';
+    $intro = $isForLeader
+        ? "Ban Giám đốc vừa giao công việc trực tiếp cho nhân viên {$targetEmployeeName} thuộc đơn vị do Ông/Bà quản lý để cùng theo dõi tiến độ thực hiện."
+        : "Ông/Bà {$assignerDisplay} vừa giao trực tiếp cho Ông/Bà một công việc / nhiệm vụ mới trên Hệ thống Phân công Công việc UFM Quảng Ngãi.";
+
+    $text = "Kính gửi Ông/Bà {$recipientName},\n\n";
+    $text .= "{$intro}\n\n";
+    $text .= "--- THÔNG TIN CÔNG VIỆC ---\n";
+    $text .= "• Tên công việc / Nhiệm vụ: {$taskTitle}\n";
+    if ($isForLeader && !empty($targetEmployeeName)) {
+        $text .= "• Cán bộ thực hiện: {$targetEmployeeName}\n";
+    }
+    $text .= "• Người giao việc: {$assignerDisplay}\n";
+    $text .= "• Hạn chót hoàn thành: {$dueDate}\n";
+    $text .= "• Nội dung ghi chú: {$descClean}\n\n";
+    $text .= "Truy cập chi tiết công việc tại liên kết:\n{$taskUrl}\n\n";
+    $text .= "Trân trọng cảm ơn,\n";
+    $text .= "Phân hiệu Trường Đại học Tài chính - Marketing tại TP. Quảng Ngãi\n";
+    $text .= "Website: https://qngai.ufm.edu.vn | Email: qngai@ufm.edu.vn\n";
+
+    return $text;
 }
 
 // Get KPI stats based on user role and scope
