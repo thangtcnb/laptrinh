@@ -12,12 +12,13 @@ require_once __DIR__ . '/../config/mail.php';
  * @return bool True if sent/accepted, False on failure
  */
 function sendSystemEmail($toEmail, $toName, $subject, $htmlMessage, $altTextMessage = '') {
-    if (empty($toEmail) || !filter_var($toEmail, FILTER_VALIDATE_EMAIL)) {
-        return false;
-    }
+    try {
+        if (empty($toEmail) || !filter_var($toEmail, FILTER_VALIDATE_EMAIL)) {
+            return false;
+        }
 
-    $fromEmail = defined('SMTP_FROM_EMAIL') ? SMTP_FROM_EMAIL : 'no-reply@ufm.edu.vn';
-    $fromName = defined('SMTP_FROM_NAME') ? SMTP_FROM_NAME : 'UFM Quảng Ngãi';
+        $fromEmail = defined('SMTP_FROM') ? SMTP_FROM : (defined('SMTP_FROM_EMAIL') ? SMTP_FROM_EMAIL : 'no-reply@ufm.edu.vn');
+        $fromName = defined('SMTP_FROM_NAME') ? SMTP_FROM_NAME : 'UFM Quảng Ngãi';
 
     // UTF-8 MIME Header encoding for Subject & Names
     $encodedSubject = '=?UTF-8?B?' . base64_encode($subject) . '?=';
@@ -56,9 +57,14 @@ function sendSystemEmail($toEmail, $toName, $subject, $htmlMessage, $altTextMess
         return true;
     }
 
-    // Log email output for local debugging environment
-    logMailDelivery($toEmail, $subject, $htmlMessage);
-    return true; // Return true for seamless workflow in local offline setup
+        // Log email output for local debugging environment
+        logMailDelivery($toEmail, $subject, $htmlMessage);
+        return true; // Return true for seamless workflow in local offline setup
+    } catch (\Throwable $e) {
+        error_log("sendSystemEmail Exception: " . $e->getMessage());
+        logMailDelivery($toEmail, $subject, "[ERROR: " . $e->getMessage() . "]\n" . $htmlMessage);
+        return false;
+    }
 }
 
 /**

@@ -21,8 +21,12 @@ if (!defined('SMTP_PASS')) {
     define('SMTP_PASS', '');
 }
 
+if (!defined('SMTP_FROM')) {
+    define('SMTP_FROM', defined('SMTP_FROM_EMAIL') ? SMTP_FROM_EMAIL : 'no-reply@ufm.edu.vn');
+}
+
 if (!defined('SMTP_FROM_EMAIL')) {
-    define('SMTP_FROM_EMAIL', 'no-reply@ufm.edu.vn');
+    define('SMTP_FROM_EMAIL', defined('SMTP_FROM') ? SMTP_FROM : 'no-reply@ufm.edu.vn');
 }
 
 if (!defined('SMTP_FROM_NAME')) {

@@ -359,8 +359,8 @@ if ($action === 'save_task') {
         }
     }
 
-    // Gửi thông báo tự động (Web Notification & Email) cho cả Nhân viên và Trưởng/Phó phòng khi BGD giao việc
-    if ($currentUser['role'] === 'BGD') {
+    // Gửi thông báo tự động (Web Notification & Email) khi BGĐ hoặc Trưởng/Phó phòng giao việc trực tiếp
+    if (in_array($currentUser['role'], ['BGD', 'TRUONG_PHONG', 'PHO_PHONG', 'SUPER_ADMIN'])) {
         $allAssigneeIds = [];
         if ($mainAssignee > 0) {
             $allAssigneeIds[] = $mainAssignee;
@@ -375,7 +375,7 @@ if ($action === 'save_task') {
         }
 
         if (!empty($allAssigneeIds)) {
-            sendBgdTaskNotifications($pdo, $taskId, $title, $description, $dueDate, $allAssigneeIds);
+            sendDirectTaskAssignmentNotifications($pdo, $taskId, $currentUser, $title, $description, $dueDate, $allAssigneeIds);
         }
     }
 

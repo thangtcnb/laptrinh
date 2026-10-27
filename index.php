@@ -142,6 +142,39 @@ if ($currentUser['role'] === 'BGD') {
 
 // Fetch KPI Stats for Stats Bar
 $kpiStats = getKpiStats($pdo, $currentUser);
+
+// Deep link: Automatically fetch & display Task Detail Modal if task_id is present in URL query
+$deepLinkTaskId = (int)($_GET['task_id'] ?? 0);
+$deepLinkTaskObj = null;
+if ($deepLinkTaskId > 0) {
+    foreach ($tasks as $t) {
+        if ($t['id'] == $deepLinkTaskId) {
+            $deepLinkTaskObj = $t;
+            break;
+        }
+    }
+    if (!$deepLinkTaskObj) {
+        $stmtDeepLink = $pdo->prepare("
+            SELECT t.*,
+                   d.code AS dept_code, d.name AS dept_name, d.color_theme AS dept_color, d.icon AS dept_icon,
+                   u.fullname AS creator_name, u.role AS creator_role,
+                   lc.fullname AS lc_fullname, lc.role AS lc_role
+            FROM tasks t
+            JOIN departments d ON t.department_id = d.id
+            JOIN users u ON t.created_by = u.id
+            LEFT JOIN users lc ON t.leader_comment_user_id = lc.id
+            WHERE t.id = ?
+        ");
+        $stmtDeepLink->execute([$deepLinkTaskId]);
+        $deepLinkTaskObj = $stmtDeepLink->fetch();
+        if ($deepLinkTaskObj) {
+            $deepLinkTaskObj['assignees'] = getTaskAssignees($pdo, $deepLinkTaskObj['id']);
+            $deepLinkTaskObj['attachments'] = getTaskAttachments($pdo, $deepLinkTaskObj['id']);
+            $deepLinkTaskObj['formatted_leader_comment'] = formatLeaderComment($deepLinkTaskObj);
+            $deepLinkTaskObj['timeline_logs'] = getTaskTimelineLogs($pdo, $deepLinkTaskObj['id']);
+        }
+    }
+}
 ?>
 
 <!-- WORKFLOW NOTIFICATION BANNER FOR BAN GIÁM ĐỐC: PENDING APPROVAL TASKS -->
@@ -1850,6 +1883,10 @@ document.addEventListener('DOMContentLoaded', function() {
         <?= json_encode($filters['date_from']) ?>,
         <?= json_encode($filters['date_to']) ?>
     );
+
+    <?php if ($deepLinkTaskObj): ?>
+        openTaskDetailModal(<?= json_encode($deepLinkTaskObj, ENT_QUOTES, "UTF-8") ?>);
+    <?php endif; ?>
 });
 </script>
 
