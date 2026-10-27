@@ -15,6 +15,7 @@ vendor/
 
 # Ignore user uploaded files in uploads/ except background images tracked in git
 uploads/*
+!uploads/.htaccess
 !uploads/bg/
 uploads/bg/*
 !uploads/bg/.gitkeep
