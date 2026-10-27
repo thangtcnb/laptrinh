@@ -111,9 +111,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 }
             }
 
-            // Trigger notification for BGD batch tasks
-            if ($currentUser['role'] === 'BGD' && !empty($rowAssigneeIds)) {
-                sendBgdTaskNotifications($pdo, $newTaskId, $title, $description, $dueDate, $rowAssigneeIds);
+            // Trigger notification for direct batch tasks assigned by BGD or Trưởng/Phó phòng
+            if (in_array($currentUser['role'], ['BGD', 'TRUONG_PHONG', 'PHO_PHONG', 'SUPER_ADMIN']) && !empty($rowAssigneeIds)) {
+                sendDirectTaskAssignmentNotifications($pdo, $newTaskId, $currentUser, $title, $description, $dueDate, $rowAssigneeIds);
             }
 
             $insertedCount++;
