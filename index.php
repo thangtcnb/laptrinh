@@ -497,7 +497,7 @@ $kpiStats = getKpiStats($pdo, $currentUser);
                                     <div class="mt-1 flex flex-wrap gap-1">
                                         <?php foreach ($t['attachments'] as $att): ?>
                                             <?php $iconMeta = getFileIconClass($att['file_name']); ?>
-                                            <a href="<?= htmlspecialchars($att['file_path']) ?>" target="_blank" class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-medium <?= $iconMeta['bg'] ?> <?= $iconMeta['color'] ?> border <?= $iconMeta['border'] ?> hover:opacity-80 transition" title="Xem/Tải file: <?= htmlspecialchars($att['file_name']) ?> (<?= formatFileSize($att['file_size']) ?>)">
+                                            <a href="download_attachment.php?id=<?= $att['id'] ?>&inline=1" target="_blank" class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-medium <?= $iconMeta['bg'] ?> <?= $iconMeta['color'] ?> border <?= $iconMeta['border'] ?> hover:opacity-80 transition" title="Xem/Tải file: <?= htmlspecialchars($att['file_name']) ?> (<?= formatFileSize($att['file_size']) ?>)">
                                                 <i class="fa-solid <?= $iconMeta['icon'] ?>"></i>
                                                 <span class="truncate max-w-[150px]"><?= htmlspecialchars($att['file_name']) ?></span>
                                             </a>
@@ -765,10 +765,10 @@ $kpiStats = getKpiStats($pdo, $currentUser);
                                                     <span class="text-[10px] text-slate-400 shrink-0">(<?= formatFileSize($att['file_size']) ?>)</span>
                                                 </div>
                                                 <div class="flex items-center gap-1.5 shrink-0">
-                                                    <a href="<?= htmlspecialchars($att['file_path']) ?>" target="_blank" class="px-2 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold rounded text-[11px] transition inline-flex items-center gap-1">
+                                                    <a href="download_attachment.php?id=<?= $att['id'] ?>&inline=1" target="_blank" class="px-2 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold rounded text-[11px] transition inline-flex items-center gap-1">
                                                         <i class="fa-solid fa-eye text-xs"></i> Xem file
                                                     </a>
-                                                    <a href="<?= htmlspecialchars($att['file_path']) ?>" download="<?= htmlspecialchars($att['file_name']) ?>" class="px-2 py-1 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded text-[11px] transition inline-flex items-center gap-1">
+                                                    <a href="download_attachment.php?id=<?= $att['id'] ?>" download="<?= htmlspecialchars($att['file_name']) ?>" class="px-2 py-1 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded text-[11px] transition inline-flex items-center gap-1">
                                                         <i class="fa-solid fa-download text-xs"></i> Tải về
                                                     </a>
                                                 </div>
@@ -1317,7 +1317,8 @@ function openTaskDetailModal(task) {
             const meta = getFileIconMeta(att.file_name);
             const sizeStr = formatBytes(att.file_size);
             const safeName = escapeHtml(att.file_name);
-            const safePath = escapeHtml(att.file_path);
+            const downloadUrl = 'download_attachment.php?id=' + att.id;
+            const inlineUrl = 'download_attachment.php?id=' + att.id + '&inline=1';
 
             const item = document.createElement('div');
             item.className = 'flex items-center justify-between p-2 bg-white rounded-lg border border-slate-200 text-xs';
@@ -1328,10 +1329,10 @@ function openTaskDetailModal(task) {
                     <span class="text-[10px] text-slate-400 shrink-0">(${sizeStr})</span>
                 </div>
                 <div class="flex items-center gap-1.5 shrink-0">
-                    <a href="${safePath}" target="_blank" class="px-2.5 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold rounded-md text-[11px] transition inline-flex items-center gap-1">
+                    <a href="${inlineUrl}" target="_blank" class="px-2.5 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold rounded-md text-[11px] transition inline-flex items-center gap-1">
                         <i class="fa-solid fa-eye text-xs"></i> Xem file
                     </a>
-                    <a href="${safePath}" download="${safeName}" class="px-2.5 py-1 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-md text-[11px] transition inline-flex items-center gap-1">
+                    <a href="${downloadUrl}" download="${safeName}" class="px-2.5 py-1 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-md text-[11px] transition inline-flex items-center gap-1">
                         <i class="fa-solid fa-download text-xs"></i> Tải về
                     </a>
                 </div>

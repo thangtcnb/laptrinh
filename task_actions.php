@@ -359,6 +359,47 @@ if ($action === 'save_task') {
         }
     }
 
+    // Gửi thông báo tự động cho Trưởng/Phó phòng khi BGD giao việc cho Nhân viên thuộc phòng ban
+    if ($currentUser['role'] === 'BGD') {
+        $allAssigneeIds = [];
+        if ($mainAssignee > 0) {
+            $allAssigneeIds[] = $mainAssignee;
+        }
+        if (is_array($coopAssignees)) {
+            foreach ($coopAssignees as $cId) {
+                $cId = (int)$cId;
+                if ($cId > 0 && !in_array($cId, $allAssigneeIds)) {
+                    $allAssigneeIds[] = $cId;
+                }
+            }
+        }
+
+        if (!empty($allAssigneeIds)) {
+            $inClause = implode(',', array_fill(0, count($allAssigneeIds), '?'));
+            $stmtAssignees = $pdo->prepare("SELECT id, fullname, role, department_id FROM users WHERE id IN ($inClause)");
+            $stmtAssignees->execute($allAssigneeIds);
+            $assignedUsers = $stmtAssignees->fetchAll();
+
+            $stmtLeaders = $pdo->prepare("SELECT id FROM users WHERE department_id = ? AND role IN ('TRUONG_PHONG', 'PHO_PHONG')");
+            $stmtNotif = $pdo->prepare("INSERT INTO notifications (user_id, task_id, title, content, is_read, created_at) VALUES (?, ?, ?, ?, 0, NOW())");
+
+            foreach ($assignedUsers as $empUser) {
+                // Kiểm tra nếu là Nhân viên hoặc Hỗ trợ thuộc phòng ban
+                if (in_array($empUser['role'], ['NHAN_VIEN', 'HO_TRO'])) {
+                    $stmtLeaders->execute([$empUser['department_id']]);
+                    $leaders = $stmtLeaders->fetchAll();
+
+                    $notifTitle = 'Thông báo BGD giao việc cho nhân viên phòng';
+                    $notifContent = "BGD vừa giao công việc '" . $title . "' cho nhân viên " . $empUser['fullname'] . " trong phòng của bạn.";
+
+                    foreach ($leaders as $leader) {
+                        $stmtNotif->execute([$leader['id'], $taskId, $notifTitle, $notifContent]);
+                    }
+                }
+            }
+        }
+    }
+
     // Process File Uploads (Văn bản chỉ đạo đính kèm)
     handleFileUploads($pdo, $taskId, $currentUser['id']);
 

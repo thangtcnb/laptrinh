@@ -95,10 +95,18 @@ if %ERRORLEVEL% NEQ 0 (
     exit /b %ERRORLEVEL%
 )
 
-echo "[13/13] Dang thuc thi Migration Task Attachments (database\migrations\update_20261027_task_attachments.sql)..."
+echo "[13/14] Dang thuc thi Migration Task Attachments (database\migrations\update_20261027_task_attachments.sql)..."
 %MYSQL_CMD% -h localhost -P 3306 -u root laptrinh_db < "database\migrations\update_20261027_task_attachments.sql"
 if %ERRORLEVEL% NEQ 0 (
     echo "[LOI] Khong the thuc thi database\migrations\update_20261027_task_attachments.sql. Vui long kiem tra XAMPP MySQL."
+    pause
+    exit /b %ERRORLEVEL%
+)
+
+echo "[14/14] Dang thuc thi Migration Secure Uploads & Notifications (database\migrations\update_20261027_secure_uploads_and_notifications.sql)..."
+%MYSQL_CMD% -h localhost -P 3306 -u root laptrinh_db < "database\migrations\update_20261027_secure_uploads_and_notifications.sql"
+if %ERRORLEVEL% NEQ 0 (
+    echo "[LOI] Khong the thuc thi database\migrations\update_20261027_secure_uploads_and_notifications.sql. Vui long kiem tra XAMPP MySQL."
     pause
     exit /b %ERRORLEVEL%
 )
