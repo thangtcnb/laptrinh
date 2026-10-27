@@ -19,3 +19,4 @@ uploads/*
 uploads/bg/*
 !uploads/bg/.gitkeep
 !uploads/bg/default_bg.jpg
+/config.php
