@@ -13,7 +13,9 @@ vendor/
 !database/schema.sql
 !database/seed.sql
 
-# Ignore user uploaded background images in uploads/bg/
+# Ignore user uploaded files in uploads/ except background images tracked in git
+uploads/*
+!uploads/bg/
 uploads/bg/*
 !uploads/bg/.gitkeep
 !uploads/bg/default_bg.jpg

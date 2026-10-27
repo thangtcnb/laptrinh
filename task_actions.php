@@ -7,6 +7,79 @@ $currentUser = getCurrentUser($pdo);
 
 $action = $_REQUEST['action'] ?? '';
 
+// Helper function to handle attachment files upload
+function handleFileUploads($pdo, $taskId, $userId) {
+    if (empty($_FILES['attachments']) || !is_array($_FILES['attachments']['name'])) {
+        return;
+    }
+
+    $allowedExts = ['pdf', 'doc', 'docx', 'xls', 'xlsx', 'png', 'jpg', 'zip', 'rar'];
+    $maxSizeBytes = 25 * 1024 * 1024; // 25 MB
+
+    $uploadedCount = 0;
+    $errors = [];
+
+    $files = $_FILES['attachments'];
+    $fileCount = count($files['name']);
+
+    for ($i = 0; $i < $fileCount; $i++) {
+        if ($files['error'][$i] === UPLOAD_ERR_NO_FILE) {
+            continue;
+        }
+
+        $originalName = basename($files['name'][$i]);
+        $fileSize = (int)$files['size'][$i];
+        $tmpName = $files['tmp_name'][$i];
+        $ext = strtolower(pathinfo($originalName, PATHINFO_EXTENSION));
+
+        if ($files['error'][$i] !== UPLOAD_ERR_OK) {
+            $errors[] = "Lỗi khi tải file '$originalName'.";
+            continue;
+        }
+
+        if (!in_array($ext, $allowedExts)) {
+            $errors[] = "File '$originalName' không đúng định dạng cho phép (pdf, doc, docx, xls, xlsx, png, jpg, zip, rar).";
+            continue;
+        }
+
+        if ($fileSize > $maxSizeBytes) {
+            $errors[] = "File '$originalName' vượt quá dung lượng tối đa 25 MB.";
+            continue;
+        }
+
+        // Target directory: uploads/documents/YYYY/MM/
+        $yearMonthDir = 'uploads/documents/' . date('Y/m');
+        if (!is_dir(__DIR__ . '/' . $yearMonthDir)) {
+            mkdir(__DIR__ . '/' . $yearMonthDir, 0777, true);
+        }
+
+        // Target filename with timestamp/random hash prefix
+        $hashPrefix = date('Ymd_His') . '_' . substr(md5(uniqid(mt_rand(), true)), 0, 6);
+        $safeFileName = $hashPrefix . '_' . preg_replace('/[^a-zA-Z0-9_\.-]/', '_', $originalName);
+        $relativePath = $yearMonthDir . '/' . $safeFileName;
+        $fullPath = __DIR__ . '/' . $relativePath;
+
+        if (move_uploaded_file($tmpName, $fullPath)) {
+            $stmt = $pdo->prepare("
+                INSERT INTO task_attachments (task_id, file_name, file_path, file_size, uploaded_by, created_at)
+                VALUES (?, ?, ?, ?, ?, NOW())
+            ");
+            $stmt->execute([$taskId, $originalName, $relativePath, $fileSize, $userId]);
+            $uploadedCount++;
+        } else {
+            $errors[] = "Không thể lưu file '$originalName' trên server.";
+        }
+    }
+
+    if (!empty($errors)) {
+        $_SESSION['flash_error'] = implode('<br>', $errors);
+    }
+
+    if ($uploadedCount > 0) {
+        logTaskTimeline($pdo, $taskId, $userId, 'UPLOAD_ATTACHMENT', "Đã tải lên $uploadedCount văn bản/tài liệu chỉ đạo");
+    }
+}
+
 // 1. UPDATE PROGRESS & PROOF LINK
 if ($action === 'update_progress') {
     $taskId = (int)($_POST['task_id'] ?? 0);
@@ -113,6 +186,17 @@ if ($action === 'delete') {
     }
 
     if ($canDelete) {
+        // Delete physical attachment files
+        $stmtFiles = $pdo->prepare("SELECT file_path FROM task_attachments WHERE task_id = ?");
+        $stmtFiles->execute([$taskId]);
+        $attachments = $stmtFiles->fetchAll();
+        foreach ($attachments as $att) {
+            $fullPath = __DIR__ . '/' . $att['file_path'];
+            if (file_exists($fullPath)) {
+                @unlink($fullPath);
+            }
+        }
+
         $stmtDelete = $pdo->prepare("DELETE FROM tasks WHERE id = ?");
         $stmtDelete->execute([$taskId]);
         logActivity($pdo, $currentUser['id'], 'DELETE_TASK', "Đã xóa công việc ID #$taskId: {$task['title']}");
@@ -124,7 +208,47 @@ if ($action === 'delete') {
     exit;
 }
 
-// 4. CREATE / EDIT SINGLE TASK
+// 4. DELETE SINGLE ATTACHMENT FILE (RBAC)
+if ($action === 'delete_attachment') {
+    $attachmentId = (int)($_REQUEST['attachment_id'] ?? 0);
+
+    $stmtAtt = $pdo->prepare("
+        SELECT ta.*, t.created_by AS task_creator
+        FROM task_attachments ta
+        JOIN tasks t ON ta.task_id = t.id
+        WHERE ta.id = ?
+    ");
+    $stmtAtt->execute([$attachmentId]);
+    $attachment = $stmtAtt->fetch();
+
+    if (!$attachment) {
+        $_SESSION['flash_error'] = "Không tìm thấy file văn bản đính kèm!";
+        header("Location: index.php");
+        exit;
+    }
+
+    $canDeleteAtt = ($currentUser['role'] === 'SUPER_ADMIN' || $attachment['task_creator'] == $currentUser['id'] || $attachment['uploaded_by'] == $currentUser['id']);
+
+    if ($canDeleteAtt) {
+        $fullPath = __DIR__ . '/' . $attachment['file_path'];
+        if (file_exists($fullPath)) {
+            @unlink($fullPath);
+        }
+
+        $stmtDel = $pdo->prepare("DELETE FROM task_attachments WHERE id = ?");
+        $stmtDel->execute([$attachmentId]);
+
+        logTaskTimeline($pdo, $attachment['task_id'], $currentUser['id'], 'DELETE_ATTACHMENT', "Đã xóa văn bản đính kèm: {$attachment['file_name']}");
+        $_SESSION['flash_success'] = "Đã xóa file đính kèm thành công!";
+    } else {
+        $_SESSION['flash_error'] = "Bạn không có quyền xóa file đính kèm này!";
+    }
+
+    header("Location: index.php");
+    exit;
+}
+
+// 5. CREATE / EDIT SINGLE TASK
 if ($action === 'save_task') {
     $taskId = (int)($_POST['task_id'] ?? 0);
     $title = trim($_POST['title'] ?? '');
@@ -235,12 +359,17 @@ if ($action === 'save_task') {
         }
     }
 
-    $_SESSION['flash_success'] = "Đã lưu công việc thành công!";
+    // Process File Uploads (Văn bản chỉ đạo đính kèm)
+    handleFileUploads($pdo, $taskId, $currentUser['id']);
+
+    if (empty($_SESSION['flash_error'])) {
+        $_SESSION['flash_success'] = "Đã lưu công việc thành công!";
+    }
     header("Location: index.php");
     exit;
 }
 
-// 5. RESPOND TO ALL ASSIGNED TASKS (BATCH ACCEPTANCE) BY ASSIGNED USERS
+// 6. RESPOND TO ALL ASSIGNED TASKS (BATCH ACCEPTANCE) BY ASSIGNED USERS
 if ($action === 'respond_all_assigned_tasks') {
     $taskIds = $_POST['task_ids'] ?? [];
     $generalComment = trim($_POST['general_comment'] ?? '');
@@ -375,7 +504,7 @@ if ($action === 'batch_approve_tasks') {
     exit;
 }
 
-// 6. RESPOND TO ASSIGNED TASK (ACCEPT SINGLE TASK) BY ASSIGNED USER
+// 7. RESPOND TO ASSIGNED TASK (ACCEPT SINGLE TASK) BY ASSIGNED USER
 if ($action === 'respond_assigned_task') {
     $taskId = (int)($_POST['task_id'] ?? 0);
     $commentFeedback = trim($_POST['comment_feedback'] ?? '');

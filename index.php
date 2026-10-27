@@ -85,6 +85,10 @@ if ($currentUser) {
     ");
     $stmtPending->execute([$currentUser['id']]);
     $pendingAssignedTasks = $stmtPending->fetchAll();
+
+    foreach ($pendingAssignedTasks as &$pt) {
+        $pt['attachments'] = getTaskAttachments($pdo, $pt['id']);
+    }
 }
 
 // Check if current logged-in user (Trưởng/Phó phòng) has pending approval tasks (CHO_DUYET) from their department
@@ -242,7 +246,7 @@ $kpiStats = getKpiStats($pdo, $currentUser);
     <div class="mb-5 bg-rose-50 border-l-4 border-rose-500 p-4 rounded-r-lg shadow-sm text-rose-800 text-sm font-medium flex items-center justify-between">
         <div class="flex items-center gap-2">
             <i class="fa-solid fa-triangle-exclamation text-rose-500 text-lg"></i>
-            <span><?= htmlspecialchars($flashError) ?></span>
+            <span><?= $flashError ?></span>
         </div>
         <button onclick="this.parentElement.remove()" class="text-rose-500 hover:text-rose-700"><i class="fa-solid fa-xmark"></i></button>
     </div>
@@ -488,6 +492,19 @@ $kpiStats = getKpiStats($pdo, $currentUser);
                                     <?= htmlspecialchars($t['title']) ?>
                                 </div>
 
+                                <!-- BADGE VĂN BẢN CHỈ ĐẠO ĐÍNH KÈM -->
+                                <?php if (!empty($t['attachments']) && count($t['attachments']) > 0): ?>
+                                    <div class="mt-1 flex flex-wrap gap-1">
+                                        <?php foreach ($t['attachments'] as $att): ?>
+                                            <?php $iconMeta = getFileIconClass($att['file_name']); ?>
+                                            <a href="<?= htmlspecialchars($att['file_path']) ?>" target="_blank" class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-medium <?= $iconMeta['bg'] ?> <?= $iconMeta['color'] ?> border <?= $iconMeta['border'] ?> hover:opacity-80 transition" title="Xem/Tải file: <?= htmlspecialchars($att['file_name']) ?> (<?= formatFileSize($att['file_size']) ?>)">
+                                                <i class="fa-solid <?= $iconMeta['icon'] ?>"></i>
+                                                <span class="truncate max-w-[150px]"><?= htmlspecialchars($att['file_name']) ?></span>
+                                            </a>
+                                        <?php endforeach; ?>
+                                    </div>
+                                <?php endif; ?>
+
                                 <!-- BADGE NGƯỜI GIAO VIỆC DÀNH CHO CÔNG VIỆC TRỰC TIẾP -->
                                 <?php
                                 $isDirectAssignment = in_array($t['creator_role'], ['TRUONG_PHONG', 'BGD', 'SUPER_ADMIN']);
@@ -731,6 +748,36 @@ $kpiStats = getKpiStats($pdo, $currentUser);
                                 <p class="text-xs text-slate-600 mb-3 bg-white p-2.5 rounded-xl border border-slate-200 leading-relaxed"><?= htmlspecialchars($pt['description']) ?></p>
                             <?php endif; ?>
 
+                            <!-- Hiển thị Văn bản / Tài liệu chỉ đạo đính kèm -->
+                            <?php if (!empty($pt['attachments']) && count($pt['attachments']) > 0): ?>
+                                <div class="mb-3 p-3 bg-blue-50/70 rounded-xl border border-blue-200">
+                                    <div class="text-[11px] font-bold text-blue-900 mb-1.5 flex items-center gap-1.5">
+                                        <i class="fa-solid fa-paperclip text-blue-600"></i>
+                                        <span>Văn bản / Tài liệu chỉ đạo đính kèm (<?= count($pt['attachments']) ?> file):</span>
+                                    </div>
+                                    <div class="space-y-1.5">
+                                        <?php foreach ($pt['attachments'] as $att): ?>
+                                            <?php $iconMeta = getFileIconClass($att['file_name']); ?>
+                                            <div class="flex items-center justify-between p-2 bg-white rounded-lg border border-slate-200 text-xs">
+                                                <div class="flex items-center gap-2 overflow-hidden mr-2">
+                                                    <i class="fa-solid <?= $iconMeta['icon'] ?> <?= $iconMeta['color'] ?> text-base shrink-0"></i>
+                                                    <span class="font-medium text-slate-800 truncate" title="<?= htmlspecialchars($att['file_name']) ?>"><?= htmlspecialchars($att['file_name']) ?></span>
+                                                    <span class="text-[10px] text-slate-400 shrink-0">(<?= formatFileSize($att['file_size']) ?>)</span>
+                                                </div>
+                                                <div class="flex items-center gap-1.5 shrink-0">
+                                                    <a href="<?= htmlspecialchars($att['file_path']) ?>" target="_blank" class="px-2 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold rounded text-[11px] transition inline-flex items-center gap-1">
+                                                        <i class="fa-solid fa-eye text-xs"></i> Xem file
+                                                    </a>
+                                                    <a href="<?= htmlspecialchars($att['file_path']) ?>" download="<?= htmlspecialchars($att['file_name']) ?>" class="px-2 py-1 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded text-[11px] transition inline-flex items-center gap-1">
+                                                        <i class="fa-solid fa-download text-xs"></i> Tải về
+                                                    </a>
+                                                </div>
+                                            </div>
+                                        <?php endforeach; ?>
+                                    </div>
+                                </div>
+                            <?php endif; ?>
+
                             <div class="flex items-center gap-4 text-xs text-slate-500 font-medium mb-3">
                                 <div><i class="fa-regular fa-calendar-check text-slate-400 mr-1"></i>Hạn chót: <strong class="text-slate-800"><?= $pt['due_date'] ? date('d/m/Y', strtotime($pt['due_date'])) : 'Không quy định' ?></strong></div>
                             </div>
@@ -885,7 +932,7 @@ $kpiStats = getKpiStats($pdo, $currentUser);
             <button onclick="closeTaskModal()" class="text-slate-400 hover:text-slate-600"><i class="fa-solid fa-xmark text-lg"></i></button>
         </div>
 
-        <form method="POST" action="task_actions.php" class="space-y-4">
+        <form method="POST" action="task_actions.php" enctype="multipart/form-data" class="space-y-4">
             <input type="hidden" name="action" value="save_task">
             <input type="hidden" name="task_id" id="form_task_id" value="0">
 
@@ -897,6 +944,28 @@ $kpiStats = getKpiStats($pdo, $currentUser);
             <div>
                 <label class="block text-xs font-semibold text-slate-700 mb-1">Mô tả chi tiết</label>
                 <textarea name="description" id="form_description" rows="3" class="w-full p-2.5 border border-slate-300 rounded-xl text-xs focus:ring-2 focus:ring-indigo-500 outline-none" placeholder="Nội dung chi tiết công việc..."></textarea>
+            </div>
+
+            <!-- Upload File Văn bản chỉ đạo đính kèm -->
+            <div class="p-3.5 bg-blue-50/60 rounded-xl border border-blue-200/80 space-y-2">
+                <label class="block text-xs font-bold text-blue-900 flex items-center gap-1.5">
+                    <i class="fa-solid fa-paperclip text-blue-600"></i>
+                    <span>Văn bản chỉ đạo đính kèm (Công văn, Tờ trình, Quyết định...)</span>
+                </label>
+
+                <!-- Existing Attachments List (For edit mode) -->
+                <div id="form_existing_attachments" class="space-y-1.5 mb-2 hidden"></div>
+
+                <div class="relative border-2 border-dashed border-blue-300 rounded-xl p-4 text-center hover:bg-blue-50/80 transition bg-white cursor-pointer" id="drop_zone">
+                    <input type="file" name="attachments[]" id="form_attachments" multiple accept=".pdf,.doc,.docx,.xls,.xlsx,.png,.jpg,.jpeg,.zip,.rar" class="absolute inset-0 w-full h-full opacity-0 cursor-pointer" onchange="previewSelectedFiles(this)">
+                    <div class="pointer-events-none">
+                        <i class="fa-solid fa-cloud-arrow-up text-blue-600 text-2xl mb-1"></i>
+                        <p class="text-xs font-semibold text-slate-700">Kéo thả file vào đây hoặc <span class="text-blue-600 underline">chọn file</span></p>
+                        <p class="text-[11px] text-slate-400 mt-0.5">Định dạng: pdf, doc, docx, xls, xlsx, png, jpg, zip, rar (Tối đa 25MB/file)</p>
+                    </div>
+                </div>
+
+                <div id="selected_files_list" class="space-y-1 text-xs"></div>
             </div>
 
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -1018,6 +1087,16 @@ $kpiStats = getKpiStats($pdo, $currentUser);
                 </div>
                 <h4 id="detailTitle" class="text-sm font-bold text-slate-900"></h4>
                 <p id="detailDesc" class="text-slate-600 leading-relaxed"></p>
+
+                <!-- Attached Files Section -->
+                <div id="detailAttachmentsContainer" class="pt-2 border-t border-slate-200/60 hidden">
+                    <h5 class="font-bold text-blue-900 text-xs mb-2 flex items-center gap-1.5">
+                        <i class="fa-solid fa-paperclip text-blue-600"></i>
+                        <span>Văn bản / Tài liệu chỉ đạo đính kèm:</span>
+                    </h5>
+                    <div id="detailAttachmentsList" class="space-y-1.5"></div>
+                </div>
+
                 <div class="grid grid-cols-2 gap-2 text-slate-500 pt-2 border-t border-slate-200/60">
                     <div><i class="fa-solid fa-user text-slate-400 mr-1"></i>Người đăng ký: <strong id="detailCreator" class="text-slate-800"></strong></div>
                     <div><i class="fa-regular fa-calendar-check text-slate-400 mr-1"></i>Hạn chót: <strong id="detailDueDate" class="text-slate-800"></strong></div>
@@ -1162,6 +1241,64 @@ $kpiStats = getKpiStats($pdo, $currentUser);
 <?php endif; ?>
 
 <script>
+function escapeHtml(str) {
+    if (!str) return '';
+    return str.replace(/&/g, "&amp;")
+              .replace(/</g, "&lt;")
+              .replace(/>/g, "&gt;")
+              .replace(/"/g, "&quot;")
+              .replace(/'/g, "&#039;");
+}
+
+function getFileIconMeta(fileName) {
+    const ext = fileName.split('.').pop().toLowerCase();
+    switch (ext) {
+        case 'pdf': return { icon: 'fa-file-pdf', color: 'text-rose-600', bg: 'bg-rose-50', border: 'border-rose-200' };
+        case 'doc':
+        case 'docx': return { icon: 'fa-file-word', color: 'text-blue-600', bg: 'bg-blue-50', border: 'border-blue-200' };
+        case 'xls':
+        case 'xlsx': return { icon: 'fa-file-excel', color: 'text-emerald-600', bg: 'bg-emerald-50', border: 'border-emerald-200' };
+        case 'png':
+        case 'jpg':
+        case 'jpeg': return { icon: 'fa-file-image', color: 'text-purple-600', bg: 'bg-purple-50', border: 'border-purple-200' };
+        case 'zip':
+        case 'rar': return { icon: 'fa-file-zipper', color: 'text-amber-600', bg: 'bg-amber-50', border: 'border-amber-200' };
+        default: return { icon: 'fa-file-lines', color: 'text-slate-600', bg: 'bg-slate-50', border: 'border-slate-200' };
+    }
+}
+
+function formatBytes(bytes) {
+    if (bytes >= 1073741824) return (bytes / 1073741824).toFixed(2) + ' GB';
+    if (bytes >= 1048576) return (bytes / 1048576).toFixed(2) + ' MB';
+    if (bytes >= 1024) return (bytes / 1024).toFixed(2) + ' KB';
+    return bytes + ' B';
+}
+
+function previewSelectedFiles(input) {
+    const listEl = document.getElementById('selected_files_list');
+    listEl.innerHTML = '';
+
+    if (input.files && input.files.length > 0) {
+        Array.from(input.files).forEach((file, index) => {
+            const meta = getFileIconMeta(file.name);
+            const sizeStr = formatBytes(file.size);
+            const safeName = escapeHtml(file.name);
+
+            const div = document.createElement('div');
+            div.className = 'flex items-center justify-between p-2 rounded-lg border bg-slate-50 border-slate-200';
+            div.innerHTML = `
+                <div class="flex items-center gap-2 overflow-hidden mr-2">
+                    <i class="fa-solid ${meta.icon} ${meta.color} text-sm shrink-0"></i>
+                    <span class="font-medium text-slate-800 truncate">${safeName}</span>
+                    <span class="text-[10px] text-slate-400 shrink-0">(${sizeStr})</span>
+                </div>
+                <span class="text-[10px] font-bold text-emerald-600 shrink-0">File mới chọn</span>
+            `;
+            listEl.appendChild(div);
+        });
+    }
+}
+
 function openTaskDetailModal(task) {
     document.getElementById('detailModalTitle').innerText = 'Chi Tiết Công Việc #' + task.id;
     document.getElementById('detailTitle').innerText = task.title;
@@ -1169,6 +1306,42 @@ function openTaskDetailModal(task) {
     document.getElementById('detailCreator').innerText = task.creator_name || 'Hệ thống';
     document.getElementById('detailDueDate').innerText = task.due_date ? new Date(task.due_date).toLocaleDateString('vi-VN') : 'Không quy định';
     document.getElementById('detailDeptBadge').innerText = '[' + (task.dept_code || '') + '] ' + (task.dept_name || '');
+
+    // Attachments section
+    const attContainer = document.getElementById('detailAttachmentsContainer');
+    const attList = document.getElementById('detailAttachmentsList');
+    attList.innerHTML = '';
+
+    if (task.attachments && task.attachments.length > 0) {
+        task.attachments.forEach(att => {
+            const meta = getFileIconMeta(att.file_name);
+            const sizeStr = formatBytes(att.file_size);
+            const safeName = escapeHtml(att.file_name);
+            const safePath = escapeHtml(att.file_path);
+
+            const item = document.createElement('div');
+            item.className = 'flex items-center justify-between p-2 bg-white rounded-lg border border-slate-200 text-xs';
+            item.innerHTML = `
+                <div class="flex items-center gap-2 overflow-hidden mr-2">
+                    <i class="fa-solid ${meta.icon} ${meta.color} text-base shrink-0"></i>
+                    <span class="font-medium text-slate-800 truncate" title="${safeName}">${safeName}</span>
+                    <span class="text-[10px] text-slate-400 shrink-0">(${sizeStr})</span>
+                </div>
+                <div class="flex items-center gap-1.5 shrink-0">
+                    <a href="${safePath}" target="_blank" class="px-2.5 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold rounded-md text-[11px] transition inline-flex items-center gap-1">
+                        <i class="fa-solid fa-eye text-xs"></i> Xem file
+                    </a>
+                    <a href="${safePath}" download="${safeName}" class="px-2.5 py-1 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-md text-[11px] transition inline-flex items-center gap-1">
+                        <i class="fa-solid fa-download text-xs"></i> Tải về
+                    </a>
+                </div>
+            `;
+            attList.appendChild(item);
+        });
+        attContainer.classList.remove('hidden');
+    } else {
+        attContainer.classList.add('hidden');
+    }
 
     const container = document.getElementById('timelineContainer');
     container.innerHTML = '';
@@ -1188,11 +1361,11 @@ function openTaskDetailModal(task) {
                 <div class="absolute -left-[21px] top-1 w-3 h-3 rounded-full ${dotColor} border-2 border-white shadow-sm"></div>
                 <div class="bg-slate-50 p-3 rounded-xl border border-slate-200">
                     <div class="flex items-center justify-between text-[11px] text-slate-500 font-medium mb-1">
-                        <span><i class="fa-solid fa-user text-slate-400 mr-1"></i><strong>${userStr}</strong></span>
-                        <span><i class="fa-regular fa-clock text-slate-400 mr-1"></i>${timeStr}</span>
+                        <span><i class="fa-solid fa-user text-slate-400 mr-1"></i><strong>${escapeHtml(userStr)}</strong></span>
+                        <span><i class="fa-regular fa-clock text-slate-400 mr-1"></i>${escapeHtml(timeStr)}</span>
                     </div>
-                    <div class="text-xs text-slate-800 font-semibold mb-0.5">${log.action}</div>
-                    <div class="text-[11px] text-slate-600 leading-snug">${log.description || ''}</div>
+                    <div class="text-xs text-slate-800 font-semibold mb-0.5">${escapeHtml(log.action)}</div>
+                    <div class="text-[11px] text-slate-600 leading-snug">${escapeHtml(log.description || '')}</div>
                 </div>
             `;
             container.appendChild(item);
@@ -1381,6 +1554,15 @@ function closeLeaderModal() {
 }
 
 function openTaskModal(task = null) {
+    // Reset file input & preview
+    const fileInput = document.getElementById('form_attachments');
+    if (fileInput) fileInput.value = '';
+    const fileListEl = document.getElementById('selected_files_list');
+    if (fileListEl) fileListEl.innerHTML = '';
+
+    const existingAttContainer = document.getElementById('form_existing_attachments');
+    existingAttContainer.innerHTML = '';
+
     if (task) {
         document.getElementById('modalTitle').innerText = 'Chỉnh Sửa Công Việc #' + task.id;
         document.getElementById('form_task_id').value = task.id;
@@ -1392,6 +1574,32 @@ function openTaskModal(task = null) {
             document.getElementById('form_status').value = task.status;
         }
         document.getElementById('form_due_date').value = task.due_date || '';
+
+        // Existing attachments in edit mode
+        if (task.attachments && task.attachments.length > 0) {
+            existingAttContainer.classList.remove('hidden');
+            task.attachments.forEach(att => {
+                const meta = getFileIconMeta(att.file_name);
+                const sizeStr = formatBytes(att.file_size);
+                const safeName = escapeHtml(att.file_name);
+
+                const div = document.createElement('div');
+                div.className = 'flex items-center justify-between p-2 rounded-lg border bg-white border-blue-200 text-xs';
+                div.innerHTML = `
+                    <div class="flex items-center gap-2 overflow-hidden mr-2">
+                        <i class="fa-solid ${meta.icon} ${meta.color} text-sm shrink-0"></i>
+                        <span class="font-medium text-slate-800 truncate" title="${safeName}">${safeName}</span>
+                        <span class="text-[10px] text-slate-400 shrink-0">(${sizeStr})</span>
+                    </div>
+                    <a href="task_actions.php?action=delete_attachment&attachment_id=${att.id}" onclick="return confirm('Bạn có chắc muốn xóa văn bản đính kèm này không?');" class="text-rose-600 hover:text-rose-800 p-1 font-bold text-xs" title="Xóa file đính kèm">
+                        <i class="fa-solid fa-trash"></i> Xóa
+                    </a>
+                `;
+                existingAttContainer.appendChild(div);
+            });
+        } else {
+            existingAttContainer.classList.add('hidden');
+        }
 
         // Assignees
         let mainUser = '';
@@ -1426,6 +1634,8 @@ function openTaskModal(task = null) {
         document.getElementById('form_description').value = '';
         document.getElementById('form_due_date').value = '';
         document.getElementById('form_main_assignee').value = '<?= $currentUser['id'] ?>';
+
+        existingAttContainer.classList.add('hidden');
 
         let coopSelect = document.getElementById('form_coop_assignees');
         Array.from(coopSelect.options).forEach(opt => opt.selected = false);
