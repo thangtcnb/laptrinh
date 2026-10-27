@@ -81,9 +81,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 </head>
 <body class="min-h-screen flex items-center justify-center p-4 relative overflow-hidden bg-gradient-to-br from-slate-900 via-indigo-950 to-blue-900">
 
-<?php if (!empty($loginBg) && file_exists(__DIR__ . '/' . $loginBg)): ?>
+<?php if (!empty($loginBg) && file_exists(__DIR__ . '/' . $loginBg)):
+    $bgTimestamp = filemtime(__DIR__ . '/' . $loginBg) ?: time();
+    $loginBgUrl = htmlspecialchars($loginBg) . '?v=' . $bgTimestamp;
+?>
     <!-- Custom Background Image with overlay -->
-    <div class="absolute inset-0 bg-cover bg-center z-0 transition-all duration-700 scale-105" style="background-image: url('<?= htmlspecialchars($loginBg) ?>');"></div>
+    <div class="absolute inset-0 z-0 transition-all duration-700 scale-105" style="background-image: url('<?= $loginBgUrl ?>'); background-size: cover; background-position: center; background-attachment: fixed; background-repeat: no-repeat;"></div>
     <div class="absolute inset-0 bg-black/20 z-0"></div>
 <?php endif; ?>
 

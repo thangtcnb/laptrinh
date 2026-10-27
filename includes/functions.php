@@ -267,13 +267,11 @@ function formatLeaderComment($t) {
 }
 
 /**
- * Direct Task Assignment Notification Helper (Web Notification & Instant Email)
+ * Direct Task Assignment Notification Helper (Web Popup Notification)
  * Triggered when Ban Giám Đốc (BGĐ) or Department Head (Trưởng/Phó phòng) directly assigns tasks to staff.
  */
 function sendDirectTaskAssignmentNotifications($pdo, $taskId, $assignerUser, $title, $description, $dueDate, $assigneeIds) {
     if (empty($assigneeIds)) return;
-
-    require_once __DIR__ . '/mailer.php';
 
     try {
         if (!is_array($assigneeIds)) {
@@ -282,9 +280,8 @@ function sendDirectTaskAssignmentNotifications($pdo, $taskId, $assignerUser, $ti
         $assigneeIds = array_unique(array_filter(array_map('intval', $assigneeIds)));
         if (empty($assigneeIds)) return;
 
-        // Fetch Assigner Position / Role display & Email
+        // Fetch Assigner Position / Role display
         $assignerName = $assignerUser['fullname'] ?? 'Lãnh đạo';
-        $assignerEmail = $assignerUser['email'] ?? '';
         $assignerRole = $assignerUser['role'] ?? '';
         $assignerDept = $assignerUser['department_name'] ?? '';
 
@@ -324,49 +321,20 @@ function sendDirectTaskAssignmentNotifications($pdo, $taskId, $assignerUser, $ti
         ");
 
         $notifiedWebUserIds = [];
-        $notifiedEmailAddresses = [];
 
         $dueDateFormatted = !empty($dueDate) ? date('d/m/Y', strtotime($dueDate)) : 'Không quy định';
-        $appUrl = defined('APP_URL') ? rtrim(APP_URL, '/') : 'http://localhost';
-        $taskDetailUrl = $appUrl . '/index.php?task_id=' . $taskId;
 
         foreach ($assignedUsers as $empUser) {
-            // 1. Send Notification & Email to Assigned Individual
+            // 1. Send Web Notification to Assigned Individual
             if (!in_array($empUser['id'], $notifiedWebUserIds)) {
                 $notifTitleEmp = 'Thông báo giao công việc mới';
                 $notifContentEmp = "$assignerDisplay vừa giao công việc: '$title' cho bạn. Hạn chót: $dueDateFormatted.";
                 $stmtNotif->execute([$empUser['id'], $taskId, $notifTitleEmp, $notifContentEmp]);
                 $notifiedWebUserIds[] = $empUser['id'];
-
-                if (!empty($empUser['email']) && !in_array($empUser['email'], $notifiedEmailAddresses)) {
-                    $emailSubject = "[UFM Task] Thông báo phân công công việc mới: " . $title;
-                    $emailBody = buildTaskAssignmentEmailHtml(
-                        $empUser['fullname'],
-                        $title,
-                        $assignerDisplay,
-                        $dueDateFormatted,
-                        $description,
-                        $taskDetailUrl,
-                        false,
-                        ''
-                    );
-                    $altText = buildTaskAssignmentEmailText(
-                        $empUser['fullname'],
-                        $title,
-                        $assignerDisplay,
-                        $dueDateFormatted,
-                        $description,
-                        $taskDetailUrl,
-                        false,
-                        ''
-                    );
-                    sendSystemEmail($empUser['email'], $empUser['fullname'], $emailSubject, $emailBody, $altText, $assignerEmail, $assignerName);
-                    $notifiedEmailAddresses[] = $empUser['email'];
-                }
             }
 
-            // 2. If Assigner is BGD assigning directly to Employee, also send email to Employee's Managing Department Leader
-            if ($assignerRole === 'BGD' && in_array($empUser['role'], ['NHAN_VIEN', 'HO_TRO', 'PHO_PHONG'])) {
+            // 2. If Assigner is BGD/Super Admin assigning directly to Employee, send Web Notification to Employee's Managing Department Leader
+            if (in_array($assignerRole, ['BGD', 'SUPER_ADMIN']) && in_array($empUser['role'], ['NHAN_VIEN', 'HO_TRO', 'PHO_PHONG'])) {
                 $stmtLeaders->execute([$empUser['department_id']]);
                 $leaders = $stmtLeaders->fetchAll();
 
@@ -376,32 +344,6 @@ function sendDirectTaskAssignmentNotifications($pdo, $taskId, $assignerUser, $ti
                         $notifContentLeader = "BGĐ vừa giao công việc '$title' cho nhân viên " . $empUser['fullname'] . " thuộc đơn vị của bạn.";
                         $stmtNotif->execute([$leader['id'], $taskId, $notifTitleLeader, $notifContentLeader]);
                         $notifiedWebUserIds[] = $leader['id'];
-
-                        if (!empty($leader['email']) && !in_array($leader['email'], $notifiedEmailAddresses)) {
-                            $emailSubject = "[UFM Task] Thông báo BGĐ giao việc cho nhân viên đơn vị: " . $empUser['fullname'] . " - " . $title;
-                            $emailBody = buildTaskAssignmentEmailHtml(
-                                $leader['fullname'],
-                                $title,
-                                $assignerDisplay,
-                                $dueDateFormatted,
-                                $description,
-                                $taskDetailUrl,
-                                true,
-                                $empUser['fullname'] . ' (' . $empUser['department_name'] . ')'
-                            );
-                            $altText = buildTaskAssignmentEmailText(
-                                $leader['fullname'],
-                                $title,
-                                $assignerDisplay,
-                                $dueDateFormatted,
-                                $description,
-                                $taskDetailUrl,
-                                true,
-                                $empUser['fullname'] . ' (' . $empUser['department_name'] . ')'
-                            );
-                            sendSystemEmail($leader['email'], $leader['fullname'], $emailSubject, $emailBody, $altText, $assignerEmail, $assignerName);
-                            $notifiedEmailAddresses[] = $leader['email'];
-                        }
                     }
                 }
             }
@@ -417,166 +359,6 @@ function sendDirectTaskAssignmentNotifications($pdo, $taskId, $assignerUser, $ti
 function sendBgdTaskNotifications($pdo, $taskId, $title, $description, $dueDate, $assigneeIds) {
     $bgdUser = ['fullname' => 'Ban Giám đốc', 'role' => 'BGD'];
     sendDirectTaskAssignmentNotifications($pdo, $taskId, $bgdUser, $title, $description, $dueDate, $assigneeIds);
-}
-
-/**
- * HTML Email Template Generator for Direct Task Assignment Notifications
- */
-function buildTaskAssignmentEmailHtml($recipientName, $taskTitle, $assignerDisplay, $dueDate, $description, $taskUrl, $isForLeader = false, $targetEmployeeName = '') {
-    $recipientEsc = htmlspecialchars($recipientName);
-    $titleEsc = htmlspecialchars($taskTitle);
-    $assignerEsc = htmlspecialchars($assignerDisplay);
-    $dueDateEsc = htmlspecialchars($dueDate);
-    $descEsc = !empty($description) ? nl2br(htmlspecialchars($description)) : '<em style="color: #94a3b8;">Không có ghi chú thêm</em>';
-    $empEsc = htmlspecialchars($targetEmployeeName);
-
-    $introText = $isForLeader
-        ? "Ban Giám đốc vừa giao công việc trực tiếp cho nhân viên <strong>{$empEsc}</strong> thuộc đơn vị do Ông/Bà quản lý để cùng theo dõi tiến độ thực hiện."
-        : "Ông/Bà <strong>{$assignerEsc}</strong> vừa giao trực tiếp cho Ông/Bà một công việc / nhiệm vụ mới trên Hệ thống Phân công Công việc UFM Quảng Ngãi.";
-
-    $badgeText = $isForLeader ? "THÔNG BÁO THEO DÕI GIAO VIỆC" : "THÔNG BÁO CÔNG VIỆC MỚI";
-
-    return "
-    <!DOCTYPE html>
-    <html lang='vi'>
-    <head>
-        <meta charset='UTF-8'>
-        <meta name='viewport' content='width=device-width, initial-scale=1.0'>
-        <title>Thông báo công việc UFM Quảng Ngãi</title>
-    </head>
-    <body style='margin: 0; padding: 0; background-color: #f1f5f9; font-family: Arial, sans-serif; -webkit-font-smoothing: antialiased; color: #1e293b;'>
-        <table role='presentation' border='0' cellpadding='0' cellspacing='0' width='100%' style='background-color: #f1f5f9; padding: 25px 10px;'>
-            <tr>
-                <td align='center'>
-                    <table role='presentation' border='0' cellpadding='0' cellspacing='0' width='100%' style='max-width: 620px; background-color: #ffffff; border-radius: 16px; overflow: hidden; box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.08); border: 1px solid #e2e8f0;'>
-
-                        <!-- Header Banner -->
-                        <tr>
-                            <td style='background: linear-gradient(135deg, #1e3a8a 0%, #1e1b4b 100%); padding: 28px 25px; text-align: center; color: #ffffff;'>
-                                <div style='font-size: 11px; font-weight: bold; text-transform: uppercase; letter-spacing: 1px; color: #93c5fd; margin-bottom: 6px;'>
-                                    PHÂN HIỆU TRƯỜNG ĐẠI HỌC TÀI CHÍNH - MARKETING TẠI TP. QUẢNG NGÃI
-                                </div>
-                                <h1 style='margin: 0; font-size: 20px; font-weight: 800; color: #ffffff; line-height: 1.3;'>
-                                    HỆ THỐNG PHÂN CÔNG & QUẢN LÝ CÔNG VIỆC
-                                </h1>
-                                <div style='display: inline-block; background-color: rgba(255, 255, 255, 0.15); color: #fef08a; font-size: 11px; font-weight: bold; padding: 4px 12px; border-radius: 20px; margin-top: 12px;'>
-                                    {$badgeText}
-                                </div>
-                            </td>
-                        </tr>
-
-                        <!-- Body Content -->
-                        <tr>
-                            <td style='padding: 30px 25px; background-color: #ffffff;'>
-                                <p style='margin: 0 0 16px 0; font-size: 15px; color: #334155;'>
-                                    Kính gửi Ông/Bà <strong>{$recipientEsc}</strong>,
-                                </p>
-                                <p style='margin: 0 0 20px 0; font-size: 14px; color: #475569; line-height: 1.6;'>
-                                    {$introText}
-                                </p>
-
-                                <!-- Task Detail Box -->
-                                <table role='presentation' border='0' cellpadding='0' cellspacing='0' width='100%' style='background-color: #f8fafc; border-left: 5px solid #2563eb; border-radius: 8px; margin-bottom: 24px; border-top: 1px solid #e2e8f0; border-right: 1px solid #e2e8f0; border-bottom: 1px solid #e2e8f0;'>
-                                    <tr>
-                                        <td style='padding: 20px;'>
-                                            <div style='margin-bottom: 12px;'>
-                                                <span style='font-size: 11px; font-weight: bold; color: #64748b; text-transform: uppercase; display: block; margin-bottom: 2px;'>Tên công việc / Nhiệm vụ:</span>
-                                                <span style='font-size: 16px; font-weight: bold; color: #0f172a; line-height: 1.4;'>{$titleEsc}</span>
-                                            </div>
-
-                                            " . ($isForLeader ? "
-                                            <div style='margin-bottom: 12px; padding-top: 8px; border-top: 1px stroke #e2e8f0;'>
-                                                <span style='font-size: 11px; font-weight: bold; color: #64748b; text-transform: uppercase; display: block; margin-bottom: 2px;'>Cán bộ thực hiện:</span>
-                                                <span style='font-size: 14px; font-weight: bold; color: #2563eb;'>{$empEsc}</span>
-                                            </div>
-                                            " : "") . "
-
-                                            <div style='margin-bottom: 12px;'>
-                                                <span style='font-size: 11px; font-weight: bold; color: #64748b; text-transform: uppercase; display: block; margin-bottom: 2px;'>Người giao việc:</span>
-                                                <span style='font-size: 14px; font-weight: bold; color: #1e293b;'>{$assignerEsc}</span>
-                                            </div>
-
-                                            <div style='margin-bottom: 12px;'>
-                                                <span style='font-size: 11px; font-weight: bold; color: #64748b; text-transform: uppercase; display: block; margin-bottom: 2px;'>Hạn chót hoàn thành (Deadline):</span>
-                                                <span style='font-size: 14px; font-weight: bold; color: #dc2626;'>{$dueDateEsc}</span>
-                                            </div>
-
-                                            <div>
-                                                <span style='font-size: 11px; font-weight: bold; color: #64748b; text-transform: uppercase; display: block; margin-bottom: 2px;'>Nội dung tóm tắt / Ghi chú:</span>
-                                                <div style='font-size: 13px; color: #334155; line-height: 1.5; background-color: #ffffff; padding: 10px; border-radius: 6px; border: 1px solid #cbd5e1;'>{$descEsc}</div>
-                                            </div>
-                                        </td>
-                                    </tr>
-                                </table>
-
-                                <!-- Action Button -->
-                                <div style='text-align: center; margin: 28px 0 20px 0;'>
-                                    <a href='{$taskUrl}' target='_blank' style='display: inline-block; background-color: #2563eb; color: #ffffff; text-decoration: none; font-size: 14px; font-weight: bold; padding: 12px 28px; border-radius: 8px; box-shadow: 0 4px 10px rgba(37, 99, 235, 0.3); transition: background-color 0.2s;'>
-                                        TRUY CẬP CHI TIẾT CÔNG VIỆC
-                                    </a>
-                                </div>
-
-                                <p style='font-size: 12px; color: #64748b; text-align: center; margin: 0 0 20px 0;'>
-                                    Hoặc truy cập trực tiếp liên kết: <br>
-                                    <a href='{$taskUrl}' style='color: #2563eb; word-break: break-all;'>{$taskUrl}</a>
-                                </p>
-
-                                <div style='border-top: 1px solid #e2e8f0; padding-top: 16px; margin-top: 20px;'>
-                                    <p style='font-size: 13px; color: #475569; margin: 0;'>
-                                        Trân trọng cảm ơn,<br>
-                                        <strong>Phân hệ Quản lý & Phân công Công việc - UFM Quảng Ngãi</strong>
-                                    </p>
-                                </div>
-                            </td>
-                        </tr>
-
-                        <!-- Footer -->
-                        <tr>
-                            <td style='background-color: #f8fafc; padding: 20px 25px; border-top: 1px solid #e2e8f0; text-align: center; font-size: 11px; color: #64748b; line-height: 1.5;'>
-                                <p style='margin: 0 0 4px 0; font-weight: bold; color: #475569;'>
-                                    PHÂN HIỆU TRƯỜNG ĐẠI HỌC TÀI CHÍNH - MARKETING TẠI TP. QUẢNG NGÃI
-                                </p>
-                                <p style='margin: 0 0 4px 0;'>Địa chỉ: 145 Phan Châu Trinh, TP. Quảng Ngãi, Tỉnh Quảng Ngãi</p>
-                                <p style='margin: 0;'>
-                                    Website: <a href='https://qngai.ufm.edu.vn' style='color: #2563eb; text-decoration: none;'>qngai.ufm.edu.vn</a> | Email: <a href='mailto:qngai@ufm.edu.vn' style='color: #2563eb; text-decoration: none;'>qngai@ufm.edu.vn</a>
-                                </p>
-                            </td>
-                        </tr>
-
-                    </table>
-                </td>
-            </tr>
-        </table>
-    </body>
-    </html>
-    ";
-}
-
-/**
- * Plain Text Email Template Generator for Direct Task Assignment Notifications
- */
-function buildTaskAssignmentEmailText($recipientName, $taskTitle, $assignerDisplay, $dueDate, $description, $taskUrl, $isForLeader = false, $targetEmployeeName = '') {
-    $descClean = !empty($description) ? trim(strip_tags($description)) : 'Không có ghi chú thêm';
-    $intro = $isForLeader
-        ? "Ban Giám đốc vừa giao công việc trực tiếp cho nhân viên {$targetEmployeeName} thuộc đơn vị do Ông/Bà quản lý để cùng theo dõi tiến độ thực hiện."
-        : "Ông/Bà {$assignerDisplay} vừa giao trực tiếp cho Ông/Bà một công việc / nhiệm vụ mới trên Hệ thống Phân công Công việc UFM Quảng Ngãi.";
-
-    $text = "Kính gửi Ông/Bà {$recipientName},\n\n";
-    $text .= "{$intro}\n\n";
-    $text .= "--- THÔNG TIN CÔNG VIỆC ---\n";
-    $text .= "• Tên công việc / Nhiệm vụ: {$taskTitle}\n";
-    if ($isForLeader && !empty($targetEmployeeName)) {
-        $text .= "• Cán bộ thực hiện: {$targetEmployeeName}\n";
-    }
-    $text .= "• Người giao việc: {$assignerDisplay}\n";
-    $text .= "• Hạn chót hoàn thành: {$dueDate}\n";
-    $text .= "• Nội dung ghi chú: {$descClean}\n\n";
-    $text .= "Truy cập chi tiết công việc tại liên kết:\n{$taskUrl}\n\n";
-    $text .= "Trân trọng cảm ơn,\n";
-    $text .= "Phân hiệu Trường Đại học Tài chính - Marketing tại TP. Quảng Ngãi\n";
-    $text .= "Website: https://qngai.ufm.edu.vn | Email: qngai@ufm.edu.vn\n";
-
-    return $text;
 }
 
 // Get KPI stats based on user role and scope

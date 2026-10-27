@@ -8,13 +8,3 @@ define('DB_PASS', '');
 
 // System URL Base (e.g. http://localhost/ufm or https://congviec.ufm.edu.vn)
 define('APP_URL', 'http://localhost');
-
-// SMTP Email Configuration (Google SMTP / Office 365 / Local Mail Server)
-define('SMTP_HOST', 'smtp.gmail.com');
-define('SMTP_PORT', 587); // 587 (TLS) or 465 (SSL)
-define('SMTP_ENCRYPTION', 'tls'); // 'tls' or 'ssl'
-define('SMTP_USER', 'your-email@ufm.edu.vn');
-define('SMTP_PASS', 'your-app-password');
-define('SMTP_FROM', 'no-reply@ufm.edu.vn');
-define('SMTP_FROM_EMAIL', 'no-reply@ufm.edu.vn');
-define('SMTP_FROM_NAME', 'UFM Quảng Ngãi - Phân công Công việc');
