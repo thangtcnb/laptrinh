@@ -539,17 +539,20 @@ try {
                 <div class="grid grid-cols-1 md:grid-cols-3 gap-6 items-start">
                     <!-- Preview Current Background -->
                     <div class="space-y-2">
-                        <label class="block text-xs font-bold text-slate-700">Hình nền hiện tại:</label>
+                        <label class="block text-xs font-bold text-slate-700">Hình nền hiện tại / Xem trước:</label>
                         <div class="w-full h-44 rounded-xl border border-slate-200 overflow-hidden bg-slate-900 relative flex items-center justify-center shadow-inner">
-                            <?php if (!empty($currentLoginBg) && file_exists(__DIR__ . '/' . $currentLoginBg)): ?>
-                                <img src="<?= htmlspecialchars($currentLoginBg) ?>" class="w-full h-full object-cover">
-                                <span class="absolute bottom-2 left-2 bg-slate-900/80 backdrop-blur-md text-white text-[10px] px-2 py-0.5 rounded font-mono">Custom BG</span>
-                            <?php else: ?>
-                                <div class="bg-gradient-to-br from-slate-900 via-indigo-950 to-blue-900 w-full h-full flex flex-col items-center justify-center text-white text-xs p-4 text-center">
-                                    <i class="fa-solid fa-palette text-2xl text-blue-300 mb-2"></i>
-                                    <span class="font-semibold">Gradient Mặc Định System</span>
-                                </div>
-                            <?php endif; ?>
+                            <?php
+                                $bgImgSrc = '';
+                                if (!empty($currentLoginBg) && file_exists(__DIR__ . '/' . $currentLoginBg)) {
+                                    $bgImgSrc = htmlspecialchars($currentLoginBg) . '?v=' . (filemtime(__DIR__ . '/' . $currentLoginBg) ?: time());
+                                }
+                            ?>
+                            <img id="bgPreviewImage" src="<?= $bgImgSrc ?>" class="w-full h-full object-cover <?= empty($bgImgSrc) ? 'hidden' : '' ?>">
+                            <div id="bgDefaultPlaceholder" class="bg-gradient-to-br from-slate-900 via-indigo-950 to-blue-900 w-full h-full flex flex-col items-center justify-center text-white text-xs p-4 text-center <?= !empty($bgImgSrc) ? 'hidden' : '' ?>">
+                                <i class="fa-solid fa-palette text-2xl text-blue-300 mb-2"></i>
+                                <span class="font-semibold">Gradient Mặc Định System</span>
+                            </div>
+                            <span id="bgTagLabel" class="absolute bottom-2 left-2 bg-slate-900/80 backdrop-blur-md text-white text-[10px] px-2 py-0.5 rounded font-mono"><?= !empty($bgImgSrc) ? 'Custom BG' : 'System Default' ?></span>
                         </div>
                     </div>
 
@@ -560,7 +563,7 @@ try {
 
                             <div>
                                 <label class="block text-xs font-bold text-slate-700 mb-1">Chọn tệp hình ảnh mới (.jpg, .png, .webp):</label>
-                                <input type="file" name="login_bg_file" accept=".jpg,.jpeg,.png,.webp" class="block w-full text-xs text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-semibold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100 cursor-pointer">
+                                <input type="file" id="loginBgFileInput" name="login_bg_file" accept=".jpg,.jpeg,.png,.webp" onchange="previewSelectedBackground(this)" class="block w-full text-xs text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-semibold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100 cursor-pointer">
                             </div>
 
                             <div class="flex items-center gap-3 pt-2">
@@ -639,6 +642,27 @@ function editDepartment(dept) {
     document.getElementById('dept_name').value = dept.name;
     document.getElementById('dept_color_theme').value = dept.color_theme || 'blue';
     document.getElementById('dept_icon').value = dept.icon || 'fa-building';
+}
+
+function previewSelectedBackground(input) {
+    if (input.files && input.files[0]) {
+        var reader = new FileReader();
+        reader.onload = function(e) {
+            var img = document.getElementById('bgPreviewImage');
+            var placeholder = document.getElementById('bgDefaultPlaceholder');
+            var label = document.getElementById('bgTagLabel');
+
+            if (img && placeholder) {
+                img.src = e.target.result;
+                img.classList.remove('hidden');
+                placeholder.classList.add('hidden');
+                if (label) {
+                    label.innerText = 'File Preview';
+                }
+            }
+        };
+        reader.readAsDataURL(input.files[0]);
+    }
 }
 </script>
 
