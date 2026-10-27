@@ -24,8 +24,22 @@ function isLoggedIn() {
     return isset($_SESSION['user_id']);
 }
 
+// Smart trigger: Run overdue email scan once per day upon active user login/session
+function triggerSmartOverdueEmailCheck($pdo) {
+    $today = date('Y-m-d');
+    if (!isset($_SESSION['last_overdue_check_date']) || $_SESSION['last_overdue_check_date'] !== $today) {
+        $_SESSION['last_overdue_check_date'] = $today;
+        if (file_exists(__DIR__ . '/overdue_email_service.php')) {
+            require_once __DIR__ . '/overdue_email_service.php';
+            checkAndSendOverdueTaskEmails($pdo);
+        }
+    }
+}
+
 // Redirect if not logged in & Check Session Timeout (1 hour = 3600 seconds)
 function requireLogin() {
+    global $pdo;
+
     if (!isLoggedIn()) {
         header("Location: login.php");
         exit;
@@ -39,6 +53,11 @@ function requireLogin() {
         exit;
     }
     $_SESSION['last_activity'] = time();
+
+    // Trigger daily overdue check on active session
+    if (isset($pdo)) {
+        triggerSmartOverdueEmailCheck($pdo);
+    }
 }
 
 // Check user role authorization
