@@ -266,6 +266,111 @@ function formatLeaderComment($t) {
     return $comment;
 }
 
+// Automated BGD Task Notification Helper (Web Notification & Email)
+function sendBgdTaskNotifications($pdo, $taskId, $title, $description, $dueDate, $assigneeIds) {
+    if (empty($assigneeIds)) return;
+
+    require_once __DIR__ . '/mailer.php';
+
+    if (!is_array($assigneeIds)) {
+        $assigneeIds = [$assigneeIds];
+    }
+    $assigneeIds = array_unique(array_filter(array_map('intval', $assigneeIds)));
+    if (empty($assigneeIds)) return;
+
+    $inClause = implode(',', array_fill(0, count($assigneeIds), '?'));
+    $stmtAssignees = $pdo->prepare("
+        SELECT u.id, u.fullname, u.email, u.role, u.department_id, d.name AS department_name
+        FROM users u
+        JOIN departments d ON u.department_id = d.id
+        WHERE u.id IN ($inClause)
+    ");
+    $stmtAssignees->execute($assigneeIds);
+    $assignedUsers = $stmtAssignees->fetchAll();
+
+    $stmtLeaders = $pdo->prepare("
+        SELECT id, fullname, email, role, department_id
+        FROM users
+        WHERE department_id = ? AND role IN ('TRUONG_PHONG', 'PHO_PHONG')
+    ");
+
+    $stmtNotif = $pdo->prepare("
+        INSERT INTO notifications (user_id, task_id, title, content, is_read, created_at)
+        VALUES (?, ?, ?, ?, 0, NOW())
+    ");
+
+    $notifiedWebUserIds = [];
+    $notifiedEmailAddresses = [];
+
+    $dueDateFormatted = !empty($dueDate) ? date('d/m/Y', strtotime($dueDate)) : 'Không quy định';
+
+    foreach ($assignedUsers as $empUser) {
+        // 1. Send Notification & Email to Assigned User
+        if (!in_array($empUser['id'], $notifiedWebUserIds)) {
+            $notifTitleEmp = 'Thông báo BGD giao công việc mới';
+            $notifContentEmp = "BGĐ vừa giao công việc: '" . $title . "' cho bạn. Hạn chót: " . $dueDateFormatted . ".";
+            $stmtNotif->execute([$empUser['id'], $taskId, $notifTitleEmp, $notifContentEmp]);
+            $notifiedWebUserIds[] = $empUser['id'];
+
+            if (!empty($empUser['email']) && !in_array($empUser['email'], $notifiedEmailAddresses)) {
+                $emailSubject = "[UFM] BGĐ đã giao công việc mới: " . $title;
+                $emailBody = "
+                    <div style='font-family: Arial, sans-serif; line-height: 1.6; color: #333;'>
+                        <h2 style='color: #1e3a8a;'>THÔNG BÁO CÔNG VIỆC MỚI TỪ BAN GIÁM ĐỐC</h2>
+                        <p>Kính gửi <strong>" . htmlspecialchars($empUser['fullname']) . "</strong>,</p>
+                        <p>Ban Giám đốc vừa giao cho bạn một công việc mới trên Hệ thống Phân công Công việc UFM Quảng Ngãi.</p>
+                        <div style='background: #f8fafc; border-left: 4px solid #2563eb; padding: 15px; margin: 15px 0; border-radius: 8px;'>
+                            <p style='margin: 0 0 8px 0;'><strong>Tên công việc:</strong> " . htmlspecialchars($title) . "</p>
+                            " . (!empty($description) ? "<p style='margin: 0 0 8px 0;'><strong>Mô tả:</strong> " . htmlspecialchars($description) . "</p>" : "") . "
+                            <p style='margin: 0;'><strong>Hạn hoàn thành:</strong> " . htmlspecialchars($dueDateFormatted) . "</p>
+                        </div>
+                        <p>Vui lòng đăng nhập hệ thống để xem chi tiết và xác nhận tiếp nhận công việc.</p>
+                        <p style='margin-top: 20px; font-size: 12px; color: #64748b;'>---<br>Phân hệ Quản lý & Phân công Công việc - UFM Quảng Ngãi</p>
+                    </div>
+                ";
+                sendSystemEmail($empUser['email'], $empUser['fullname'], $emailSubject, $emailBody);
+                $notifiedEmailAddresses[] = $empUser['email'];
+            }
+        }
+
+        // 2. Send Notification & Email to Department Leaders (Trưởng/Phó phòng) of employee's department
+        if (in_array($empUser['role'], ['NHAN_VIEN', 'HO_TRO', 'PHO_PHONG'])) {
+            $stmtLeaders->execute([$empUser['department_id']]);
+            $leaders = $stmtLeaders->fetchAll();
+
+            foreach ($leaders as $leader) {
+                if (!in_array($leader['id'], $notifiedWebUserIds)) {
+                    $notifTitleLeader = 'Thông báo BGD giao việc cho nhân viên phòng';
+                    $notifContentLeader = "BGĐ vừa giao công việc '" . $title . "' cho nhân viên " . $empUser['fullname'] . " thuộc phòng của bạn.";
+                    $stmtNotif->execute([$leader['id'], $taskId, $notifTitleLeader, $notifContentLeader]);
+                    $notifiedWebUserIds[] = $leader['id'];
+
+                    if (!empty($leader['email']) && !in_array($leader['email'], $notifiedEmailAddresses)) {
+                        $emailSubject = "[UFM] BGĐ giao việc cho nhân viên phòng: " . $empUser['fullname'];
+                        $emailBody = "
+                            <div style='font-family: Arial, sans-serif; line-height: 1.6; color: #333;'>
+                                <h2 style='color: #1e3a8a;'>THÔNG BÁO BGĐ GIAO VIỆC CHO NHÂN VIÊN PHÒNG</h2>
+                                <p>Kính gửi <strong>" . htmlspecialchars($leader['fullname']) . "</strong> (Lãnh đạo " . htmlspecialchars($empUser['department_name']) . "),</p>
+                                <p>Ban Giám đốc vừa giao công việc trực tiếp cho nhân viên thuộc phòng ban do bạn quản lý.</p>
+                                <div style='background: #f8fafc; border-left: 4px solid #d97706; padding: 15px; margin: 15px 0; border-radius: 8px;'>
+                                    <p style='margin: 0 0 8px 0;'><strong>Nhân viên nhận việc:</strong> " . htmlspecialchars($empUser['fullname']) . "</p>
+                                    <p style='margin: 0 0 8px 0;'><strong>Tên công việc:</strong> " . htmlspecialchars($title) . "</p>
+                                    " . (!empty($description) ? "<p style='margin: 0 0 8px 0;'><strong>Mô tả:</strong> " . htmlspecialchars($description) . "</p>" : "") . "
+                                    <p style='margin: 0;'><strong>Hạn hoàn thành:</strong> " . htmlspecialchars($dueDateFormatted) . "</p>
+                                </div>
+                                <p>Thông báo này giúp Lãnh đạo đơn vị cùng theo dõi tiến độ và chỉ đạo thực hiện.</p>
+                                <p style='margin-top: 20px; font-size: 12px; color: #64748b;'>---<br>Phân hệ Quản lý & Phân công Công việc - UFM Quảng Ngãi</p>
+                            </div>
+                        ";
+                        sendSystemEmail($leader['email'], $leader['fullname'], $emailSubject, $emailBody);
+                        $notifiedEmailAddresses[] = $leader['email'];
+                    }
+                }
+            }
+        }
+    }
+}
+
 // Get KPI stats based on user role and scope
 // Role permissions:
 // - NHAN_VIEN / HO_TRO: Personal tasks (Cá nhân)
@@ -285,15 +390,18 @@ function getKpiStats($pdo, $currentUser) {
         $params[] = $currentUser['id'];
         $params[] = $currentUser['id'];
     } elseif ($currentUser['role'] === 'TRUONG_PHONG') {
-        $where[] = "t.department_id = ?";
+        $where[] = "(t.department_id = ? OR t.id IN (SELECT ta.task_id FROM task_assignees ta JOIN users u ON ta.user_id = u.id WHERE u.department_id = ?))";
+        $params[] = $currentUser['department_id'];
         $params[] = $currentUser['department_id'];
     }
     // For BGD and SUPER_ADMIN, default to all campus tasks
 
-    // Internal BGD Security Restriction (Allow assigned users to see tasks assigned to them by BGD)
+    // Internal BGD Security Restriction (Allow assigned users & department leaders to see tasks assigned by BGD)
     if (!in_array($currentUser['role'], ['BGD', 'SUPER_ADMIN'])) {
-        $where[] = "((t.department_id != 1 AND t.created_by NOT IN (SELECT id FROM users WHERE role = 'BGD')) OR t.id IN (SELECT task_id FROM task_assignees WHERE user_id = ?))";
+        $where[] = "((t.department_id != 1 AND t.created_by NOT IN (SELECT id FROM users WHERE role = 'BGD')) OR t.id IN (SELECT task_id FROM task_assignees WHERE user_id = ?) OR t.department_id = ? OR t.id IN (SELECT ta.task_id FROM task_assignees ta JOIN users u ON ta.user_id = u.id WHERE u.department_id = ?))";
         $params[] = $currentUser['id'];
+        $params[] = $currentUser['department_id'];
+        $params[] = $currentUser['department_id'];
     }
 
     $whereSql = implode(" AND ", $where);
@@ -388,16 +496,19 @@ function getTasksFiltered($pdo, $filters = [], $limit = 15, $offset = 0, $curren
             $params[] = $currentUser['id'];
             $params[] = $currentUser['id'];
         } elseif (is_numeric($filters['dept_filter'])) {
-            $where[] = "t.department_id = ?";
+            $where[] = "(t.department_id = ? OR t.id IN (SELECT ta.task_id FROM task_assignees ta JOIN users u ON ta.user_id = u.id WHERE u.department_id = ?))";
+            $params[] = (int)$filters['dept_filter'];
             $params[] = (int)$filters['dept_filter'];
         }
     }
 
     // Internal BGD Security Restriction:
-    // Internal BGD tasks are restricted unless assigned to the user
+    // Internal BGD tasks are restricted unless assigned to the user or department
     if (!$currentUser || !in_array($currentUser['role'], ['BGD', 'SUPER_ADMIN'])) {
-        $where[] = "((t.department_id != 1 AND t.created_by NOT IN (SELECT id FROM users WHERE role = 'BGD')) OR t.id IN (SELECT task_id FROM task_assignees WHERE user_id = ?))";
+        $where[] = "((t.department_id != 1 AND t.created_by NOT IN (SELECT id FROM users WHERE role = 'BGD')) OR t.id IN (SELECT task_id FROM task_assignees WHERE user_id = ?) OR t.department_id = ? OR t.id IN (SELECT ta.task_id FROM task_assignees ta JOIN users u ON ta.user_id = u.id WHERE u.department_id = ?))";
         $params[] = $currentUser['id'];
+        $params[] = $currentUser['department_id'];
+        $params[] = $currentUser['department_id'];
     }
 
     // Role-based visibility restriction for Pending Approval (CHO_DUYET) tasks:

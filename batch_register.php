@@ -86,11 +86,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
             logTaskTimeline($pdo, $newTaskId, $currentUser['id'], 'BATCH_REGISTER', "Đăng ký công việc hàng loạt");
 
+            $rowAssigneeIds = [];
+
             // Insert MAIN Assignee
             if ($mainAssignee > 0) {
                 $isAcceptedMain = ($mainAssignee === $currentUser['id'] && $defaultStatus !== 'CHO_TIEP_NHAN') ? 1 : 0;
                 $acceptedAtMain = $isAcceptedMain ? date('Y-m-d H:i:s') : null;
                 $stmtAssignee->execute([$newTaskId, $mainAssignee, 'MAIN', $isAcceptedMain, $acceptedAtMain]);
+                $rowAssigneeIds[] = $mainAssignee;
             }
 
             // Insert COOP Assignees
@@ -101,8 +104,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         $isAcceptedCoop = ($coopId === $currentUser['id'] && $defaultStatus !== 'CHO_TIEP_NHAN') ? 1 : 0;
                         $acceptedAtCoop = $isAcceptedCoop ? date('Y-m-d H:i:s') : null;
                         $stmtAssignee->execute([$newTaskId, $coopId, 'COOP', $isAcceptedCoop, $acceptedAtCoop]);
+                        if (!in_array($coopId, $rowAssigneeIds)) {
+                            $rowAssigneeIds[] = $coopId;
+                        }
                     }
                 }
+            }
+
+            // Trigger notification for BGD batch tasks
+            if ($currentUser['role'] === 'BGD' && !empty($rowAssigneeIds)) {
+                sendBgdTaskNotifications($pdo, $newTaskId, $title, $description, $dueDate, $rowAssigneeIds);
             }
 
             $insertedCount++;
