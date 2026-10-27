@@ -1,7 +1,7 @@
 <?php
 // CLI Database Migration Runner
 // Automatically reads connection settings from config.php (or config.php.example fallback)
-// Executes migrations safely without hardcoding passwords.
+// Executes migrations safely via PDO without hardcoding passwords or relying on OS mysql CLI.
 
 if (php_sapi_name() !== 'cli' && !defined('ALLOW_WEB_MIGRATION')) {
     header('HTTP/1.1 403 Forbidden');
@@ -10,6 +10,8 @@ if (php_sapi_name() !== 'cli' && !defined('ALLOW_WEB_MIGRATION')) {
 }
 
 // 1. Load Configuration
+// Check root config.php FIRST to acquire environment DB parameters (DB_HOST, DB_USER, DB_PASS, DB_NAME).
+// Fallback to config.php.example only if config.php does not exist.
 $configFile = __DIR__ . '/../config.php';
 $exampleConfigFile = __DIR__ . '/../config.php.example';
 
@@ -24,6 +26,7 @@ if (file_exists($configFile)) {
     exit(1);
 }
 
+// Extract parameters from configuration constants dynamically
 $dbHost = defined('DB_HOST') ? DB_HOST : 'localhost';
 $dbUser = defined('DB_USER') ? DB_USER : 'root';
 $dbPass = defined('DB_PASS') ? DB_PASS : '';
@@ -38,6 +41,7 @@ try {
         PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
         PDO::MYSQL_ATTR_INIT_COMMAND => "SET NAMES utf8mb4",
         PDO::MYSQL_ATTR_USE_BUFFERED_QUERY => true,
+        PDO::MYSQL_ATTR_MULTI_STATEMENTS => true,
     ];
     $pdo = new PDO($dsn, $dbUser, $dbPass, $options);
 
