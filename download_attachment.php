@@ -89,7 +89,7 @@ if (!file_exists($filePath)) {
     exit('Tập tin không tồn tại trên máy chủ.');
 }
 
-// Xác định Content-Type phù hợp
+// Xác định Content-Type chuẩn theo đuôi file (file extension) để tránh bị chặn tải file
 $fileName = $attachment['file_name'];
 $fileSize = filesize($filePath);
 $ext = strtolower(pathinfo($fileName, PATHINFO_EXTENSION));
@@ -107,7 +107,18 @@ $mimeTypes = [
     'rar'  => 'application/x-rar-compressed'
 ];
 
-$contentType = $mimeTypes[$ext] ?? 'application/octet-stream';
+if (isset($mimeTypes[$ext])) {
+    $contentType = $mimeTypes[$ext];
+} elseif (function_exists('finfo_open')) {
+    $finfo = finfo_open(FILEINFO_MIME_TYPE);
+    $detectedType = finfo_file($finfo, $filePath);
+    finfo_close($finfo);
+    $contentType = $detectedType ?: 'application/octet-stream';
+} elseif (function_exists('mime_content_type')) {
+    $contentType = mime_content_type($filePath) ?: 'application/octet-stream';
+} else {
+    $contentType = 'application/octet-stream';
+}
 
 // Nếu tham số inline=1 và là PDF hoặc hình ảnh, cho phép mở trực tiếp trong trình duyệt
 $disposition = 'attachment';
@@ -121,6 +132,7 @@ if (ob_get_level()) {
 }
 
 // Set Header để stream file an toàn
+header('Access-Control-Allow-Origin: *');
 header('Content-Description: File Transfer');
 header('Content-Type: ' . $contentType);
 header('Content-Disposition: ' . $disposition . '; filename="' . rawurlencode($fileName) . '"; filename*=UTF-8\'\'' . rawurlencode($fileName));
