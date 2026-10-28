@@ -18,6 +18,7 @@ if (isset($_GET['action']) && $_GET['action'] === 'fetch_messages') {
             FROM discussions d
             JOIN users u ON d.user_id = u.id
             LEFT JOIN departments dep ON u.department_id = dep.id
+            WHERE d.created_at >= DATE_SUB(NOW(), INTERVAL 7 DAY)
             ORDER BY d.created_at ASC, d.id ASC
         ";
         $stmtMsg = $pdo->prepare($sqlMessages);
@@ -49,7 +50,8 @@ if (isset($_GET['action']) && $_GET['action'] === 'fetch_messages') {
         echo json_encode([
             'success' => true,
             'data' => $messages,
-            'current_user_id' => (int)$currentUser['id']
+            'current_user_id' => (int)$currentUser['id'],
+            'is_super_admin' => ($currentUser['role'] === 'SUPER_ADMIN')
         ]);
     } catch (\PDOException $e) {
         echo json_encode([
@@ -60,10 +62,37 @@ if (isset($_GET['action']) && $_GET['action'] === 'fetch_messages') {
     exit;
 }
 
-// 2. Handle POST Request: Send Message
+// 2. Handle POST Request: Send Message & Delete Message
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $action = $_POST['action'] ?? '';
     $isAjax = (!empty($_SERVER['HTTP_X_REQUESTED_WITH']) && strtolower($_SERVER['HTTP_X_REQUESTED_WITH']) === 'xmlhttprequest') || isset($_POST['ajax']);
+
+    if ($action === 'delete_message') {
+        header('Content-Type: application/json; charset=utf-8');
+        if ($currentUser['role'] !== 'SUPER_ADMIN') {
+            echo json_encode(['success' => false, 'message' => 'Bạn không có quyền thực hiện thao tác xóa ý kiến trao đổi!']);
+            exit;
+        }
+
+        $messageId = !empty($_POST['id']) ? (int)$_POST['id'] : 0;
+        if ($messageId <= 0) {
+            echo json_encode(['success' => false, 'message' => 'Mã tin nhắn không hợp lệ!']);
+            exit;
+        }
+
+        try {
+            $stmtDel = $pdo->prepare("DELETE FROM discussions WHERE id = ?");
+            $stmtDel->execute([$messageId]);
+
+            logActivity($pdo, $currentUser['id'], 'DELETE_DISCUSSION', 'Đã xóa ý kiến trao đổi ID #' . $messageId);
+
+            echo json_encode(['success' => true, 'message' => 'Đã xóa ý kiến trao đổi thành công!']);
+            exit;
+        } catch (\PDOException $e) {
+            echo json_encode(['success' => false, 'message' => 'Lỗi khi xóa ý kiến trao đổi: ' . $e->getMessage()]);
+            exit;
+        }
+    }
 
     if ($action === 'send_message') {
         $message = trim($_POST['message'] ?? $_POST['content'] ?? '');
@@ -115,6 +144,7 @@ $sqlInitial = "
     FROM discussions d
     JOIN users u ON d.user_id = u.id
     LEFT JOIN departments dep ON u.department_id = dep.id
+    WHERE d.created_at >= DATE_SUB(NOW(), INTERVAL 7 DAY)
     ORDER BY d.created_at ASC, d.id ASC
 ";
 $stmtInit = $pdo->prepare($sqlInitial);
@@ -231,6 +261,12 @@ require_once __DIR__ . '/includes/header.php';
                                     </span>
                                 <?php endif; ?>
                             </div>
+                            <?php if ($currentUser['role'] === 'SUPER_ADMIN'): ?>
+                                <button type="button" onclick="deleteMessage(<?= (int)$msg['id'] ?>)" class="text-rose-500 hover:text-rose-700 hover:bg-rose-50 p-1 rounded-md transition text-xs flex items-center gap-1 font-semibold" title="Xóa tin nhắn này">
+                                    <i class="fa-solid fa-trash-can"></i>
+                                    <span class="hidden sm:inline text-[11px]">Xóa</span>
+                                </button>
+                            <?php endif; ?>
                         </div>
 
                         <!-- Định dạng chuẩn: [Tên thành viên] ([Thời gian]): [Nội dung ý kiến] -->
@@ -318,7 +354,13 @@ function escapeHtml(text) {
         .replace(/'/g, "&#039;");
 }
 
-function renderMessages(messages, currentUserId) {
+let isSuperAdmin = <?= json_encode($currentUser['role'] === 'SUPER_ADMIN') ?>;
+
+function renderMessages(messages, currentUserId, isSuperAdminFlag) {
+    if (typeof isSuperAdminFlag !== 'undefined') {
+        isSuperAdmin = isSuperAdminFlag;
+    }
+
     const chatBox = document.getElementById('chatMainBox');
     const totalCountEl = document.getElementById('totalMessageCount');
 
@@ -330,7 +372,7 @@ function renderMessages(messages, currentUserId) {
         chatBox.innerHTML = `
             <div id="emptyChatNotice" class="h-full flex flex-col items-center justify-center text-slate-400 py-12">
                 <i class="fa-solid fa-comments text-5xl mb-3 text-slate-300"></i>
-                <p class="text-sm font-semibold text-slate-600">Chưa có ý kiến trao đổi nào trong hệ thống.</p>
+                <p class="text-sm font-semibold text-slate-600">Chưa có ý kiến trao đổi nào trong vòng 7 ngày gần đây.</p>
                 <p class="text-xs text-slate-400 mt-1">Hãy gõ nội dung vào khung bên dưới để gửi ý kiến đầu tiên!</p>
             </div>`;
         return;
@@ -348,6 +390,12 @@ function renderMessages(messages, currentUserId) {
                 <i class="fa-solid fa-building text-slate-400 mr-1"></i>${escapeHtml(msg.department_name)}
             </span>` : '';
 
+        const deleteBtnHtml = isSuperAdmin ? `
+            <button type="button" onclick="deleteMessage(${msg.id})" class="text-rose-500 hover:text-rose-700 hover:bg-rose-50 p-1 rounded-md transition text-xs flex items-center gap-1 font-semibold" title="Xóa tin nhắn này">
+                <i class="fa-solid fa-trash-can"></i>
+                <span class="hidden sm:inline text-[11px]">Xóa</span>
+            </button>` : '';
+
         // Standard line structure: [Tên thành viên] ([Thời gian]): [Nội dung ý kiến]
         html += `
             <div class="chat-item flex flex-col space-y-1.5 p-3.5 rounded-2xl border transition ${bgClass}" data-id="${msg.id}">
@@ -358,6 +406,7 @@ function renderMessages(messages, currentUserId) {
                         </span>
                         ${departmentTag}
                     </div>
+                    ${deleteBtnHtml}
                 </div>
                 <div class="text-xs leading-relaxed text-slate-800 pt-0.5">
                     <span class="font-extrabold ${nameColor}">[${escapeHtml(msg.fullname)}]</span>
@@ -389,12 +438,57 @@ function fetchMessages() {
     .then(response => response.json())
     .then(res => {
         if (res.success && res.data) {
-            renderMessages(res.data, res.current_user_id);
+            renderMessages(res.data, res.current_user_id, res.is_super_admin);
         }
     })
     .catch(err => {
         console.error("Lỗi tải tin nhắn trao đổi:", err);
     });
+}
+
+function deleteMessage(messageId) {
+    if (!messageId) return;
+
+    const performDelete = () => {
+        const formData = new FormData();
+        formData.append('action', 'delete_message');
+        formData.append('id', messageId);
+        formData.append('ajax', '1');
+
+        fetch('discussion.php', {
+            method: 'POST',
+            headers: {
+                'X-Requested-With': 'XMLHttpRequest'
+            },
+            body: formData
+        })
+        .then(response => response.json())
+        .then(res => {
+            if (res.success) {
+                fetchMessages();
+            } else {
+                if (typeof sysAlert === 'function') {
+                    sysAlert(res.message || 'Có lỗi xảy ra khi xóa ý kiến.');
+                } else {
+                    alert(res.message || 'Có lỗi xảy ra khi xóa ý kiến.');
+                }
+            }
+        })
+        .catch(err => {
+            console.error("Lỗi xóa tin nhắn:", err);
+            if (typeof sysAlert === 'function') {
+                sysAlert('Lỗi kết nối máy chủ khi xóa ý kiến!');
+            } else {
+                alert('Lỗi kết nối máy chủ khi xóa ý kiến!');
+            }
+        });
+    };
+
+    if (typeof sysConfirm === 'function') {
+        sysConfirm('Bạn có chắc chắn muốn xóa ý kiến trao đổi này không?', performDelete);
+    } else if (confirm('Bạn có chắc chắn muốn xóa ý kiến trao đổi này không?')) {
+        performDelete();
+    }
 }
 
 function handleSendMessage(e) {
