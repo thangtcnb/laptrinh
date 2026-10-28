@@ -13,7 +13,7 @@ if (isset($_GET['action']) && $_GET['action'] === 'fetch_messages') {
     header('Content-Type: application/json; charset=utf-8');
     try {
         $sqlMessages = "
-            SELECT d.id, d.task_id, d.user_id, COALESCE(d.message, d.content, '') AS message, d.created_at,
+            SELECT d.id, d.task_id, d.user_id, d.message, d.created_at,
                    u.fullname, u.email, u.role, dep.name AS department_name, dep.code AS department_code
             FROM discussions d
             JOIN users u ON d.user_id = u.id
@@ -110,7 +110,7 @@ unset($_SESSION['flash_success'], $_SESSION['flash_error']);
 
 // Query initial messages for SSR render fallback
 $sqlInitial = "
-    SELECT d.id, d.task_id, d.user_id, COALESCE(d.message, d.content, '') AS message, d.created_at,
+    SELECT d.id, d.task_id, d.user_id, d.message, d.created_at,
            u.fullname, u.email, u.role, dep.name AS department_name, dep.code AS department_code
     FROM discussions d
     JOIN users u ON d.user_id = u.id
