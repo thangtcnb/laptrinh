@@ -73,6 +73,7 @@ $migrationFiles = [
     'update_20261027_secure_uploads_and_notifications.sql' => 'database/migrations/update_20261027_secure_uploads_and_notifications.sql',
     'update_20261027_overdue_email_logs.sql' => 'database/migrations/update_20261027_overdue_email_logs.sql',
     'update_20261028_discussions.sql' => 'database/migrations/update_20261028_discussions.sql',
+    'update_20261028_create_t1.sql' => 'database/migrations/update_20261028_create_t1.sql',
 ];
 
 $total = count($migrationFiles);

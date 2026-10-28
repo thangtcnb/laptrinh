@@ -1,0 +1,9 @@
+USE `laptrinh_db`;
+SET SQL_MODE = '';
+
+-- Create table t1
+CREATE TABLE IF NOT EXISTS `t1` (
+    `id` INT AUTO_INCREMENT PRIMARY KEY,
+    `name` VARCHAR(255) DEFAULT NULL,
+    `created_at` DATETIME DEFAULT CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
