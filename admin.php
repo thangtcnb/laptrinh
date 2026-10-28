@@ -329,7 +329,7 @@ try {
                                             </button>
 
                                             <?php if ($u['id'] !== $currentUser['id']): ?>
-                                                <form method="POST" action="admin.php?tab=users" onsubmit="return confirm('Bạn có chắc chắn muốn xóa tài khoản này không?');">
+                                                <form method="POST" action="admin.php?tab=users" onsubmit="return sysConfirmForm(event, this, 'Bạn có chắc chắn muốn xóa tài khoản này không?');">
                                                     <input type="hidden" name="action" value="delete_user">
                                                     <input type="hidden" name="user_id" value="<?= $u['id'] ?>">
                                                     <button type="submit" class="px-2 py-1 bg-rose-50 hover:bg-rose-600 text-rose-700 hover:text-white border border-rose-200 rounded-lg font-bold transition flex items-center gap-1">
@@ -573,7 +573,7 @@ try {
                                 </button>
 
                                 <?php if (!empty($currentLoginBg)): ?>
-                                    <button type="submit" name="reset_bg" value="1" onclick="return confirm('Khôi phục hình nền đăng nhập về mặc định?');" class="bg-rose-50 hover:bg-rose-600 text-rose-700 hover:text-white border border-rose-200 px-3 py-2 rounded-xl text-xs font-semibold transition flex items-center gap-1">
+                                    <button type="button" onclick="sysConfirm('Khôi phục hình nền đăng nhập về mặc định?', function(){ const form = document.createElement('form'); form.method = 'POST'; form.action = 'admin.php?tab=backup'; const act = document.createElement('input'); act.type='hidden'; act.name='action'; act.value='update_login_bg'; form.appendChild(act); const rst = document.createElement('input'); rst.type='hidden'; rst.name='reset_bg'; rst.value='1'; form.appendChild(rst); document.body.appendChild(form); form.submit(); });" class="bg-rose-50 hover:bg-rose-600 text-rose-700 hover:text-white border border-rose-200 px-3 py-2 rounded-xl text-xs font-semibold transition flex items-center gap-1">
                                         <i class="fa-solid fa-rotate-left"></i>
                                         <span>Đặt Lại Mặc Định</span>
                                     </button>
@@ -596,7 +596,7 @@ try {
                     <i class="fa-solid fa-circle-info mr-1 text-amber-600"></i>
                     File script thiết lập tự động <strong>setup_db.bat</strong> sẵn sàng phục vụ khởi tạo lại MySQL bất kỳ lúc nào.
                 </div>
-                <button onclick="alert('Đã tạo tệp sao lưu dữ liệu thành công! CSDL laptrinh_db sẵn sàng kết nối.')" class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold px-4 py-2.5 rounded-xl text-xs shadow flex items-center gap-2">
+                <button onclick="sysAlert('Đã tạo tệp sao lưu dữ liệu thành công! CSDL laptrinh_db sẵn sàng kết nối.', 'Hệ thống Quản lý Công việc', 'success')" class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold px-4 py-2.5 rounded-xl text-xs shadow flex items-center gap-2">
                     <i class="fa-solid fa-download"></i>
                     <span>Tải Về Tệp Backup Database SQL</span>
                 </button>

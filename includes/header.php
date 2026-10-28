@@ -35,6 +35,8 @@ if ($roleLabel === 'TRUONG_PHONG') {
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
     <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
     <script src="https://cdn.jsdelivr.net/npm/flatpickr/dist/l10n/vn.js"></script>
+    <!-- SweetAlert2 CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     <script>
         tailwind.config = {
             theme: {
@@ -67,6 +69,73 @@ if ($roleLabel === 'TRUONG_PHONG') {
                 });
             }
         });
+
+        // Global Helper Functions for SweetAlert2 Dialogs
+        function sysAlert(message, title = "Hệ thống Quản lý Công việc", icon = "warning") {
+            return Swal.fire({
+                title: title,
+                html: message,
+                icon: icon,
+                confirmButtonColor: '#1e3a8a',
+                confirmButtonText: 'Đóng'
+            });
+        }
+
+        function sysConfirm(message, onConfirm, title = "Hệ thống Quản lý Công việc", icon = "question") {
+            Swal.fire({
+                title: title,
+                html: message,
+                icon: icon,
+                showCancelButton: true,
+                confirmButtonColor: '#1e3a8a',
+                cancelButtonColor: '#64748b',
+                confirmButtonText: 'Đồng ý',
+                cancelButtonText: 'Hủy'
+            }).then((result) => {
+                if (result.isConfirmed && typeof onConfirm === 'function') {
+                    onConfirm();
+                }
+            });
+        }
+
+        function sysConfirmLink(event, element, message, title = "Hệ thống Quản lý Công việc") {
+            event.preventDefault();
+            const url = element.getAttribute('href');
+            Swal.fire({
+                title: title,
+                html: message,
+                icon: 'warning',
+                showCancelButton: true,
+                confirmButtonColor: '#e11d48',
+                cancelButtonColor: '#64748b',
+                confirmButtonText: 'Đồng ý',
+                cancelButtonText: 'Hủy'
+            }).then((result) => {
+                if (result.isConfirmed) {
+                    window.location.href = url;
+                }
+            });
+            return false;
+        }
+
+        function sysConfirmForm(event, formElement, message, title = "Hệ thống Quản lý Công việc") {
+            event.preventDefault();
+            Swal.fire({
+                title: title,
+                html: message,
+                icon: 'warning',
+                showCancelButton: true,
+                confirmButtonColor: '#e11d48',
+                cancelButtonColor: '#64748b',
+                confirmButtonText: 'Đồng ý',
+                cancelButtonText: 'Hủy'
+            }).then((result) => {
+                if (result.isConfirmed) {
+                    formElement.submit();
+                }
+            });
+            return false;
+        }
     </script>
     <style>
         @media print {
