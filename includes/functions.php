@@ -375,14 +375,12 @@ function getKpiStats($pdo, $currentUser) {
     $params = [];
 
     // Role-based scoping
-    if ($currentUser['role'] === 'NHAN_VIEN' || $currentUser['role'] === 'HO_TRO') {
-        $where[] = "(t.created_by = ? OR t.id IN (SELECT task_id FROM task_assignees WHERE user_id = ?))";
-        $params[] = $currentUser['id'];
-        $params[] = $currentUser['id'];
-    } elseif ($currentUser['role'] === 'TRUONG_PHONG') {
-        $where[] = "(t.department_id = ? OR t.id IN (SELECT ta.task_id FROM task_assignees ta JOIN users u ON ta.user_id = u.id WHERE u.department_id = ?))";
-        $params[] = $currentUser['department_id'];
-        $params[] = $currentUser['department_id'];
+    if (in_array($currentUser['role'], ['TRUONG_PHONG', 'NHAN_VIEN', 'HO_TRO'])) {
+        if (!empty($currentUser['department_id'])) {
+            $where[] = "(t.department_id = ? OR t.id IN (SELECT ta.task_id FROM task_assignees ta JOIN users u ON ta.user_id = u.id WHERE u.department_id = ?))";
+            $params[] = $currentUser['department_id'];
+            $params[] = $currentUser['department_id'];
+        }
     }
     // For BGD and SUPER_ADMIN, default to all campus tasks
 
