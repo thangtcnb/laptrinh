@@ -73,6 +73,16 @@ try {
 
     echo "[SUCCESS] Khoi tao / Cap nhat bang 'discussions' thanh cong!\n";
 
+    // DDL: Create 't1' table if not exists
+    $sqlT1 = "CREATE TABLE IF NOT EXISTS t1 (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        name VARCHAR(255) DEFAULT NULL,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;";
+
+    $pdo->exec($sqlT1);
+    echo "[SUCCESS] Khoi tao / Cap nhat bang 't1' thanh cong!\n";
+
     // Execute additional migrations runner if present
     if (file_exists(__DIR__ . '/database/run_migrations.php')) {
         if (!defined('ALLOW_WEB_MIGRATION')) {
