@@ -361,12 +361,8 @@ function sendBgdTaskNotifications($pdo, $taskId, $title, $description, $dueDate,
     sendDirectTaskAssignmentNotifications($pdo, $taskId, $bgdUser, $title, $description, $dueDate, $assigneeIds);
 }
 
-// Get KPI stats based on user role and scope
-// Role permissions:
-// - NHAN_VIEN / HO_TRO: Personal tasks (Cá nhân)
-// - TRUONG_PHONG: Department tasks (Toàn Phòng)
-// - BGD / SUPER_ADMIN: Campus-wide tasks (Toàn Phân hiệu)
-function getKpiStats($pdo, $currentUser) {
+// Get KPI stats based on selected filter and user permissions
+function getKpiStats($pdo, $currentUser, $filters = []) {
     if (!$currentUser) {
         return ['completed' => 0, 'in_progress' => 0, 'overdue' => 0, 'pending' => 0];
     }
@@ -374,36 +370,59 @@ function getKpiStats($pdo, $currentUser) {
     $where = ["1=1"];
     $params = [];
 
-    // Role-based scoping
-    if (in_array($currentUser['role'], ['TRUONG_PHONG', 'NHAN_VIEN', 'HO_TRO'])) {
-        if (!empty($currentUser['department_id'])) {
+    // Filter by due date range if provided in filters
+    if (!empty($filters['date_from'])) {
+        $dateFromVal = $filters['date_from'];
+        if (strlen($dateFromVal) === 10) {
+            $dateFromVal .= ' 00:00:00';
+        }
+        $where[] = "t.due_date >= ?";
+        $params[] = $dateFromVal;
+    }
+    if (!empty($filters['date_to'])) {
+        $dateToVal = $filters['date_to'];
+        if (strlen($dateToVal) === 10) {
+            $dateToVal .= ' 23:59:59';
+        }
+        $where[] = "t.due_date <= ?";
+        $params[] = $dateToVal;
+    }
+
+    // Dynamic scoping based on dept_filter parameter
+    if (isset($filters['dept_filter'])) {
+        if ($filters['dept_filter'] === 'MY_TASKS') {
+            $where[] = "(t.created_by = ? OR t.id IN (SELECT task_id FROM task_assignees WHERE user_id = ?))";
+            $params[] = $currentUser['id'];
+            $params[] = $currentUser['id'];
+        } elseif (is_numeric($filters['dept_filter'])) {
             $where[] = "(t.department_id = ? OR t.id IN (SELECT ta.task_id FROM task_assignees ta JOIN users u ON ta.user_id = u.id WHERE u.department_id = ?))";
-            $params[] = $currentUser['department_id'];
-            $params[] = $currentUser['department_id'];
+            $params[] = (int)$filters['dept_filter'];
+            $params[] = (int)$filters['dept_filter'];
+        }
+    } else {
+        // Fallback default scoping if dept_filter not passed
+        if (in_array($currentUser['role'], ['TRUONG_PHONG', 'NHAN_VIEN', 'HO_TRO'])) {
+            if (!empty($currentUser['department_id'])) {
+                $where[] = "(t.department_id = ? OR t.id IN (SELECT ta.task_id FROM task_assignees ta JOIN users u ON ta.user_id = u.id WHERE u.department_id = ?))";
+                $params[] = $currentUser['department_id'];
+                $params[] = $currentUser['department_id'];
+            }
         }
     }
-    // For BGD and SUPER_ADMIN, default to all campus tasks
 
-    // Internal BGD Security Restriction (Allow assigned users & managing department leaders to see tasks assigned by BGD)
+    // Task Visibility Logic:
+    // In-progress / completed tasks are public to all campus users.
+    // Unapproved pending tasks are visible to creator, assigned employees, department head, BGD, or Super Admin.
     if (!in_array($currentUser['role'], ['BGD', 'SUPER_ADMIN'])) {
-        $userId = $currentUser['id'];
-        $deptId = $currentUser['department_id'];
-        $isDeptHead = ($currentUser['role'] === 'TRUONG_PHONG') ? 1 : 0;
+        $userId = $currentUser['id'] ?? 0;
+        $deptId = $currentUser['department_id'] ?? 0;
+        $isDeptHead = ($currentUser['role'] ?? '') === 'TRUONG_PHONG' ? 1 : 0;
 
         $where[] = "(
-            (
-                t.department_id != 1
-                AND t.created_by NOT IN (SELECT id FROM users WHERE role = 'BGD')
-            )
-            OR
-            (
-                (t.department_id = 1 OR t.created_by IN (SELECT id FROM users WHERE role = 'BGD'))
-                AND (
-                    t.created_by = ?
-                    OR t.id IN (SELECT task_id FROM task_assignees WHERE user_id = ?)
-                    OR (? = 1 AND t.id IN (SELECT ta.task_id FROM task_assignees ta JOIN users u ON ta.user_id = u.id WHERE u.department_id = ?))
-                )
-            )
+            t.status NOT IN ('CHO_DUYET', 'CHO_BGD_DUYET')
+            OR t.created_by = ?
+            OR t.id IN (SELECT task_id FROM task_assignees WHERE user_id = ?)
+            OR (? = 1 AND t.department_id = ?)
         )";
         $params[] = $userId;
         $params[] = $userId;
@@ -509,40 +528,20 @@ function getTasksFiltered($pdo, $filters = [], $limit = 15, $offset = 0, $curren
         }
     }
 
-    // Task Visibility Logic based on system role and task origin:
-    // 1. Direct BGD Tasks (department_id = 1 OR created_by in BGD role):
-    //    Only assigned employees, task creator, managing department leaders of assigned employees, BGD, and Super Admin can view.
-    // 2. General / Campus Public Tasks:
-    //    All campus members can view in-progress (status != 'CHO_DUYET') tasks to track overall progress.
+    // Task Visibility Logic:
+    // All campus users can view in-progress / completed tasks across all departments.
+    // Unapproved pending tasks (CHO_DUYET, CHO_BGD_DUYET) are restricted to creator, assignees, managing department head, BGD, or Super Admin.
     if (!$currentUser || !in_array($currentUser['role'], ['BGD', 'SUPER_ADMIN'])) {
         $userId = $currentUser['id'] ?? 0;
         $deptId = $currentUser['department_id'] ?? 0;
         $isDeptHead = ($currentUser['role'] ?? '') === 'TRUONG_PHONG' ? 1 : 0;
 
         $where[] = "(
-            (
-                t.department_id != 1
-                AND t.created_by NOT IN (SELECT id FROM users WHERE role = 'BGD')
-                AND (
-                    t.status != 'CHO_DUYET'
-                    OR t.department_id = ?
-                    OR t.created_by = ?
-                    OR t.id IN (SELECT task_id FROM task_assignees WHERE user_id = ?)
-                )
-            )
-            OR
-            (
-                (t.department_id = 1 OR t.created_by IN (SELECT id FROM users WHERE role = 'BGD'))
-                AND (
-                    t.created_by = ?
-                    OR t.id IN (SELECT task_id FROM task_assignees WHERE user_id = ?)
-                    OR (? = 1 AND t.id IN (SELECT ta.task_id FROM task_assignees ta JOIN users u ON ta.user_id = u.id WHERE u.department_id = ?))
-                )
-            )
+            t.status NOT IN ('CHO_DUYET', 'CHO_BGD_DUYET')
+            OR t.created_by = ?
+            OR t.id IN (SELECT task_id FROM task_assignees WHERE user_id = ?)
+            OR (? = 1 AND t.department_id = ?)
         )";
-        $params[] = $deptId;
-        $params[] = $userId;
-        $params[] = $userId;
         $params[] = $userId;
         $params[] = $userId;
         $params[] = $isDeptHead;

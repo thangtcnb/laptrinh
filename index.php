@@ -139,8 +139,8 @@ if ($currentUser['role'] === 'BGD') {
     $pendingApprovalTasks = $stmtAdminPending->fetchAll();
 }
 
-// Fetch KPI Stats for Stats Bar
-$kpiStats = getKpiStats($pdo, $currentUser);
+// Fetch KPI Stats for Stats Bar based on active filters
+$kpiStats = getKpiStats($pdo, $currentUser, $filters);
 
 // Deep link: Automatically fetch & display Task Detail Modal if task_id is present in URL query
 $deepLinkTaskId = (int)($_GET['task_id'] ?? 0);
@@ -380,12 +380,14 @@ if ($deepLinkTaskId > 0) {
 
     <!-- THANH THỐNG KÊ NHANH KPI (Stats Bar Phân Quyền) -->
     <?php
-    // Scope label based on role
-    $scopeLabel = 'Cá nhân';
-    if ($currentUser['role'] === 'TRUONG_PHONG') {
-        $scopeLabel = 'Toàn Phòng ' . htmlspecialchars($currentUser['department_code']);
-    } elseif (in_array($currentUser['role'], ['BGD', 'SUPER_ADMIN'])) {
-        $scopeLabel = 'Toàn Phân hiệu';
+    // Scope label based on selected filter
+    $scopeLabel = 'Toàn Phân hiệu';
+    if ($filters['dept_filter'] === 'MY_TASKS') {
+        $scopeLabel = '📌 Công việc của tôi';
+    } elseif (!empty($filters['dept_filter']) && is_numeric($filters['dept_filter'])) {
+        $matchedDept = array_filter($departmentsList, fn($d) => $d['id'] == $filters['dept_filter']);
+        $deptObj = reset($matchedDept);
+        $scopeLabel = 'Phòng: ' . htmlspecialchars($deptObj['name'] ?? '');
     }
 
     // Preserve existing filter params except status for quick filtering

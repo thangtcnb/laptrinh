@@ -14,7 +14,7 @@ if ($attachmentId <= 0) {
 
 // Lấy thông tin file đính kèm và thông tin công việc liên quan
 $stmt = $pdo->prepare("
-    SELECT ta.*, t.created_by AS task_creator_id, t.department_id AS task_department_id, t.title AS task_title
+    SELECT ta.*, t.created_by AS task_creator_id, t.department_id AS task_department_id, t.title AS task_title, t.status AS task_status
     FROM task_attachments ta
     JOIN tasks t ON ta.task_id = t.id
     WHERE ta.id = ?
@@ -30,11 +30,11 @@ if (!$attachment) {
 $taskId = (int)$attachment['task_id'];
 
 // Kiểm tra quyền hạn RBAC đối với file đính kèm / công việc:
-// Quyền truy cập/tải file được cấp nếu:
 // (1) Super Admin hoặc Ban Giám đốc (BGD)
-// (2) Người tạo / giao công việc đó (created_by)
-// (3) Trưởng/Phó phòng quản lý đơn vị thực hiện công việc đó (role TRUONG_PHONG & department_id == task_department_id)
-// (4) Người dùng là thành viên được phân công thực hiện công việc đó (có trong task_assignees)
+// (2) Người tạo / giao công việc đó hoặc người tải file
+// (3) Trưởng/Phó phòng quản lý đơn vị thực hiện công việc đó
+// (4) Người dùng thuộc danh sách phân công (task_assignees)
+// (5) Công việc ở trạng thái công khai đã duyệt/đang thực hiện/hoàn thành (tất cả cá nhân trong phân hiệu có quyền xem công việc)
 $hasAccess = false;
 
 if (in_array($currentUser['role'], ['SUPER_ADMIN', 'BGD'])) {
@@ -42,6 +42,9 @@ if (in_array($currentUser['role'], ['SUPER_ADMIN', 'BGD'])) {
 } elseif ($attachment['task_creator_id'] == $currentUser['id'] || $attachment['uploaded_by'] == $currentUser['id']) {
     $hasAccess = true;
 } elseif (in_array($currentUser['role'], ['TRUONG_PHONG', 'PHO_PHONG']) && $currentUser['department_id'] == $attachment['task_department_id']) {
+    $hasAccess = true;
+} elseif (!in_array($attachment['task_status'], ['CHO_DUYET', 'CHO_BGD_DUYET'])) {
+    // Công việc đã duyệt / đang thực hiện / hoàn thành hiển thị công khai toàn Phân hiệu
     $hasAccess = true;
 } else {
     // Kiểm tra danh sách người được phân công (assignees)

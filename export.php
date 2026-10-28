@@ -57,39 +57,19 @@ $where = ["1=1"];
 $params = [];
 
 // Task Visibility Logic for Export:
-// 1. Direct BGD Tasks (department_id = 1 OR created_by in BGD role):
-//    Only assigned employees, task creator, managing department leaders of assigned employees, BGD, and Super Admin can view/export.
-// 2. General / Campus Public Tasks:
-//    All campus members can view/export in-progress/completed tasks within their allowed scope.
+// All campus users can view/export in-progress and completed tasks across all departments.
+// Unapproved pending tasks are restricted to creator, assignees, department head, BGD, or Super Admin.
 if (!$currentUser || !in_array($currentUser['role'], ['BGD', 'SUPER_ADMIN'])) {
     $userId = $currentUser['id'] ?? 0;
     $deptId = $currentUser['department_id'] ?? 0;
     $isDeptHead = ($currentUser['role'] ?? '') === 'TRUONG_PHONG' ? 1 : 0;
 
     $where[] = "(
-        (
-            t.department_id != 1
-            AND t.created_by NOT IN (SELECT id FROM users WHERE role = 'BGD')
-            AND (
-                t.status != 'CHO_DUYET'
-                OR t.department_id = ?
-                OR t.created_by = ?
-                OR t.id IN (SELECT task_id FROM task_assignees WHERE user_id = ?)
-            )
-        )
-        OR
-        (
-            (t.department_id = 1 OR t.created_by IN (SELECT id FROM users WHERE role = 'BGD'))
-            AND (
-                t.created_by = ?
-                OR t.id IN (SELECT task_id FROM task_assignees WHERE user_id = ?)
-                OR (? = 1 AND t.id IN (SELECT ta.task_id FROM task_assignees ta JOIN users u ON ta.user_id = u.id WHERE u.department_id = ?))
-            )
-        )
+        t.status NOT IN ('CHO_DUYET', 'CHO_BGD_DUYET')
+        OR t.created_by = ?
+        OR t.id IN (SELECT task_id FROM task_assignees WHERE user_id = ?)
+        OR (? = 1 AND t.department_id = ?)
     )";
-    $params[] = $deptId;
-    $params[] = $userId;
-    $params[] = $userId;
     $params[] = $userId;
     $params[] = $userId;
     $params[] = $isDeptHead;
