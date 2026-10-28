@@ -8,15 +8,14 @@ $flashError = $_SESSION['flash_error'] ?? null;
 unset($_SESSION['flash_success'], $_SESSION['flash_error']);
 
 // Filters parameters - Default homepage view based on user role:
-// For TRUONG_PHONG: Default to their department ID ("DANH SÁCH CÔNG VIỆC PHÒNG [TÊN PHÒNG]")
-// For BGD and SUPER_ADMIN (thangtcnb@gmail.com): Default to '' ("TẤT CẢ CÔNG VIỆC PHÂN HIỆU QUẢNG NGÃI")
-// For others: Default to 'MY_TASKS'
-$defaultDeptFilter = 'MY_TASKS';
+// For BGD and SUPER_ADMIN (thangtcnb@gmail.com): Default to '' ("-- Tất cả đơn vị Phân hiệu --")
+// For TRUONG_PHONG, NHAN_VIEN, and other department staff: Default to their department ID
+$defaultDeptFilter = '';
 if (isset($currentUser['role'])) {
-    if ($currentUser['role'] === 'TRUONG_PHONG') {
-        $defaultDeptFilter = $currentUser['department_id'];
-    } elseif (in_array($currentUser['role'], ['BGD', 'SUPER_ADMIN']) || ($currentUser['email'] ?? '') === 'thangtcnb@gmail.com') {
+    if (in_array($currentUser['role'], ['BGD', 'SUPER_ADMIN']) || ($currentUser['email'] ?? '') === 'thangtcnb@gmail.com') {
         $defaultDeptFilter = '';
+    } else {
+        $defaultDeptFilter = $currentUser['department_id'] ?? '';
     }
 }
 
