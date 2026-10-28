@@ -348,7 +348,7 @@ function removeRow(index) {
     if (rowEl) {
         const allRows = document.querySelectorAll('#rowsContainer > div');
         if (allRows.length <= 1) {
-            alert('Cần giữ lại ít nhất 1 dòng công việc.');
+            sysAlert('Cần giữ lại ít nhất 1 dòng công việc.');
             return;
         }
         rowEl.remove();

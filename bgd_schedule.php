@@ -404,7 +404,7 @@ require_once __DIR__ . '/includes/header.php';
                                                 <button onclick='openEditScheduleModal(<?= json_encode($itemPayload, JSON_HEX_APOS | JSON_HEX_QUOT) ?>)' class="p-1.5 bg-purple-50 hover:bg-purple-600 text-purple-700 hover:text-white rounded-lg transition" title="Sửa mục lịch này">
                                                     <i class="fa-solid fa-pen-to-square text-xs"></i>
                                                 </button>
-                                                <form method="POST" action="bgd_schedule.php?week=<?= $week ?>&year=<?= $year ?>" onsubmit="return confirm('Bạn có chắc chắn muốn xóa mục lịch công tác này?');" class="inline">
+                                                <form method="POST" action="bgd_schedule.php?week=<?= $week ?>&year=<?= $year ?>" onsubmit="return sysConfirmForm(event, this, 'Bạn có chắc chắn muốn xóa mục lịch công tác này?');" class="inline">
                                                     <input type="hidden" name="action" value="delete_schedule">
                                                     <input type="hidden" name="schedule_id" value="<?= $sItem['id'] ?>">
                                                     <button type="submit" class="p-1.5 bg-rose-50 hover:bg-rose-600 text-rose-600 hover:text-white rounded-lg transition" title="Xóa mục lịch này">
@@ -656,7 +656,7 @@ function closeScheduleModal() {
 function submitScheduleForm(mode) {
     const content = document.getElementById('sched_content').value.trim();
     if (!content) {
-        alert('Vui lòng nhập nội dung công việc!');
+        sysAlert('Vui lòng nhập nội dung công việc!');
         document.getElementById('sched_content').focus();
         return;
     }

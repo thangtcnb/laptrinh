@@ -686,7 +686,7 @@ if ($deepLinkTaskId > 0) {
 
                                     <!-- Delete Button (Cá nhân được quyền xóa công việc do chính mình đã tạo/đăng ký) -->
                                     <?php if ($isCreator || $currentUser['role'] === 'SUPER_ADMIN'): ?>
-                                        <a href="task_actions.php?action=delete&task_id=<?= $t['id'] ?>" onclick="return confirm('Bạn có chắc chắn muốn xóa công việc này không?');" class="p-1.5 bg-rose-50 hover:bg-rose-600 text-rose-600 hover:text-white rounded-lg transition" title="Xóa">
+                                        <a href="task_actions.php?action=delete&task_id=<?= $t['id'] ?>" onclick="return sysConfirmLink(event, this, 'Bạn có chắc chắn muốn xóa công việc này không?');" class="p-1.5 bg-rose-50 hover:bg-rose-600 text-rose-600 hover:text-white rounded-lg transition" title="Xóa">
                                             <i class="fa-solid fa-trash text-xs"></i>
                                         </a>
                                     <?php endif; ?>
@@ -1478,13 +1478,17 @@ function toggleRowCheckbox(event, checkboxId) {
     }
 }
 
-function validateBatchApprovalForm() {
+function validateBatchApprovalForm(event) {
+    if (event) event.preventDefault();
     const checkedCount = document.querySelectorAll('.batch-approval-checkbox:checked').length;
     if (checkedCount === 0) {
-        alert('Vui lòng tích chọn ít nhất một công việc để phê duyệt!');
+        sysAlert('Vui lòng tích chọn ít nhất một công việc để phê duyệt!');
         return false;
     }
-    return confirm(`Bạn có chắc chắn muốn phê duyệt ${checkedCount} công việc đã chọn không?`);
+    sysConfirm(`Bạn có chắc chắn muốn phê duyệt ${checkedCount} công việc đã chọn không?`, function() {
+        document.getElementById('batchApprovalForm').submit();
+    });
+    return false;
 }
 
 function openPendingTaskModal() {
@@ -1518,7 +1522,7 @@ function hideRejectReason(taskId) {
 function validateRejection(taskId) {
     const val = document.getElementById(`reject_input_${taskId}`).value.trim();
     if (!val) {
-        alert('Vui lòng nhập nội dung ý kiến, đề xuất hoặc vướng mắc!');
+        sysAlert('Vui lòng nhập nội dung ý kiến, đề xuất hoặc vướng mắc!');
         return false;
     }
     return true;
@@ -1625,7 +1629,7 @@ function openTaskModal(task = null) {
                         <span class="font-medium text-slate-800 truncate" title="${safeName}">${safeName}</span>
                         <span class="text-[10px] text-slate-400 shrink-0">(${sizeStr})</span>
                     </div>
-                    <a href="task_actions.php?action=delete_attachment&attachment_id=${att.id}" onclick="return confirm('Bạn có chắc muốn xóa văn bản đính kèm này không?');" class="text-rose-600 hover:text-rose-800 p-1 font-bold text-xs" title="Xóa file đính kèm">
+                    <a href="task_actions.php?action=delete_attachment&attachment_id=${att.id}" onclick="return sysConfirmLink(event, this, 'Bạn có chắc muốn xóa văn bản đính kèm này không?');" class="text-rose-600 hover:text-rose-800 p-1 font-bold text-xs" title="Xóa file đính kèm">
                         <i class="fa-solid fa-trash"></i> Xóa
                     </a>
                 `;
@@ -1706,7 +1710,7 @@ function validateDateFilter(form) {
     const dateTo = form.date_to ? form.date_to.value : '';
 
     if (dateFrom && dateTo && dateFrom > dateTo) {
-        alert('Cảnh báo: Ngày bắt đầu phải nhỏ hơn hoặc bằng Ngày kết thúc!\nVui lòng chọn lại khoảng thời gian hợp lệ.');
+        sysAlert('Cảnh báo: Ngày bắt đầu phải nhỏ hơn hoặc bằng Ngày kết thúc!<br>Vui lòng chọn lại khoảng thời gian hợp lệ.');
         return false;
     }
     return true;
