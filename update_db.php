@@ -56,6 +56,21 @@ try {
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;";
 
     $pdo->exec($sqlDiscussions);
+
+    // Check if 'message' column exists in 'discussions' table, if not add it
+    $stmtCheckMsg = $pdo->query("SHOW COLUMNS FROM `discussions` LIKE 'message'");
+    if ($stmtCheckMsg->rowCount() === 0) {
+        $pdo->exec("ALTER TABLE `discussions` ADD COLUMN `message` TEXT NOT NULL");
+        echo "[UPDATE] Da bổ sung cot 'message' vao bang 'discussions'.\n";
+    }
+
+    // Check if legacy 'content' column exists and copy data to 'message' if needed
+    $stmtCheckContent = $pdo->query("SHOW COLUMNS FROM `discussions` LIKE 'content'");
+    if ($stmtCheckContent->rowCount() > 0) {
+        $pdo->exec("UPDATE `discussions` SET `message` = `content` WHERE (`message` IS NULL OR `message` = '') AND `content` IS NOT NULL AND `content` != ''");
+        echo "[UPDATE] Da dong bo du lieu tu cot legacy 'content' sang 'message'.\n";
+    }
+
     echo "[SUCCESS] Khoi tao / Cap nhat bang 'discussions' thanh cong!\n";
 
     // Execute additional migrations runner if present
