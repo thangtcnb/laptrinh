@@ -17,14 +17,16 @@ $loginBg = '';
 
 // 1. Check CSDL configuration (system_settings table)
 try {
-    $stmtBg = $pdo->query("SELECT setting_value FROM system_settings WHERE setting_key = 'login_bg'");
-    if ($rowBg = $stmtBg->fetch()) {
-        $dbBg = trim($rowBg['setting_value'] ?? '');
-        if (!empty($dbBg) && file_exists(__DIR__ . '/' . $dbBg)) {
-            $loginBg = $dbBg;
+    if (isset($pdo) && $pdo) {
+        $stmtBg = $pdo->query("SELECT setting_value FROM system_settings WHERE setting_key = 'login_bg'");
+        if ($rowBg = $stmtBg->fetch()) {
+            $dbBg = trim($rowBg['setting_value'] ?? '');
+            if (!empty($dbBg) && file_exists(__DIR__ . '/' . $dbBg)) {
+                $loginBg = $dbBg;
+            }
         }
     }
-} catch (\PDOException $e) {
+} catch (\Exception $e) {
     $loginBg = '';
 }
 

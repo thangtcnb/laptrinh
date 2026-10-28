@@ -19,5 +19,6 @@ uploads/*
 !uploads/bg/
 uploads/bg/*
 !uploads/bg/.gitkeep
+!uploads/bg/.htaccess
 !uploads/bg/default_bg.jpg
 /config.php
