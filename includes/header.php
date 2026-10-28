@@ -227,7 +227,13 @@ if ($roleLabel === 'TRUONG_PHONG') {
                 <span>Lịch Công Tác</span>
             </a>
 
-            <!-- Tab 4: Xuất báo cáo (Cam) -->
+            <!-- Tab 4: Trao đổi (Xanh Lam) -->
+            <a href="discussion.php" class="px-3.5 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition flex items-center gap-1.5 <?= $currentPage === 'discussion.php' ? 'bg-teal-600 text-white shadow-md shadow-teal-900/50' : 'bg-teal-950/40 text-teal-200 hover:bg-teal-800/50 border border-teal-800/40' ?>">
+                <i class="fa-solid fa-comments"></i>
+                <span>Trao Đổi</span>
+            </a>
+
+            <!-- Tab 5: Xuất báo cáo (Cam) -->
             <a href="export.php" class="px-3.5 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition flex items-center gap-1.5 <?= $currentPage === 'export.php' ? 'bg-amber-600 text-white shadow-md shadow-amber-900/50' : 'bg-amber-950/40 text-amber-200 hover:bg-amber-800/50 border border-amber-800/40' ?>">
                 <i class="fa-solid fa-file-excel"></i>
                 <span>Xuất Báo Cáo & In Ấn</span>
