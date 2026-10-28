@@ -127,6 +127,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 if (!is_dir($uploadDir)) {
                     mkdir($uploadDir, 0777, true);
                 }
+
+                // Cleanup previous custom background file if exists
+                try {
+                    $stmtOld = $pdo->query("SELECT setting_value FROM system_settings WHERE setting_key = 'login_bg'");
+                    if ($rowOld = $stmtOld->fetch()) {
+                        $oldBg = trim($rowOld['setting_value'] ?? '');
+                        if (!empty($oldBg) && file_exists(__DIR__ . '/' . $oldBg) && str_starts_with($oldBg, 'uploads/bg/login_bg_')) {
+                            @unlink(__DIR__ . '/' . $oldBg);
+                        }
+                    }
+                } catch (\Exception $e) {
+                    // Ignore error on old file cleanup
+                }
+
                 $newFileName = 'login_bg_' . time() . '.' . $fileExt;
                 $targetFile = $uploadDir . $newFileName;
 
@@ -141,6 +155,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 }
             }
         } elseif (isset($_POST['reset_bg'])) {
+            // Cleanup previous custom background file if exists
+            try {
+                $stmtOld = $pdo->query("SELECT setting_value FROM system_settings WHERE setting_key = 'login_bg'");
+                if ($rowOld = $stmtOld->fetch()) {
+                    $oldBg = trim($rowOld['setting_value'] ?? '');
+                    if (!empty($oldBg) && file_exists(__DIR__ . '/' . $oldBg) && str_starts_with($oldBg, 'uploads/bg/login_bg_')) {
+                        @unlink(__DIR__ . '/' . $oldBg);
+                    }
+                }
+            } catch (\Exception $e) {
+                // Ignore error on old file cleanup
+            }
+
             $stmt = $pdo->prepare("INSERT INTO system_settings (setting_key, setting_value) VALUES ('login_bg', '') ON DUPLICATE KEY UPDATE setting_value = ''");
             $stmt->execute();
             logActivity($pdo, $currentUser['id'], 'RESET_LOGIN_BG', "Đặt lại hình nền trang đăng nhập về mặc định");
