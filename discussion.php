@@ -30,6 +30,7 @@ if (isset($_GET['action']) && $_GET['action'] === 'fetch_messages') {
             $roleName = $msg['role'];
             if ($roleName === 'BGD') $roleName = 'Ban Giám đốc';
             elseif ($roleName === 'TRUONG_PHONG') $roleName = 'Trưởng phòng';
+            elseif ($roleName === 'PHO_PHONG') $roleName = 'Phó phòng';
             elseif ($roleName === 'NHAN_VIEN') $roleName = 'Nhân viên';
             elseif ($roleName === 'HO_TRO') $roleName = 'Hỗ trợ';
             elseif ($roleName === 'SUPER_ADMIN') $roleName = 'Super Admin';
@@ -244,6 +245,7 @@ require_once __DIR__ . '/includes/header.php';
                     $roleName = $msg['role'];
                     if ($roleName === 'BGD') $roleName = 'Ban Giám đốc';
                     elseif ($roleName === 'TRUONG_PHONG') $roleName = 'Trưởng phòng';
+                    elseif ($roleName === 'PHO_PHONG') $roleName = 'Phó phòng';
                     elseif ($roleName === 'NHAN_VIEN') $roleName = 'Nhân viên';
                     elseif ($roleName === 'HO_TRO') $roleName = 'Hỗ trợ';
                     elseif ($roleName === 'SUPER_ADMIN') $roleName = 'Super Admin';

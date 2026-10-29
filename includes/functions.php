@@ -23,7 +23,7 @@ function getUsers($pdo, $departmentId = null, $excludeSuperAdmin = false) {
 
     $whereSql = !empty($where) ? "WHERE " . implode(" AND ", $where) : "";
 
-    $sql = "SELECT u.*, d.name AS department_name FROM users u JOIN departments d ON u.department_id = d.id $whereSql ORDER BY d.id ASC, u.fullname ASC";
+    $sql = "SELECT u.*, COALESCE(d.name, 'Chưa phân công') AS department_name FROM users u LEFT JOIN departments d ON u.department_id = d.id $whereSql ORDER BY d.id ASC, u.fullname ASC";
     $stmt = $pdo->prepare($sql);
     $stmt->execute($params);
     return $stmt->fetchAll();
@@ -32,10 +32,10 @@ function getUsers($pdo, $departmentId = null, $excludeSuperAdmin = false) {
 // Get task assignees for a given task
 function getTaskAssignees($pdo, $taskId) {
     $stmt = $pdo->prepare("
-        SELECT ta.role_type, u.id AS user_id, u.fullname, u.email, u.department_id, d.name AS department_name
+        SELECT ta.role_type, u.id AS user_id, u.fullname, u.email, u.department_id, COALESCE(d.name, 'Chưa phân công') AS department_name
         FROM task_assignees ta
         JOIN users u ON ta.user_id = u.id
-        JOIN departments d ON u.department_id = d.id
+        LEFT JOIN departments d ON u.department_id = d.id
         WHERE ta.task_id = ?
         ORDER BY FIELD(ta.role_type, 'MAIN', 'COOP'), u.fullname ASC
     ");
@@ -244,8 +244,8 @@ function formatLeaderComment($t) {
     if (!empty($t['lc_role'])) {
         if ($t['lc_role'] === 'BGD') {
             $prefix = 'BGĐ: ';
-        } elseif ($t['lc_role'] === 'TRUONG_PHONG') {
-            $prefix = ($t['lc_fullname'] ?? 'Trưởng/Phó phòng') . ': ';
+        } elseif (in_array($t['lc_role'], ['TRUONG_PHONG', 'PHO_PHONG'])) {
+            $prefix = ($t['lc_fullname'] ?? 'Lãnh đạo phòng') . ': ';
         } else {
             $prefix = ($t['lc_fullname'] ?? 'Lãnh đạo') . ': ';
         }
@@ -401,7 +401,7 @@ function getKpiStats($pdo, $currentUser, $filters = []) {
         }
     } else {
         // Fallback default scoping if dept_filter not passed
-        if (in_array($currentUser['role'], ['TRUONG_PHONG', 'NHAN_VIEN', 'HO_TRO'])) {
+        if (in_array($currentUser['role'], ['TRUONG_PHONG', 'PHO_PHONG', 'NHAN_VIEN', 'HO_TRO'])) {
             if (!empty($currentUser['department_id'])) {
                 $where[] = "(t.department_id = ? OR t.id IN (SELECT ta.task_id FROM task_assignees ta JOIN users u ON ta.user_id = u.id WHERE u.department_id = ?))";
                 $params[] = $currentUser['department_id'];
@@ -416,7 +416,7 @@ function getKpiStats($pdo, $currentUser, $filters = []) {
     if (!in_array($currentUser['role'], ['BGD', 'SUPER_ADMIN'])) {
         $userId = $currentUser['id'] ?? 0;
         $deptId = $currentUser['department_id'] ?? 0;
-        $isDeptHead = ($currentUser['role'] ?? '') === 'TRUONG_PHONG' ? 1 : 0;
+        $isDeptHead = in_array($currentUser['role'] ?? '', ['TRUONG_PHONG', 'PHO_PHONG']) ? 1 : 0;
 
         $where[] = "(
             t.status NOT IN ('CHO_DUYET', 'CHO_BGD_DUYET')
@@ -534,7 +534,7 @@ function getTasksFiltered($pdo, $filters = [], $limit = 15, $offset = 0, $curren
     if (!$currentUser || !in_array($currentUser['role'], ['BGD', 'SUPER_ADMIN'])) {
         $userId = $currentUser['id'] ?? 0;
         $deptId = $currentUser['department_id'] ?? 0;
-        $isDeptHead = ($currentUser['role'] ?? '') === 'TRUONG_PHONG' ? 1 : 0;
+        $isDeptHead = in_array($currentUser['role'] ?? '', ['TRUONG_PHONG', 'PHO_PHONG']) ? 1 : 0;
 
         $where[] = "(
             t.status NOT IN ('CHO_DUYET', 'CHO_BGD_DUYET')

@@ -18,7 +18,7 @@ $defaultEndDate = date('Y-m-d', strtotime('sunday this week'));
 
 $departmentsList = getDepartments($pdo);
 $assignableUsers = getUsers($pdo, null, true); // Exclude Super Admin
-$deptEmployeesForMain = ($currentUser['role'] === 'TRUONG_PHONG')
+$deptEmployeesForMain = in_array($currentUser['role'], ['TRUONG_PHONG', 'PHO_PHONG'])
     ? getUsers($pdo, $currentUser['department_id'], true)
     : $assignableUsers;
 $coopUsersList = array_filter($assignableUsers, fn($u) => $u['role'] !== 'BGD');
@@ -37,7 +37,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $defaultStatus = 'CHO_DUYET';
     $targetStatus = null;
 
-    if ($currentUser['role'] === 'TRUONG_PHONG') {
+    if (in_array($currentUser['role'], ['TRUONG_PHONG', 'PHO_PHONG'])) {
         $defaultStatus = 'CHO_TIEP_NHAN';
         $targetStatus = 'DANG_THUC_HIEN';
     } elseif ($currentUser['role'] === 'BGD') {
@@ -301,7 +301,7 @@ function createRowHtml(index) {
 
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-3 pt-2 border-t border-slate-200/50">
                 <div>
-                    <label class="block text-[11px] font-semibold text-slate-600 mb-1">Người phụ trách chính (MAIN) <?php if ($currentUser['role'] === 'TRUONG_PHONG'): ?><span class="text-indigo-600 font-normal">(Thuộc phòng)</span><?php endif; ?></label>
+                    <label class="block text-[11px] font-semibold text-slate-600 mb-1">Người phụ trách chính (MAIN) <?php if (in_array($currentUser['role'], ['TRUONG_PHONG', 'PHO_PHONG'])): ?><span class="text-indigo-600 font-normal">(Thuộc phòng)</span><?php endif; ?></label>
                     <select name="tasks[${index}][main_assignee]" class="w-full p-2 border border-slate-300 rounded-xl text-xs bg-white font-medium">
                         ${mainUsersOptionsHtml}
                     </select>

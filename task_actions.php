@@ -128,7 +128,7 @@ if ($action === 'save_leader_comment' || $action === 'approve') {
     $canApprove = false;
     if ($currentUser['role'] === 'BGD') {
         $canApprove = true;
-    } elseif ($currentUser['role'] === 'TRUONG_PHONG' && $task['department_id'] == $currentUser['department_id']) {
+    } elseif (in_array($currentUser['role'], ['TRUONG_PHONG', 'PHO_PHONG']) && $task['department_id'] == $currentUser['department_id']) {
         $canApprove = true;
     }
 
@@ -253,7 +253,7 @@ if ($action === 'save_task') {
     $taskId = (int)($_POST['task_id'] ?? 0);
     $title = trim($_POST['title'] ?? '');
     $description = trim($_POST['description'] ?? '');
-    $departmentId = in_array($currentUser['role'], ['TRUONG_PHONG', 'NHAN_VIEN', 'HO_TRO'])
+    $departmentId = in_array($currentUser['role'], ['TRUONG_PHONG', 'PHO_PHONG', 'NHAN_VIEN', 'HO_TRO'])
         ? $currentUser['department_id']
         : (int)($_POST['department_id'] ?? $currentUser['department_id']);
     $priority = $_POST['priority'] ?? 'NORMAL';
@@ -266,7 +266,7 @@ if ($action === 'save_task') {
     if (in_array($currentUser['role'], ['NHAN_VIEN', 'HO_TRO'])) {
         $status = 'CHO_DUYET';
         $targetStatus = null;
-    } elseif ($currentUser['role'] === 'TRUONG_PHONG') {
+    } elseif (in_array($currentUser['role'], ['TRUONG_PHONG', 'PHO_PHONG'])) {
         $status = 'CHO_TIEP_NHAN';
         $targetStatus = 'DANG_THUC_HIEN';
     } elseif ($currentUser['role'] === 'BGD') {
@@ -452,7 +452,7 @@ if ($action === 'batch_approve_tasks') {
     $taskIds = $_POST['task_ids'] ?? [];
     $generalComment = trim($_POST['leader_comments_general'] ?? '');
 
-    if (!in_array($currentUser['role'], ['TRUONG_PHONG', 'BGD', 'SUPER_ADMIN'])) {
+    if (!in_array($currentUser['role'], ['TRUONG_PHONG', 'PHO_PHONG', 'BGD', 'SUPER_ADMIN'])) {
         $_SESSION['flash_error'] = "Bạn không có quyền thực hiện chức năng phê duyệt hàng loạt!";
         header("Location: index.php");
         exit;
@@ -496,7 +496,7 @@ if ($action === 'batch_approve_tasks') {
             if ($task['status'] === 'CHO_BGD_DUYET' || $task['status'] === 'CHO_DUYET') {
                 $canApprove = true;
             }
-        } elseif ($currentUser['role'] === 'TRUONG_PHONG') {
+        } elseif (in_array($currentUser['role'], ['TRUONG_PHONG', 'PHO_PHONG'])) {
             if ($task['status'] === 'CHO_DUYET' && $task['department_id'] == $currentUser['department_id']) {
                 $canApprove = true;
             }
