@@ -1,6 +1,7 @@
 <?php
 session_start();
 require_once __DIR__ . '/config.php';
+require_once __DIR__ . '/includes/functions.php';
 
 if (isset($_SESSION['user_id'])) {
     header("Location: index.php");
@@ -27,17 +28,9 @@ try {
     $setting_bg_filename = '';
 }
 
-// 2. Verify physical file existence on server; fallback to default_bg.jpg if missing or empty
-$loginBg = $setting_bg_filename;
-if (empty($loginBg) || !file_exists(__DIR__ . '/' . $loginBg)) {
-    if (file_exists(__DIR__ . '/uploads/bg/default_bg.jpg')) {
-        $loginBg = 'uploads/bg/default_bg.jpg';
-    } elseif (file_exists(__DIR__ . '/assets/images/default_bg.jpg')) {
-        $loginBg = 'assets/images/default_bg.jpg';
-    } else {
-        $loginBg = '';
-    }
-}
+// 2. Verify physical file existence on server and normalize path
+$resolvedBg = resolveLoginBackground($setting_bg_filename);
+$loginBgUrl = htmlspecialchars($resolvedBg['url']);
 
 $error = '';
 if (isset($_GET['timeout']) && $_GET['timeout'] == '1') {
@@ -78,10 +71,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 </head>
 <body class="min-h-screen flex items-center justify-center p-4 relative overflow-hidden bg-gradient-to-br from-slate-900 via-indigo-950 to-blue-900">
 
-<?php if (!empty($loginBg) && file_exists(__DIR__ . '/' . $loginBg)):
-    $bgTimestamp = filemtime(__DIR__ . '/' . $loginBg) ?: time();
-    $loginBgUrl = htmlspecialchars($loginBg) . '?v=' . $bgTimestamp;
-?>
+<?php if (!empty($loginBgUrl)): ?>
     <!-- Custom Background Image with overlay -->
     <div class="absolute inset-0 z-0 transition-all duration-700 scale-105" style="background-image: url('<?= $loginBgUrl ?>'); background-size: cover; background-position: center; background-attachment: fixed; background-repeat: no-repeat;"></div>
     <div class="absolute inset-0 bg-black/20 z-0"></div>
