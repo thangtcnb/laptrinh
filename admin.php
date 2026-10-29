@@ -571,9 +571,30 @@ try {
                         <label class="block text-xs font-bold text-slate-700">Hình nền hiện tại / Xem trước:</label>
                         <div class="w-full h-44 rounded-xl border border-slate-200 overflow-hidden bg-slate-900 relative flex items-center justify-center shadow-inner">
                             <?php
-                                $resolvedBg = resolveLoginBackground($currentLoginBg);
-                                $bgImgSrc = htmlspecialchars($resolvedBg['url']);
-                                $isCustomBg = $resolvedBg['is_custom'];
+                                $setting_bg_filename = trim($currentLoginBg ?? '');
+                                $isCustomBg = false;
+                                $previewBgPath = '';
+
+                                if (!empty($setting_bg_filename)) {
+                                    // Bổ sung uploads/bg/ nếu CSDL chưa có, nếu có rồi thì giữ nguyên
+                                    $checkPath = (strpos($setting_bg_filename, 'uploads/bg/') === 0) ? $setting_bg_filename : 'uploads/bg/' . $setting_bg_filename;
+
+                                    // Kiểm tra file vật lý trên server local
+                                    if (file_exists(__DIR__ . '/' . $checkPath)) {
+                                        $previewBgPath = $checkPath;
+                                        $isCustomBg = true;
+                                    }
+                                }
+
+                                // Fallback về default nếu không tìm thấy file custom
+                                if (empty($previewBgPath)) {
+                                    if (file_exists(__DIR__ . '/uploads/bg/default_bg.jpg')) {
+                                        $previewBgPath = 'uploads/bg/default_bg.jpg';
+                                    }
+                                }
+
+                                // Tạo URL chống Cache trình duyệt
+                                $bgImgSrc = !empty($previewBgPath) ? htmlspecialchars($previewBgPath) . '?v=' . (filemtime(__DIR__ . '/' . $previewBgPath) ?: time()) : '';
                             ?>
                             <img id="bgPreviewImage" src="<?= $bgImgSrc ?>" class="w-full h-full object-cover <?= empty($bgImgSrc) ? 'hidden' : '' ?>">
                             <div id="bgDefaultPlaceholder" class="bg-gradient-to-br from-slate-900 via-indigo-950 to-blue-900 w-full h-full flex flex-col items-center justify-center text-white text-xs p-4 text-center <?= !empty($bgImgSrc) ? 'hidden' : '' ?>">
