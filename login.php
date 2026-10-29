@@ -28,9 +28,27 @@ try {
     $setting_bg_filename = '';
 }
 
-// 2. Verify physical file existence on server and normalize path
-$resolvedBg = resolveLoginBackground($setting_bg_filename);
-$loginBgUrl = htmlspecialchars($resolvedBg['url']);
+// Chuẩn hóa đường dẫn đọc từ CSDL system_settings
+$setting_bg_filename = trim($setting_bg_filename ?? '');
+$loginBg = '';
+
+if (!empty($setting_bg_filename)) {
+    $checkBg = (strpos($setting_bg_filename, 'uploads/bg/') === 0) ? $setting_bg_filename : 'uploads/bg/' . $setting_bg_filename;
+    if (file_exists(__DIR__ . '/' . $checkBg)) {
+        $loginBg = $checkBg;
+    }
+}
+
+// Fallback mecanismo nếu file custom bị xóa/mất vật lý
+if (empty($loginBg)) {
+    if (file_exists(__DIR__ . '/uploads/bg/default_bg.jpg')) {
+        $loginBg = 'uploads/bg/default_bg.jpg';
+    } elseif (file_exists(__DIR__ . '/assets/images/default_bg.jpg')) {
+        $loginBg = 'assets/images/default_bg.jpg';
+    }
+}
+
+$loginBgUrl = !empty($loginBg) ? htmlspecialchars($loginBg) . '?v=' . (filemtime(__DIR__ . '/' . $loginBg) ?: time()) : '';
 
 $error = '';
 if (isset($_GET['timeout']) && $_GET['timeout'] == '1') {
