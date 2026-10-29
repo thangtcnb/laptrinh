@@ -603,3 +603,52 @@ function getTasksFiltered($pdo, $filters = [], $limit = 15, $offset = 0, $curren
         'total_pages' => max(1, ceil($total / $limit))
     ];
 }
+
+/**
+ * Resolve login background path and URL with fallback handling
+ */
+function resolveLoginBackground($dbValue) {
+    $rootDir = dirname(__DIR__);
+    $rawPath = trim((string)($dbValue ?? ''));
+
+    $path = '';
+    $isCustom = false;
+
+    if ($rawPath !== '') {
+        $cleanPath = ltrim($rawPath, '/\\');
+        if (strpos($cleanPath, 'uploads/bg/') !== 0) {
+            if (strpos($cleanPath, 'bg/') === 0) {
+                $cleanPath = 'uploads/' . $cleanPath;
+            } else {
+                $cleanPath = 'uploads/bg/' . $cleanPath;
+            }
+        }
+        if (file_exists($rootDir . '/' . $cleanPath) && is_file($rootDir . '/' . $cleanPath)) {
+            $path = $cleanPath;
+            $isCustom = true;
+        }
+    }
+
+    // Fallback if custom bg missing or empty
+    if ($path === '') {
+        $defaultPath = 'uploads/bg/default_bg.jpg';
+        if (file_exists($rootDir . '/' . $defaultPath) && is_file($rootDir . '/' . $defaultPath)) {
+            $path = $defaultPath;
+        } elseif (file_exists($rootDir . '/assets/images/default_bg.jpg') && is_file($rootDir . '/assets/images/default_bg.jpg')) {
+            $path = 'assets/images/default_bg.jpg';
+        }
+    }
+
+    if ($path !== '') {
+        $mtime = filemtime($rootDir . '/' . $path) ?: time();
+        $url = $path . '?v=' . $mtime;
+    } else {
+        $url = '';
+    }
+
+    return [
+        'path' => $path,
+        'url' => $url,
+        'is_custom' => $isCustom
+    ];
+}

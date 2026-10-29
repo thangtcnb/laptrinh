@@ -571,18 +571,9 @@ try {
                         <label class="block text-xs font-bold text-slate-700">Hình nền hiện tại / Xem trước:</label>
                         <div class="w-full h-44 rounded-xl border border-slate-200 overflow-hidden bg-slate-900 relative flex items-center justify-center shadow-inner">
                             <?php
-                                $setting_bg_filename = trim($currentLoginBg ?? '');
-                                $isCustomBg = false;
-                                if (!empty($setting_bg_filename) && file_exists(__DIR__ . '/' . $setting_bg_filename)) {
-                                    $previewBgPath = $setting_bg_filename;
-                                    $isCustomBg = true;
-                                } elseif (file_exists(__DIR__ . '/uploads/bg/default_bg.jpg')) {
-                                    $previewBgPath = 'uploads/bg/default_bg.jpg';
-                                } else {
-                                    $previewBgPath = '';
-                                }
-
-                                $bgImgSrc = !empty($previewBgPath) ? htmlspecialchars($previewBgPath) . '?v=' . (filemtime(__DIR__ . '/' . $previewBgPath) ?: time()) : '';
+                                $resolvedBg = resolveLoginBackground($currentLoginBg);
+                                $bgImgSrc = htmlspecialchars($resolvedBg['url']);
+                                $isCustomBg = $resolvedBg['is_custom'];
                             ?>
                             <img id="bgPreviewImage" src="<?= $bgImgSrc ?>" class="w-full h-full object-cover <?= empty($bgImgSrc) ? 'hidden' : '' ?>">
                             <div id="bgDefaultPlaceholder" class="bg-gradient-to-br from-slate-900 via-indigo-950 to-blue-900 w-full h-full flex flex-col items-center justify-center text-white text-xs p-4 text-center <?= !empty($bgImgSrc) ? 'hidden' : '' ?>">
