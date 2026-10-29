@@ -13,34 +13,29 @@ if (!file_exists('uploads/bg/')) {
 }
 
 // Background loading logic with fallback mechanism
-$loginBg = '';
+$setting_bg_filename = '';
 
 // 1. Check CSDL configuration (system_settings table)
 try {
     if (isset($pdo) && $pdo) {
         $stmtBg = $pdo->query("SELECT setting_value FROM system_settings WHERE setting_key = 'login_bg'");
         if ($rowBg = $stmtBg->fetch()) {
-            $dbBg = trim($rowBg['setting_value'] ?? '');
-            if (!empty($dbBg) && file_exists(__DIR__ . '/' . $dbBg)) {
-                $loginBg = $dbBg;
-            }
+            $setting_bg_filename = trim($rowBg['setting_value'] ?? '');
         }
     }
 } catch (\Exception $e) {
-    $loginBg = '';
+    $setting_bg_filename = '';
 }
 
-// 2. If no valid image in CSDL, check if Admin uploaded file uploads/bg/login_bg.jpg exists
-if (empty($loginBg) && file_exists(__DIR__ . '/uploads/bg/login_bg.jpg')) {
-    $loginBg = 'uploads/bg/login_bg.jpg';
-}
-
-// 3. Fallback to system default background image
-if (empty($loginBg)) {
-    if (file_exists(__DIR__ . '/assets/images/default_bg.jpg')) {
-        $loginBg = 'assets/images/default_bg.jpg';
-    } elseif (file_exists(__DIR__ . '/uploads/bg/default_bg.jpg')) {
+// 2. Verify physical file existence on server; fallback to default_bg.jpg if missing or empty
+$loginBg = $setting_bg_filename;
+if (empty($loginBg) || !file_exists(__DIR__ . '/' . $loginBg)) {
+    if (file_exists(__DIR__ . '/uploads/bg/default_bg.jpg')) {
         $loginBg = 'uploads/bg/default_bg.jpg';
+    } elseif (file_exists(__DIR__ . '/assets/images/default_bg.jpg')) {
+        $loginBg = 'assets/images/default_bg.jpg';
+    } else {
+        $loginBg = '';
     }
 }
 
