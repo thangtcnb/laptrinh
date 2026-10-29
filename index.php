@@ -63,7 +63,7 @@ $totalPages = $result['total_pages'];
 $departmentsList = getDepartments($pdo);
 $usersList = getUsers($pdo); // All users for filters & admin views
 $assignableUsers = getUsers($pdo, null, true); // Exclude Super Admin from assignments
-$deptEmployeesForMain = ($currentUser['role'] === 'TRUONG_PHONG')
+$deptEmployeesForMain = in_array($currentUser['role'], ['TRUONG_PHONG', 'PHO_PHONG'])
     ? getUsers($pdo, $currentUser['department_id'], true)
     : $assignableUsers;
 $coopUsersList = array_filter($assignableUsers, fn($u) => $u['role'] !== 'BGD'); // Exclude BGD from COOP
@@ -92,7 +92,7 @@ if ($currentUser) {
 
 // Check if current logged-in user (Trưởng/Phó phòng) has pending approval tasks (CHO_DUYET) from their department
 $pendingApprovalTasksForDept = [];
-if ($currentUser['role'] === 'TRUONG_PHONG') {
+if (in_array($currentUser['role'], ['TRUONG_PHONG', 'PHO_PHONG'])) {
     $stmtDeptPending = $pdo->prepare("
         SELECT t.*, u.fullname AS creator_name, d.name AS dept_name, d.code AS dept_code
         FROM tasks t
@@ -124,7 +124,7 @@ if ($currentUser['role'] === 'BGD') {
 $pendingApprovalTasks = [];
 if ($currentUser['role'] === 'BGD') {
     $pendingApprovalTasks = $pendingApprovalTasksForBgd;
-} elseif ($currentUser['role'] === 'TRUONG_PHONG') {
+} elseif (in_array($currentUser['role'], ['TRUONG_PHONG', 'PHO_PHONG'])) {
     $pendingApprovalTasks = $pendingApprovalTasksForDept;
 } elseif ($currentUser['role'] === 'SUPER_ADMIN') {
     $stmtAdminPending = $pdo->prepare("
@@ -294,7 +294,7 @@ if ($deepLinkTaskId > 0) {
             <h3 class="font-bold text-slate-800 text-base">Bộ Lọc Thông Minh & Tìm Kiếm</h3>
         </div>
         <div class="flex items-center gap-2">
-            <?php if (in_array($currentUser['role'], ['TRUONG_PHONG', 'BGD', 'SUPER_ADMIN'])): ?>
+            <?php if (in_array($currentUser['role'], ['TRUONG_PHONG', 'PHO_PHONG', 'BGD', 'SUPER_ADMIN'])): ?>
                 <button onclick="openBatchApprovalModal()" class="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-xl text-xs font-semibold transition flex items-center gap-1.5 shadow-md shadow-emerald-100 relative">
                     <i class="fa-solid fa-clipboard-check"></i>
                     <span>Xem danh sách cần duyệt</span>
@@ -541,7 +541,7 @@ if ($deepLinkTaskId > 0) {
 
                                 <!-- BADGE NGƯỜI GIAO VIỆC DÀNH CHO CÔNG VIỆC TRỰC TIẾP -->
                                 <?php
-                                $isDirectAssignment = in_array($t['creator_role'], ['TRUONG_PHONG', 'BGD', 'SUPER_ADMIN']);
+                                $isDirectAssignment = in_array($t['creator_role'], ['TRUONG_PHONG', 'PHO_PHONG', 'BGD', 'SUPER_ADMIN']);
                                 ?>
                                 <?php if ($isDirectAssignment): ?>
                                     <div class="mt-1">
@@ -651,7 +651,7 @@ if ($deepLinkTaskId > 0) {
                                         }
                                     }
                                     $isCreator = ($t['created_by'] == $currentUser['id']);
-                                    $isLeaderOfDept = ($currentUser['role'] === 'TRUONG_PHONG' && $t['department_id'] == $currentUser['department_id']);
+                                    $isLeaderOfDept = (in_array($currentUser['role'], ['TRUONG_PHONG', 'PHO_PHONG']) && $t['department_id'] == $currentUser['department_id']);
                                     $isBgd = ($currentUser['role'] === 'BGD');
                                     ?>
 
@@ -660,9 +660,9 @@ if ($deepLinkTaskId > 0) {
                                         <i class="fa-solid fa-clock-rotate-left text-xs"></i>
                                     </button>
 
-                                    <!-- Progress & Proof Update Button (Trưởng phòng không hiển thị nút này theo yêu cầu) -->
+                                    <!-- Progress & Proof Update Button (Lãnh đạo phòng không hiển thị nút này theo yêu cầu) -->
                                     <?php
-                                    $canUpdateProgress = ($isAssignee || $isCreator || $isBgd) && ($currentUser['role'] !== 'TRUONG_PHONG');
+                                    $canUpdateProgress = ($isAssignee || $isCreator || $isBgd) && (!in_array($currentUser['role'], ['TRUONG_PHONG', 'PHO_PHONG']));
                                     ?>
                                     <?php if ($canUpdateProgress): ?>
                                         <button onclick='openProgressModal(<?= htmlspecialchars(json_encode($t), ENT_QUOTES, "UTF-8") ?>)' class="p-1.5 bg-indigo-50 hover:bg-indigo-600 text-indigo-600 hover:text-white rounded-lg transition" title="Cập nhật tiến độ & minh chứng">
@@ -1005,7 +1005,7 @@ if ($deepLinkTaskId > 0) {
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                     <label class="block text-xs font-semibold text-slate-700 mb-1">Đơn vị chủ trì</label>
-                    <?php if (in_array($currentUser['role'], ['TRUONG_PHONG', 'NHAN_VIEN', 'HO_TRO'])): ?>
+                    <?php if (in_array($currentUser['role'], ['TRUONG_PHONG', 'PHO_PHONG', 'NHAN_VIEN', 'HO_TRO'])): ?>
                         <?php
                         $userDept = array_filter($departmentsList, fn($d) => $d['id'] == $currentUser['department_id']);
                         $userDeptObj = reset($userDept);
@@ -1059,7 +1059,7 @@ if ($deepLinkTaskId > 0) {
                 </div>
 
                 <div>
-                    <label class="block text-[11px] font-semibold text-slate-600 mb-1">1. Người phụ trách chính (MAIN) <?php if ($currentUser['role'] === 'TRUONG_PHONG'): ?><span class="text-indigo-600 font-normal">(Chỉ gồm nhân viên thuộc phòng)</span><?php endif; ?></label>
+                    <label class="block text-[11px] font-semibold text-slate-600 mb-1">1. Người phụ trách chính (MAIN) <?php if (in_array($currentUser['role'], ['TRUONG_PHONG', 'PHO_PHONG'])): ?><span class="text-indigo-600 font-normal">(Chỉ gồm nhân viên thuộc phòng)</span><?php endif; ?></label>
                     <select name="main_assignee" id="form_main_assignee" class="w-full p-2 border border-slate-300 rounded-lg text-xs font-medium bg-white">
                         <option value="">-- Chọn Người phụ trách chính --</option>
                         <?php foreach ($deptEmployeesForMain as $u): ?>
@@ -1159,7 +1159,7 @@ if ($deepLinkTaskId > 0) {
 </div>
 
 <!-- ==================== MODAL: BATCH APPROVAL FOR LEADERS (TRƯỞNG PHÒNG & BGD) ==================== -->
-<?php if (in_array($currentUser['role'], ['TRUONG_PHONG', 'BGD', 'SUPER_ADMIN'])): ?>
+<?php if (in_array($currentUser['role'], ['TRUONG_PHONG', 'PHO_PHONG', 'BGD', 'SUPER_ADMIN'])): ?>
 <div id="batchApprovalModal" class="fixed inset-0 bg-slate-900/70 backdrop-blur-md hidden items-center justify-center p-4 z-50">
     <div class="bg-white rounded-2xl shadow-2xl max-w-4xl w-full p-6 border border-slate-200 transform transition-all max-h-[90vh] flex flex-col">
         <!-- Modal Header -->
@@ -1169,8 +1169,8 @@ if ($deepLinkTaskId > 0) {
                 <span>
                     <?php if ($currentUser['role'] === 'BGD'): ?>
                         Danh Sách Công Việc Kính Trình Ban Giám Đốc Phê Duyệt
-                    <?php elseif ($currentUser['role'] === 'TRUONG_PHONG'): ?>
-                        Danh Sách Công Việc Chờ Trưởng Phòng Phê Duyệt
+                    <?php elseif (in_array($currentUser['role'], ['TRUONG_PHONG', 'PHO_PHONG'])): ?>
+                        Danh Sách Công Việc Chờ Trưởng/Phó Phòng Phê Duyệt
                     <?php else: ?>
                         Danh Sách Công Việc Chờ Phê Duyệt Hàng Loạt
                     <?php endif; ?>

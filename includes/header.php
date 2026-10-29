@@ -8,6 +8,8 @@ $currentUser = getCurrentUser($pdo);
 $roleLabel = $currentUser['role'];
 if ($roleLabel === 'TRUONG_PHONG') {
     $roleLabel = 'Trưởng phòng';
+} elseif ($roleLabel === 'PHO_PHONG') {
+    $roleLabel = 'Phó phòng';
 } elseif ($roleLabel === 'NHAN_VIEN') {
     $roleLabel = 'Nhân viên';
 } elseif ($roleLabel === 'HO_TRO') {

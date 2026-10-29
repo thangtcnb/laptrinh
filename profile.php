@@ -75,6 +75,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
             $displayRole = $currentUser['role'];
             if ($displayRole === 'HO_TRO') $displayRole = 'Hỗ trợ';
             elseif ($displayRole === 'TRUONG_PHONG') $displayRole = 'Trưởng phòng';
+            elseif ($displayRole === 'PHO_PHONG') $displayRole = 'Phó phòng';
             elseif ($displayRole === 'NHAN_VIEN') $displayRole = 'Nhân viên';
             elseif ($displayRole === 'BGD') $displayRole = 'Ban Giám đốc';
             elseif ($displayRole === 'SUPER_ADMIN') $displayRole = 'Super Admin';

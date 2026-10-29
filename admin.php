@@ -181,7 +181,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 }
 
 // Fetch data
-$allUsers = $pdo->query("SELECT u.*, d.name AS department_name, d.code AS department_code FROM users u JOIN departments d ON u.department_id = d.id ORDER BY u.id ASC")->fetchAll();
+$allUsers = $pdo->query("SELECT u.*, COALESCE(d.name, 'Chưa phân công') AS department_name, COALESCE(d.code, 'N/A') AS department_code FROM users u LEFT JOIN departments d ON u.department_id = d.id ORDER BY u.id ASC")->fetchAll();
 $allDepartments = getDepartments($pdo);
 $auditLogs = $pdo->query("SELECT l.*, u.fullname, u.email FROM audit_logs l LEFT JOIN users u ON l.user_id = u.id ORDER BY l.id DESC LIMIT 100")->fetchAll();
 
@@ -285,7 +285,8 @@ try {
                         <select name="role" class="w-full p-2 border border-slate-300 rounded-xl text-xs focus:ring-2 focus:ring-indigo-500 outline-none bg-white font-semibold">
                             <option value="NHAN_VIEN">Nhân viên</option>
                             <option value="HO_TRO">Hỗ trợ</option>
-                            <option value="TRUONG_PHONG">Trưởng / Phó phòng</option>
+                            <option value="TRUONG_PHONG">Trưởng phòng</option>
+                            <option value="PHO_PHONG">Phó phòng</option>
                             <option value="BGD">Ban Giám đốc</option>
                             <option value="SUPER_ADMIN">Super Admin</option>
                         </select>
@@ -344,6 +345,8 @@ try {
                                             <span class="px-2 py-0.5 rounded text-[11px] font-bold bg-amber-100 text-amber-800 border border-amber-200">Ban Giám đốc</span>
                                         <?php elseif ($u['role'] === 'TRUONG_PHONG'): ?>
                                             <span class="px-2 py-0.5 rounded text-[11px] font-bold bg-blue-100 text-blue-800 border border-blue-200">Trưởng phòng</span>
+                                        <?php elseif ($u['role'] === 'PHO_PHONG'): ?>
+                                            <span class="px-2 py-0.5 rounded text-[11px] font-bold bg-indigo-100 text-indigo-800 border border-indigo-200">Phó phòng</span>
                                         <?php elseif ($u['role'] === 'HO_TRO'): ?>
                                             <span class="px-2 py-0.5 rounded text-[11px] font-bold bg-teal-100 text-teal-800 border border-teal-200">Hỗ trợ</span>
                                         <?php else: ?>
@@ -411,7 +414,8 @@ try {
                         <select name="role" id="edit_role" class="w-full p-2.5 border border-slate-300 rounded-xl text-xs font-semibold bg-white outline-none">
                             <option value="NHAN_VIEN">Nhân viên</option>
                             <option value="HO_TRO">Hỗ trợ</option>
-                            <option value="TRUONG_PHONG">Trưởng / Phó phòng</option>
+                            <option value="TRUONG_PHONG">Trưởng phòng</option>
+                            <option value="PHO_PHONG">Phó phòng</option>
                             <option value="BGD">Ban Giám đốc</option>
                             <option value="SUPER_ADMIN">Super Admin</option>
                         </select>

@@ -33,7 +33,7 @@ $usersList = getUsers($pdo);
 
 if ($currentUser['role'] === 'NHAN_VIEN' || $currentUser['role'] === 'HO_TRO') {
     $scope = 'USER_' . $currentUser['id'];
-} elseif ($currentUser['role'] === 'TRUONG_PHONG') {
+} elseif (in_array($currentUser['role'], ['TRUONG_PHONG', 'PHO_PHONG'])) {
     $deptId = $currentUser['department_id'];
     $allowedUserIds = array_column(getUsers($pdo, $deptId), 'id');
 
@@ -62,7 +62,7 @@ $params = [];
 if (!$currentUser || !in_array($currentUser['role'], ['BGD', 'SUPER_ADMIN'])) {
     $userId = $currentUser['id'] ?? 0;
     $deptId = $currentUser['department_id'] ?? 0;
-    $isDeptHead = ($currentUser['role'] ?? '') === 'TRUONG_PHONG' ? 1 : 0;
+    $isDeptHead = in_array($currentUser['role'] ?? '', ['TRUONG_PHONG', 'PHO_PHONG']) ? 1 : 0;
 
     $where[] = "(
         t.status NOT IN ('CHO_DUYET', 'CHO_BGD_DUYET')
@@ -394,7 +394,7 @@ require_once __DIR__ . '/includes/header.php';
                     <option value="USER_<?= $currentUser['id'] ?>" selected>
                         📌 Cá nhân tôi: <?= htmlspecialchars($currentUser['fullname']) ?>
                     </option>
-                <?php elseif ($currentUser['role'] === 'TRUONG_PHONG'): ?>
+                <?php elseif (in_array($currentUser['role'], ['TRUONG_PHONG', 'PHO_PHONG'])): ?>
                     <?php
                     $myDeptId = $currentUser['department_id'];
                     $deptObjArr = array_filter($departmentsList, fn($d) => $d['id'] == $myDeptId);

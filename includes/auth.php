@@ -11,7 +11,7 @@ function getCurrentUser($pdo) {
         return null;
     }
     try {
-        $stmt = $pdo->prepare("SELECT u.*, d.name AS department_name, d.code AS department_code, d.color_theme, d.icon AS department_icon FROM users u JOIN departments d ON u.department_id = d.id WHERE u.id = ?");
+        $stmt = $pdo->prepare("SELECT u.*, COALESCE(d.name, 'Chưa phân công') AS department_name, COALESCE(d.code, 'N/A') AS department_code, d.color_theme, d.icon AS department_icon FROM users u LEFT JOIN departments d ON u.department_id = d.id WHERE u.id = ?");
         $stmt->execute([$_SESSION['user_id']]);
         return $stmt->fetch() ?: null;
     } catch (\PDOException $e) {
