@@ -128,13 +128,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     mkdir($uploadDir, 0777, true);
                 }
 
-                // Cleanup previous custom background file if exists
+                // Cleanup all previous custom background files in uploads/bg/
                 try {
-                    $stmtOld = $pdo->query("SELECT setting_value FROM system_settings WHERE setting_key = 'login_bg'");
-                    if ($rowOld = $stmtOld->fetch()) {
-                        $oldBg = trim($rowOld['setting_value'] ?? '');
-                        if (!empty($oldBg) && file_exists(__DIR__ . '/' . $oldBg) && str_starts_with($oldBg, 'uploads/bg/login_bg_')) {
-                            @unlink(__DIR__ . '/' . $oldBg);
+                    $bgFiles = glob(__DIR__ . '/uploads/bg/login_bg_*');
+                    if (is_array($bgFiles)) {
+                        foreach ($bgFiles as $oldFile) {
+                            if (is_file($oldFile)) {
+                                @unlink($oldFile);
+                            }
                         }
                     }
                 } catch (\Exception $e) {
@@ -155,13 +156,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 }
             }
         } elseif (isset($_POST['reset_bg'])) {
-            // Cleanup previous custom background file if exists
+            // Cleanup all previous custom background files in uploads/bg/
             try {
-                $stmtOld = $pdo->query("SELECT setting_value FROM system_settings WHERE setting_key = 'login_bg'");
-                if ($rowOld = $stmtOld->fetch()) {
-                    $oldBg = trim($rowOld['setting_value'] ?? '');
-                    if (!empty($oldBg) && file_exists(__DIR__ . '/' . $oldBg) && str_starts_with($oldBg, 'uploads/bg/login_bg_')) {
-                        @unlink(__DIR__ . '/' . $oldBg);
+                $bgFiles = glob(__DIR__ . '/uploads/bg/login_bg_*');
+                if (is_array($bgFiles)) {
+                    foreach ($bgFiles as $oldFile) {
+                        if (is_file($oldFile)) {
+                            @unlink($oldFile);
+                        }
                     }
                 }
             } catch (\Exception $e) {
@@ -569,17 +571,25 @@ try {
                         <label class="block text-xs font-bold text-slate-700">Hình nền hiện tại / Xem trước:</label>
                         <div class="w-full h-44 rounded-xl border border-slate-200 overflow-hidden bg-slate-900 relative flex items-center justify-center shadow-inner">
                             <?php
-                                $bgImgSrc = '';
-                                if (!empty($currentLoginBg) && file_exists(__DIR__ . '/' . $currentLoginBg)) {
-                                    $bgImgSrc = htmlspecialchars($currentLoginBg) . '?v=' . (filemtime(__DIR__ . '/' . $currentLoginBg) ?: time());
+                                $setting_bg_filename = trim($currentLoginBg ?? '');
+                                $isCustomBg = false;
+                                if (!empty($setting_bg_filename) && file_exists(__DIR__ . '/' . $setting_bg_filename)) {
+                                    $previewBgPath = $setting_bg_filename;
+                                    $isCustomBg = true;
+                                } elseif (file_exists(__DIR__ . '/uploads/bg/default_bg.jpg')) {
+                                    $previewBgPath = 'uploads/bg/default_bg.jpg';
+                                } else {
+                                    $previewBgPath = '';
                                 }
+
+                                $bgImgSrc = !empty($previewBgPath) ? htmlspecialchars($previewBgPath) . '?v=' . (filemtime(__DIR__ . '/' . $previewBgPath) ?: time()) : '';
                             ?>
                             <img id="bgPreviewImage" src="<?= $bgImgSrc ?>" class="w-full h-full object-cover <?= empty($bgImgSrc) ? 'hidden' : '' ?>">
                             <div id="bgDefaultPlaceholder" class="bg-gradient-to-br from-slate-900 via-indigo-950 to-blue-900 w-full h-full flex flex-col items-center justify-center text-white text-xs p-4 text-center <?= !empty($bgImgSrc) ? 'hidden' : '' ?>">
                                 <i class="fa-solid fa-palette text-2xl text-blue-300 mb-2"></i>
                                 <span class="font-semibold">Gradient Mặc Định System</span>
                             </div>
-                            <span id="bgTagLabel" class="absolute bottom-2 left-2 bg-slate-900/80 backdrop-blur-md text-white text-[10px] px-2 py-0.5 rounded font-mono"><?= !empty($bgImgSrc) ? 'Custom BG' : 'System Default' ?></span>
+                            <span id="bgTagLabel" class="absolute bottom-2 left-2 bg-slate-900/80 backdrop-blur-md text-white text-[10px] px-2 py-0.5 rounded font-mono"><?= $isCustomBg ? 'Custom BG' : 'System Default' ?></span>
                         </div>
                     </div>
 
