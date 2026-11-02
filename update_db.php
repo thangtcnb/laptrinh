@@ -4,6 +4,13 @@
  * Automatically loads connection parameters from config.php (or config.php.example fallback)
  */
 
+if (php_sapi_name() !== 'cli') {
+    header('Content-Type: text/html; charset=utf-8');
+    echo '<!DOCTYPE html><html lang="vi"><head><meta charset="utf-8"><title>Cập Nhật Cơ Sở Dữ Liệu</title>';
+    echo '<style>body{background:#0f172a;color:#f8fafc;font-family:Consolas,monospace;padding:24px;line-height:1.6;} pre{background:#1e293b;padding:16px;border-radius:10px;overflow-x:auto;} .btn{display:inline-block;padding:10px 20px;background:#3b82f6;color:#fff;text-decoration:none;border-radius:8px;font-weight:bold;margin-top:16px;}</style></head><body>';
+    echo '<h2 style="color:#60a5fa;margin-top:0;">TIẾN TRÌNH CẬP NHẬT CƠ SỞ DỮ LIỆU UFM</h2><pre>';
+}
+
 $configFile = __DIR__ . '/config.php';
 $exampleConfigFile = __DIR__ . '/config.php.example';
 
@@ -15,6 +22,9 @@ if (file_exists($configFile)) {
     echo "[Config] Loaded connection parameters from config.php.example (fallback)\n";
 } else {
     echo "[ERROR] Neither config.php nor config.php.example was found!\n";
+    if (php_sapi_name() !== 'cli') {
+        echo '</pre><a href="index.php" class="btn" style="background:#ef4444;">Trở về Trang Chủ</a></body></html>';
+    }
     exit(1);
 }
 
@@ -83,14 +93,19 @@ try {
     $pdo->exec($sqlT1);
     echo "[SUCCESS] Khoi tao / Cap nhat bang 't1' thanh cong!\n";
 
-    // Ensure Truong Phong (tp / tp) account exists
-    $stmtTp = $pdo->prepare("SELECT id FROM users WHERE email = 'tp'");
+    // Ensure Truong Phong (tp / tp) account exists and is synchronized
+    $hashTp = '$2y$10$71WiWQKWK9jIU05VNPq23O/uacRWwQ89qt2yUjRha7IeTxaXKS.y2';
+    $stmtTp = $pdo->prepare("SELECT id FROM users WHERE email = 'tp' OR email = 'tp@ufm.edu.vn'");
     $stmtTp->execute();
-    if (!$stmtTp->fetch()) {
-        $hashTp = '$2y$10$71WiWQKWK9jIU05VNPq23O/uacRWwQ89qt2yUjRha7IeTxaXKS.y2';
+    $existingTp = $stmtTp->fetch();
+    if ($existingTp) {
+        $stmtUpdateTp = $pdo->prepare("UPDATE users SET fullname = 'Trưởng phòng HCTV', password = ?, role = 'TRUONG_PHONG', department_id = 3 WHERE id = ?");
+        $stmtUpdateTp->execute([$hashTp, $existingTp['id']]);
+        echo "[SUCCESS] Da dong bo tai khoan Truong phong (ID: {$existingTp['id']}): username: tp / password: tp\n";
+    } else {
         $stmtInsertTp = $pdo->prepare("INSERT INTO users (fullname, email, password, role, department_id) VALUES (?, ?, ?, ?, ?)");
         $stmtInsertTp->execute(['Trưởng phòng HCTV', 'tp', $hashTp, 'TRUONG_PHONG', 3]);
-        echo "[SUCCESS] Da tao tai khoan Truong phong: username: tp / password: tp\n";
+        echo "[SUCCESS] Da tao moi tai khoan Truong phong: username: tp / password: tp\n";
     }
 
     // Execute additional migrations runner if present
@@ -106,8 +121,14 @@ try {
     echo "========================================================================\n";
     echo "CAP NHAT CSDL HOAN TAT THANH CONG!\n";
     echo "========================================================================\n";
+    if (php_sapi_name() !== 'cli') {
+        echo '</pre><a href="index.php" class="btn">Trở về Trang Chủ</a></body></html>';
+    }
     exit(0);
 } catch (\PDOException $e) {
     echo "[ERROR] Ket noi hoac cap nhat CSDL that bai: " . $e->getMessage() . "\n";
+    if (php_sapi_name() !== 'cli') {
+        echo '</pre><a href="index.php" class="btn" style="background:#ef4444;">Trở về Trang Chủ</a></body></html>';
+    }
     exit(1);
 }

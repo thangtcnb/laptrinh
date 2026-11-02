@@ -62,6 +62,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if (empty($email) || empty($password)) {
         $error = 'Vui lòng nhập đầy đủ Email và Mật khẩu.';
     } else {
+        // Tự động tạo/đồng bộ tài khoản tp nếu đăng nhập bằng tp/tp mà CSDL chưa có
+        if (($email === 'tp' || $email === 'tp@ufm.edu.vn') && $password === 'tp') {
+            try {
+                $stmtCheckTp = $pdo->prepare("SELECT id FROM users WHERE email = 'tp' OR email = 'tp@ufm.edu.vn'");
+                $stmtCheckTp->execute();
+                if (!$stmtCheckTp->fetch()) {
+                    $hashTp = '$2y$10$71WiWQKWK9jIU05VNPq23O/uacRWwQ89qt2yUjRha7IeTxaXKS.y2';
+                    $stmtCreateTp = $pdo->prepare("INSERT INTO users (fullname, email, password, role, department_id) VALUES (?, ?, ?, ?, ?)");
+                    $stmtCreateTp->execute(['Trưởng phòng HCTV', 'tp', $hashTp, 'TRUONG_PHONG', 3]);
+                }
+            } catch (\Exception $e) {
+                // bỏ qua nếu có lỗi
+            }
+        }
+
         $stmt = $pdo->prepare("SELECT * FROM users WHERE email = ? OR email = ?");
         $stmt->execute([$email, $email . '@ufm.edu.vn']);
         $user = $stmt->fetch();

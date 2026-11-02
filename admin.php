@@ -209,6 +209,10 @@ try {
             <p class="text-xs text-amber-100 mt-1">Quản lý người dùng, phân quyền vai trò, danh mục phòng ban, nhật ký hệ thống và sao lưu dữ liệu.</p>
         </div>
         <div class="flex items-center gap-2">
+            <a href="update_db.php" target="_blank" class="bg-amber-500 hover:bg-amber-600 text-white font-bold px-4 py-2 rounded-xl text-xs transition inline-flex items-center gap-1.5 shadow" title="Cập nhật cấu trúc bảng và các migration CSDL mới nhất">
+                <i class="fa-solid fa-database"></i>
+                <span>Cập Nhật CSDL</span>
+            </a>
             <a href="index.php" class="bg-white/10 hover:bg-white/20 text-white border border-white/20 px-4 py-2 rounded-xl text-xs font-semibold transition inline-flex items-center gap-1.5">
                 <i class="fa-solid fa-house"></i>
                 <span>Về Trang chủ</span>

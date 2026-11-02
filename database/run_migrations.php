@@ -78,6 +78,19 @@ $migrationFiles = [
     'update_20261102_add_user_tp.sql' => 'database/migrations/update_20261102_add_user_tp.sql',
 ];
 
+// Tu dong quet them bat ky file migration moi nao trong database/migrations/
+$discoveredSqlFiles = glob(__DIR__ . '/migrations/*.sql');
+if ($discoveredSqlFiles) {
+    sort($discoveredSqlFiles);
+    foreach ($discoveredSqlFiles as $migFullPath) {
+        $migFileName = basename($migFullPath);
+        $migRelPath = 'database/migrations/' . $migFileName;
+        if (!in_array($migRelPath, $migrationFiles)) {
+            $migrationFiles[$migFileName] = $migRelPath;
+        }
+    }
+}
+
 $total = count($migrationFiles);
 $index = 1;
 
