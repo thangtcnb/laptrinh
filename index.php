@@ -660,9 +660,9 @@ if ($deepLinkTaskId > 0) {
                                         <i class="fa-solid fa-clock-rotate-left text-xs"></i>
                                     </button>
 
-                                    <!-- Progress & Proof Update Button (Lãnh đạo phòng không hiển thị nút này theo yêu cầu) -->
+                                    <!-- Progress & Proof Update Button -->
                                     <?php
-                                    $canUpdateProgress = ($isAssignee || $isCreator || $isBgd) && (!in_array($currentUser['role'], ['TRUONG_PHONG', 'PHO_PHONG']));
+                                    $canUpdateProgress = ($isAssignee || $isCreator || $isLeaderOfDept || $isBgd || ($currentUser['role'] === 'SUPER_ADMIN'));
                                     ?>
                                     <?php if ($canUpdateProgress): ?>
                                         <button onclick='openProgressModal(<?= htmlspecialchars(json_encode($t), ENT_QUOTES, "UTF-8") ?>)' class="p-1.5 bg-indigo-50 hover:bg-indigo-600 text-indigo-600 hover:text-white rounded-lg transition" title="Cập nhật tiến độ & minh chứng">
@@ -1047,7 +1047,7 @@ if ($deepLinkTaskId > 0) {
 
                 <div class="<?= $currentUser['role'] === 'SUPER_ADMIN' ? '' : 'sm:col-span-2' ?>">
                     <label class="block text-xs font-semibold text-slate-700 mb-1">Hạn chót hoàn thành (dd/mm/yyyy)</label>
-                    <input type="date" name="due_date" id="form_due_date" class="w-full p-2.5 border border-slate-300 rounded-xl text-xs focus:ring-2 focus:ring-indigo-500 outline-none">
+                    <input type="text" name="due_date" id="form_due_date" placeholder="dd/mm/yyyy" class="w-full p-2.5 border border-slate-300 rounded-xl text-xs focus:ring-2 focus:ring-indigo-500 outline-none">
                 </div>
             </div>
 
@@ -1612,7 +1612,19 @@ function openTaskModal(task = null) {
         if (document.getElementById('form_status')) {
             document.getElementById('form_status').value = task.status;
         }
-        document.getElementById('form_due_date').value = task.due_date || '';
+        const dueDateInput = document.getElementById('form_due_date');
+        if (dueDateInput) {
+            let dVal = task.due_date || '';
+            if (dVal && dVal.includes('-')) {
+                const dp = dVal.split('-');
+                if (dp.length === 3) dVal = `${dp[2]}/${dp[1]}/${dp[0]}`;
+            }
+            if (dueDateInput._flatpickr) {
+                dueDateInput._flatpickr.setDate(dVal, true, "d/m/Y");
+            } else {
+                dueDateInput.value = dVal;
+            }
+        }
 
         // Existing attachments in edit mode
         if (task.attachments && task.attachments.length > 0) {
@@ -1671,7 +1683,11 @@ function openTaskModal(task = null) {
         document.getElementById('form_task_id').value = 0;
         document.getElementById('form_title').value = '';
         document.getElementById('form_description').value = '';
-        document.getElementById('form_due_date').value = '';
+        const newDueDateInput = document.getElementById('form_due_date');
+        if (newDueDateInput) {
+            if (newDueDateInput._flatpickr) newDueDateInput._flatpickr.clear();
+            else newDueDateInput.value = '';
+        }
         document.getElementById('form_main_assignee').value = '<?= $currentUser['id'] ?>';
 
         existingAttContainer.classList.add('hidden');
@@ -1883,6 +1899,13 @@ function initSmartTimeFilter(savedTimeDetail, savedDateFrom, savedDateTo) {
 }
 
 document.addEventListener('DOMContentLoaded', function() {
+    if (typeof flatpickr !== 'undefined') {
+        flatpickr('#form_due_date', {
+            dateFormat: "d/m/Y",
+            allowInput: true,
+            locale: "vn"
+        });
+    }
     initSmartTimeFilter(
         <?= json_encode($filters['time_detail']) ?>,
         <?= json_encode($filters['date_from']) ?>,

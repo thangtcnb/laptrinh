@@ -25,10 +25,23 @@ $coopUsersList = array_filter($assignableUsers, fn($u) => $u['role'] !== 'BGD');
 
 $errorMsg = '';
 
+function parseDateToYmd($dateStr, $default = null) {
+    $dateStr = trim((string)$dateStr);
+    if (empty($dateStr)) return $default;
+    if (preg_match('/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/', $dateStr, $m)) {
+        return sprintf('%04d-%02d-%02d', $m[3], $m[2], $m[1]);
+    }
+    if (preg_match('/^\d{4}-\d{2}-\d{2}$/', $dateStr)) {
+        return $dateStr;
+    }
+    $ts = strtotime($dateStr);
+    return $ts ? date('Y-m-d', $ts) : $default;
+}
+
 // Handle POST batch registration BEFORE header.php output to avoid 'Headers already sent'
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    $batchStartDate = $_POST['batch_start_date'] ?? $defaultStartDate;
-    $batchEndDate = $_POST['batch_end_date'] ?? $defaultEndDate;
+    $batchStartDate = parseDateToYmd($_POST['batch_start_date'] ?? '', $defaultStartDate);
+    $batchEndDate = parseDateToYmd($_POST['batch_end_date'] ?? '', $defaultEndDate);
     $tasksData = $_POST['tasks'] ?? [];
 
     $insertedCount = 0;
@@ -66,7 +79,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             if (!in_array($priority, ['NORMAL', 'URGENT'])) {
                 $priority = 'NORMAL';
             }
-            $dueDate = !empty($tData['due_date']) ? $tData['due_date'] : $batchEndDate;
+            $dueDate = parseDateToYmd($tData['due_date'] ?? '', $batchEndDate);
             $mainAssignee = (int)($tData['main_assignee'] ?? $currentUser['id']);
             $coopAssignees = $tData['coop_assignees'] ?? [];
 
@@ -174,11 +187,11 @@ require_once __DIR__ . '/includes/header.php';
             <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 max-w-3xl">
                 <div>
                     <label class="block text-xs font-semibold text-slate-600 mb-1">Từ ngày (Thứ Hai)</label>
-                    <input type="date" name="batch_start_date" value="<?= htmlspecialchars($defaultStartDate) ?>" required class="w-full p-2.5 border border-slate-300 rounded-xl text-xs font-medium focus:ring-2 focus:ring-indigo-500 outline-none">
+                    <input type="text" name="batch_start_date" id="batch_start_date" value="<?= htmlspecialchars(date('d/m/Y', strtotime($defaultStartDate))) ?>" placeholder="dd/mm/yyyy" required class="w-full p-2.5 border border-slate-300 rounded-xl text-xs font-medium focus:ring-2 focus:ring-indigo-500 outline-none">
                 </div>
                 <div>
                     <label class="block text-xs font-semibold text-slate-600 mb-1">Đến ngày (Chủ Nhật)</label>
-                    <input type="date" name="batch_end_date" value="<?= htmlspecialchars($defaultEndDate) ?>" required class="w-full p-2.5 border border-slate-300 rounded-xl text-xs font-medium focus:ring-2 focus:ring-indigo-500 outline-none">
+                    <input type="text" name="batch_end_date" id="batch_end_date" value="<?= htmlspecialchars(date('d/m/Y', strtotime($defaultEndDate))) ?>" placeholder="dd/mm/yyyy" required class="w-full p-2.5 border border-slate-300 rounded-xl text-xs font-medium focus:ring-2 focus:ring-indigo-500 outline-none">
                 </div>
                 <div>
                     <label class="block text-xs font-semibold text-slate-600 mb-1">Đơn vị chủ trì</label>
@@ -295,7 +308,7 @@ function createRowHtml(index) {
                 <!-- Due date (2 cols) -->
                 <div class="md:col-span-2">
                     <label class="block text-[11px] font-semibold text-slate-600 mb-1">Hạn chót (dd/mm/yyyy)</label>
-                    <input type="date" name="tasks[${index}][due_date]" value="<?= htmlspecialchars($defaultEndDate) ?>" class="w-full p-2 border border-slate-300 rounded-xl text-xs focus:ring-2 focus:ring-indigo-500 outline-none bg-white font-medium">
+                    <input type="text" name="tasks[${index}][due_date]" id="task_due_date_${index}" value="<?= htmlspecialchars(date('d/m/Y', strtotime($defaultEndDate))) ?>" placeholder="dd/mm/yyyy" class="w-full p-2 border border-slate-300 rounded-xl text-xs focus:ring-2 focus:ring-indigo-500 outline-none bg-white font-medium">
                 </div>
             </div>
 
@@ -325,11 +338,24 @@ function createRowHtml(index) {
     `;
 }
 
+function initRowDatePicker(index) {
+    const el = document.getElementById('task_due_date_' + index);
+    if (el && typeof flatpickr !== 'undefined') {
+        flatpickr(el, {
+            dateFormat: "d/m/Y",
+            allowInput: true,
+            locale: "vn"
+        });
+    }
+}
+
 function addRow() {
     const container = document.getElementById('rowsContainer');
     const div = document.createElement('div');
     div.innerHTML = createRowHtml(rowCount);
     container.appendChild(div.firstElementChild);
+
+    initRowDatePicker(rowCount);
 
     // Default select current user as MAIN assignee
     const newMainSelect = document.querySelector(`#row_${rowCount} select[name="tasks[${rowCount}][main_assignee]"]`);
@@ -357,6 +383,10 @@ function removeRow(index) {
 
 // Initialize 3 default rows
 document.addEventListener('DOMContentLoaded', () => {
+    if (typeof flatpickr !== 'undefined') {
+        flatpickr('#batch_start_date', { dateFormat: "d/m/Y", allowInput: true, locale: "vn" });
+        flatpickr('#batch_end_date', { dateFormat: "d/m/Y", allowInput: true, locale: "vn" });
+    }
     for (let i = 0; i < 3; i++) {
         addRow();
     }

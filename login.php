@@ -138,55 +138,5 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             </button>
         </form>
 
-        <!-- Demo Test Users Block (Demo Test Users) -->
-        <div class="mt-6 pt-5 border-t border-slate-200">
-            <div class="flex items-center justify-between mb-3">
-                <span class="text-xs font-bold text-slate-700 uppercase tracking-wider flex items-center gap-1.5">
-                    <i class="fa-solid fa-users-viewfinder text-indigo-600"></i>
-                    <span>Tài khoản thử nghiệm (Demo)</span>
-                </span>
-                <span class="text-[11px] bg-indigo-50 text-indigo-700 px-2 py-0.5 rounded-full font-bold">Mật khẩu: 123</span>
-            </div>
-
-            <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
-                <!-- 1. Ban Giám đốc -->
-                <button type="button" onclick="fillLogin('yenlinhbt@ufm.edu.vn', '123')" class="text-left p-2.5 rounded-xl border border-slate-200 bg-slate-50 hover:bg-indigo-50 hover:border-indigo-300 transition group">
-                    <div class="font-bold text-slate-800 group-hover:text-indigo-900">1. Ban Giám đốc</div>
-                    <div class="text-slate-600 text-[11px] font-semibold">Bùi Thị Yến Linh</div>
-                    <div class="text-slate-400 text-[10px] truncate">yenlinhbt@ufm.edu.vn</div>
-                </button>
-
-                <!-- 2. Trưởng phòng -->
-                <button type="button" onclick="fillLogin('phamhoainam@ufm.edu.vn', '123')" class="text-left p-2.5 rounded-xl border border-slate-200 bg-slate-50 hover:bg-indigo-50 hover:border-indigo-300 transition group">
-                    <div class="font-bold text-slate-800 group-hover:text-indigo-900">2. Trưởng phòng DTT</div>
-                    <div class="text-slate-600 text-[11px] font-semibold">Phạm Hoài Nam</div>
-                    <div class="text-slate-400 text-[10px] truncate">phamhoainam@ufm.edu.vn</div>
-                </button>
-
-                <!-- 3. Nhân viên Phòng DTT -->
-                <button type="button" onclick="fillLogin('nguyenthithuthuy@ufm.edu.vn', '123')" class="text-left p-2.5 rounded-xl border border-slate-200 bg-slate-50 hover:bg-indigo-50 hover:border-indigo-300 transition group">
-                    <div class="font-bold text-slate-800 group-hover:text-indigo-900">3. Nhân viên Phòng DTT</div>
-                    <div class="text-slate-600 text-[11px] font-semibold">Nguyễn Thị Thu Thủy</div>
-                    <div class="text-slate-400 text-[10px] truncate">nguyenthithuthuy@ufm.edu.vn</div>
-                </button>
-
-                <!-- 4. Nhân viên Phòng HCTV -->
-                <button type="button" onclick="fillLogin('huynhthianhtung@ufm.edu.vn', '123')" class="text-left p-2.5 rounded-xl border border-slate-200 bg-slate-50 hover:bg-indigo-50 hover:border-indigo-300 transition group">
-                    <div class="font-bold text-slate-800 group-hover:text-indigo-900">4. Nhân viên Phòng HCTV</div>
-                    <div class="text-slate-600 text-[11px] font-semibold">Huỳnh Thị Anh Tùng</div>
-                    <div class="text-slate-400 text-[10px] truncate">huynhthianhtung@ufm.edu.vn</div>
-                </button>
-            </div>
-        </div>
-    </div>
-</div>
-
-<script>
-function fillLogin(email, password) {
-    document.getElementById('loginEmail').value = email;
-    document.getElementById('loginPassword').value = password;
-}
-</script>
-
 </body>
 </html>

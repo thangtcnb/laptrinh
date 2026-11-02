@@ -278,8 +278,30 @@ if ($action === 'save_task') {
         $targetStatus = ($status === 'CHO_TIEP_NHAN') ? 'DANG_THUC_HIEN' : null;
     }
 
-    $startDate = $_POST['start_date'] ?: null;
-    $dueDate = $_POST['due_date'] ?: null;
+    $startDateRaw = trim($_POST['start_date'] ?? '');
+    $startDate = null;
+    if (!empty($startDateRaw)) {
+        if (preg_match('/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/', $startDateRaw, $m)) {
+            $startDate = sprintf('%04d-%02d-%02d', $m[3], $m[2], $m[1]);
+        } elseif (preg_match('/^\d{4}-\d{2}-\d{2}$/', $startDateRaw)) {
+            $startDate = $startDateRaw;
+        } else {
+            $ts = strtotime($startDateRaw);
+            $startDate = $ts ? date('Y-m-d', $ts) : null;
+        }
+    }
+    $dueDateRaw = trim($_POST['due_date'] ?? '');
+    $dueDate = null;
+    if (!empty($dueDateRaw)) {
+        if (preg_match('/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/', $dueDateRaw, $m)) {
+            $dueDate = sprintf('%04d-%02d-%02d', $m[3], $m[2], $m[1]);
+        } elseif (preg_match('/^\d{4}-\d{2}-\d{2}$/', $dueDateRaw)) {
+            $dueDate = $dueDateRaw;
+        } else {
+            $ts = strtotime($dueDateRaw);
+            $dueDate = $ts ? date('Y-m-d', $ts) : null;
+        }
+    }
     $mainAssignee = (int)($_POST['main_assignee'] ?? 0);
     $coopAssignees = $_POST['coop_assignees'] ?? [];
 
