@@ -20,9 +20,11 @@
 <script>
 /**
  * Tự động xử lý khi click vào các liên kết có chứa drive.google.com:
- * 1. Gọi hàm mở trình duyệt mặc định của hệ thống thông qua window.open
- * 2. Hoặc chuyển hướng URL trực tiếp tại window chính (window.location.href)
- *    để trình duyệt / môi trường Desktop WebEngine bắt sự kiện mở trình duyệt ngoài (Chrome).
+ * 1. Chặn toàn bộ hành vi mở tab mới bên trong ứng dụng (e.preventDefault(), e.stopPropagation())
+ * 2. Giữ nguyên trang web hiện tại chạy bình thường mà không reload/navigate
+ * 3. Gửi yêu cầu ngầm qua bridge (hidden iframe scheme open-external://)
+ *    để ứng dụng Desktop Python kích hoạt mở trực tiếp bằng trình duyệt Google Chrome mặc định của hệ thống
+ * 4. Fallback: Nếu không phải trong ứng dụng Desktop (người dùng mở qua trình duyệt web thông thường), mở tab mới như bình thường
  */
 function handleDriveGoogleLink(url, event) {
     if (event) {
@@ -31,27 +33,37 @@ function handleDriveGoogleLink(url, event) {
     }
     if (!url) return false;
 
-    // Đảm bảo có tiền tố giao thức https://
+    // Chuẩn hóa giao thức https:// nếu thiếu
     var targetUrl = url.trim();
     if (!/^https?:\/\//i.test(targetUrl)) {
         targetUrl = 'https://' + targetUrl;
     }
 
-    var isWindowOpened = false;
-    try {
-        var win = window.open(targetUrl, '_blank', 'noopener,noreferrer');
-        if (win && !win.closed && typeof win.closed !== 'undefined') {
-            isWindowOpened = true;
+    // Kiểm tra xem đang chạy trong ứng dụng Desktop (PyQt6 WebEngine) hay trình duyệt web thông thường
+    var isDesktopApp = (window.IS_DESKTOP_APP === true) || 
+                       (typeof window.pyBridge !== 'undefined') ||
+                       (navigator.userAgent && (navigator.userAgent.indexOf('UFMTaskApp') !== -1 || navigator.userAgent.indexOf('QtWebEngine') !== -1));
+
+    // 1. Gửi yêu cầu ngầm thông qua hidden iframe để ứng dụng Desktop Python bắt qua bridge
+    var hiddenFrame = document.createElement('iframe');
+    hiddenFrame.style.display = 'none';
+    hiddenFrame.style.width = '0px';
+    hiddenFrame.style.height = '0px';
+    hiddenFrame.style.border = 'none';
+    hiddenFrame.src = 'open-external://' + encodeURIComponent(targetUrl);
+    document.body.appendChild(hiddenFrame);
+
+    setTimeout(function() {
+        if (hiddenFrame && hiddenFrame.parentNode) {
+            hiddenFrame.parentNode.removeChild(hiddenFrame);
         }
-    } catch (err) {
-        isWindowOpened = false;
+    }, 1200);
+
+    // 2. Fallback: Nếu không phải trong Desktop App (ví dụ người dùng mở website qua trình duyệt web Chrome/Edge bên ngoài)
+    if (!isDesktopApp) {
+        window.open(targetUrl, '_blank', 'noopener,noreferrer');
     }
 
-    // Nếu không mở được cửa sổ mới (hoặc trong ứng dụng Desktop / WebView chặn popup),
-    // chuyển hướng URL trực tiếp tại window chính
-    if (!isWindowOpened) {
-        window.location.href = targetUrl;
-    }
     return false;
 }
 
@@ -62,6 +74,9 @@ document.addEventListener('click', function(e) {
 
     var href = a.getAttribute('href') || '';
     if (href.indexOf('drive.google.com') !== -1) {
+        // Chặn ngay lập tức hành vi mặc định để không mở tab mới bên trong ứng dụng
+        e.preventDefault();
+        e.stopPropagation();
         handleDriveGoogleLink(href, e);
     }
 }, true);

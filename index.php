@@ -1559,19 +1559,13 @@ function validateRejection(taskId) {
 
 function openDriveProofLink(e, url) {
     if (e) {
-        e.stopPropagation();
+        if (typeof e.preventDefault === 'function') e.preventDefault();
+        if (typeof e.stopPropagation === 'function') e.stopPropagation();
     }
     if (typeof handleDriveGoogleLink === 'function') {
         return handleDriveGoogleLink(url, e);
     }
-    if (!url) return;
-    if (!/^https?:\/\//i.test(url)) {
-        url = 'https://' + url;
-    }
-    var win = window.open(url, '_blank', 'noopener,noreferrer');
-    if (!win || win.closed || typeof win.closed === 'undefined') {
-        window.location.href = url;
-    }
+    return false;
 }
 
 function openProgressModal(task) {
