@@ -93,6 +93,15 @@ try {
     $pdo->exec($sqlT1);
     echo "[SUCCESS] Khoi tao / Cap nhat bang 't1' thanh cong!\n";
 
+    // Ensure tasks table status ENUM has CHO_TIEP_NHAN and fix blank status
+    try {
+        $pdo->exec("ALTER TABLE `tasks` MODIFY COLUMN `status` ENUM('CHO_BGD_DUYET','CHO_DUYET','CHO_XAC_NHAN','CHO_TIEP_NHAN','DANG_THUC_HIEN','HOAN_THANH','TU_CHOI_CHO_TP_XAC_NHAN','YEU_CAU_CHINH_SUA') NOT NULL DEFAULT 'CHO_DUYET'");
+        $pdo->exec("UPDATE `tasks` SET `status` = 'CHO_TIEP_NHAN' WHERE `status` = '' OR `status` IS NULL");
+        echo "[SUCCESS] Da cap nhat ENUM cot 'status' va dong bo cac cong viec cho tiep nhan.\n";
+    } catch (\PDOException $e) {
+        // ignore if already done
+    }
+
     // Ensure Truong Phong (tp / tp) account exists and is synchronized
     $hashTp = '$2y$10$71WiWQKWK9jIU05VNPq23O/uacRWwQ89qt2yUjRha7IeTxaXKS.y2';
     $stmtTp = $pdo->prepare("SELECT id FROM users WHERE email = 'tp' OR email = 'tp@ufm.edu.vn'");

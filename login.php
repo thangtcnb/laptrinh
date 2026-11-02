@@ -128,12 +128,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         <form method="POST" action="login.php" class="space-y-4">
             <div>
-                <label class="block text-xs font-semibold text-slate-700 mb-1">Tên đăng nhập hoặc Email</label>
+                <label class="block text-xs font-semibold text-slate-700 mb-1">Email</label>
                 <div class="relative">
                     <span class="absolute inset-y-0 left-0 pl-3 flex items-center text-slate-400">
-                        <i class="fa-solid fa-user"></i>
+                        <i class="fa-solid fa-envelope"></i>
                     </span>
-                    <input type="text" id="loginEmail" name="email" required placeholder="Tên đăng nhập hoặc Email (ví dụ: tp)" value="" class="w-full pl-9 pr-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none">
+                    <input type="text" id="loginEmail" name="email" required placeholder="Email" value="" class="w-full pl-9 pr-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none">
                 </div>
             </div>
 

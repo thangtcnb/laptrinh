@@ -85,6 +85,9 @@ if ($action === 'update_progress') {
     $taskId = (int)($_POST['task_id'] ?? 0);
     $progress = min(100, max(0, (int)($_POST['progress'] ?? 0)));
     $proofLink = trim($_POST['proof_link'] ?? '');
+    if (!empty($proofLink) && !preg_match('#^[a-zA-Z][a-zA-Z0-9+\-.]*://#', $proofLink)) {
+        $proofLink = 'https://' . $proofLink;
+    }
 
     // Auto update status to HOAN_THANH if progress reaches 100%, else DANG_THUC_HIEN if > 0 and was CHO_DUYET/CHO_BGD_DUYET
     $stmt = $pdo->prepare("SELECT status FROM tasks WHERE id = ?");

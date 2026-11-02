@@ -85,9 +85,10 @@ if ($currentUser) {
     $stmtPending->execute([$currentUser['id']]);
     $pendingAssignedTasks = $stmtPending->fetchAll();
 
-    foreach ($pendingAssignedTasks as &$pt) {
-        $pt['attachments'] = getTaskAttachments($pdo, $pt['id']);
+    foreach ($pendingAssignedTasks as $k => $pt) {
+        $pendingAssignedTasks[$k]['attachments'] = getTaskAttachments($pdo, $pt['id']);
     }
+    unset($pt);
 }
 
 // Check if current logged-in user (Trưởng/Phó phòng) has pending approval tasks (CHO_DUYET) from their department
@@ -596,7 +597,23 @@ if ($deepLinkTaskId > 0) {
 
                             <!-- 5. TRẠNG THÁI -->
                             <td class="py-3.5 px-3 text-center border-r border-slate-100">
-                                <?= renderStatusBadge($t['status'], $t['due_date']) ?>
+                                <?php
+                                $displayStatus = $t['status'];
+                                // Kiểm tra nếu người dùng hiện tại là người phối hợp và đang chờ xác nhận
+                                $isMyCoopPending = false;
+                                if (!empty($t['assignees'])) {
+                                    foreach ($t['assignees'] as $asg) {
+                                        if ($asg['user_id'] == $currentUser['id'] && $asg['role_type'] === 'COOP' && (empty($asg['is_accepted']) || $asg['is_accepted'] == 0)) {
+                                            $isMyCoopPending = true;
+                                            break;
+                                        }
+                                    }
+                                }
+                                if ($isMyCoopPending || $displayStatus === 'CHO_TIEP_NHAN' || empty($displayStatus)) {
+                                    $displayStatus = 'CHO_TIEP_NHAN';
+                                }
+                                ?>
+                                <?= renderStatusBadge($displayStatus, $t['due_date']) ?>
                             </td>
 
                             <!-- 7. TIẾN ĐỘ & MINH CHỨNG -->
@@ -613,7 +630,18 @@ if ($deepLinkTaskId > 0) {
                                     <!-- Proof Link / Drive Icon -->
                                     <div class="pt-0.5">
                                         <?php if (!empty($t['proof_link'])): ?>
-                                            <a href="<?= htmlspecialchars($t['proof_link']) ?>" target="_blank" rel="noopener noreferrer" class="inline-flex items-center gap-1.5 text-xs text-emerald-700 font-semibold hover:text-emerald-900 bg-emerald-50 hover:bg-emerald-100 px-2 py-0.5 rounded border border-emerald-200 transition" title="Mở link Google Drive minh chứng">
+                                            <?php
+                                            $rawDriveUrl = trim($t['proof_link']);
+                                            if (!preg_match('#^[a-zA-Z][a-zA-Z0-9+\-.]*://#', $rawDriveUrl)) {
+                                                $rawDriveUrl = 'https://' . $rawDriveUrl;
+                                            }
+                                            ?>
+                                            <a href="<?= htmlspecialchars($rawDriveUrl) ?>" 
+                                               target="_blank" 
+                                               rel="noopener noreferrer" 
+                                               onclick="openDriveProofLink(event, '<?= htmlspecialchars(addslashes($rawDriveUrl)) ?>')" 
+                                               class="inline-flex items-center gap-1.5 text-xs text-emerald-700 font-semibold hover:text-emerald-900 bg-emerald-50 hover:bg-emerald-100 px-2 py-0.5 rounded border border-emerald-200 transition shadow-xs cursor-pointer" 
+                                               title="Mở link Google Drive minh chứng">
                                                 <i class="fa-brands fa-google-drive text-emerald-600 text-sm"></i>
                                                 <span>Minh chứng Drive</span>
                                                 <i class="fa-solid fa-arrow-up-right-from-square text-[9px]"></i>
@@ -943,7 +971,7 @@ if ($deepLinkTaskId > 0) {
                     <i class="fa-brands fa-google-drive text-emerald-600"></i>
                     <span>Link Minh chứng (Google Drive / Docs / Sheets)</span>
                 </label>
-                <input type="url" name="proof_link" id="prog_proof_link" placeholder="https://drive.google.com/..." class="w-full p-2.5 border border-slate-300 rounded-xl text-xs focus:ring-2 focus:ring-indigo-500 outline-none">
+                <input type="text" name="proof_link" id="prog_proof_link" placeholder="https://drive.google.com/..." class="w-full p-2.5 border border-slate-300 rounded-xl text-xs focus:ring-2 focus:ring-indigo-500 outline-none">
                 <p class="text-[11px] text-slate-400 mt-1">Dán liên kết Google Drive mở quyền xem cho hội đồng/cấp quản lý.</p>
             </div>
 
@@ -1527,6 +1555,20 @@ function validateRejection(taskId) {
         return false;
     }
     return true;
+}
+
+function openDriveProofLink(e, url) {
+    if (e) {
+        e.stopPropagation();
+    }
+    if (!url) return;
+    if (!/^https?:\/\//i.test(url)) {
+        url = 'https://' + url;
+    }
+    var win = window.open(url, '_blank', 'noopener,noreferrer');
+    if (!win || win.closed || typeof win.closed === 'undefined') {
+        window.location.href = url;
+    }
 }
 
 function openProgressModal(task) {

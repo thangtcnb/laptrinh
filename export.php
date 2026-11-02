@@ -126,9 +126,10 @@ $stmt = $pdo->prepare($sql);
 $stmt->execute($params);
 $allTasksForExcel = $stmt->fetchAll();
 
-foreach ($allTasksForExcel as &$t) {
-    $t['assignees'] = getTaskAssignees($pdo, $t['id']);
+foreach ($allTasksForExcel as $k => $t) {
+    $allTasksForExcel[$k]['assignees'] = getTaskAssignees($pdo, $t['id']);
 }
+unset($t);
 
 // ---------------- Handle Standard OpenXML .xlsx Excel Download ----------------
 if ($exportType === 'excel') {
@@ -184,10 +185,11 @@ if ($exportType === 'excel') {
     }
 
     $statusMap = [
+        'CHO_TIEP_NHAN' => 'Chờ tiếp nhận',
+        'CHO_XAC_NHAN' => 'Chờ NV xác nhận',
         'CHO_DUYET' => 'Chờ Trưởng phòng duyệt',
         'CHO_BGD_DUYET' => 'Chờ BGD duyệt',
         'YEU_CAU_CHINH_SUA' => 'Yêu cầu chỉnh sửa',
-        'CHO_XAC_NHAN' => 'Chờ NV xác nhận',
         'TU_CHOI_CHO_TP_XAC_NHAN' => 'Từ chối - Chờ TP xác nhận',
         'DANG_THUC_HIEN' => 'Đang thực hiện',
         'HOAN_THANH' => 'Hoàn thành'
@@ -262,10 +264,40 @@ if ($exportType === 'excel') {
                 $timeFormatted = '<center>' . $timeStr . '</center>';
 
                 $statusText = $statusMap[$t['status']] ?? $t['status'];
+                // Nếu là công việc phối hợp mà đang chờ tiếp nhận hoặc trạng thái để trống thì thể hiện "Chờ tiếp nhận"
+                if ($bannerTitle === "BẢNG 2: CÔNG VIỆC PHỐI HỢP (Cá nhân tham gia phối hợp)") {
+                    $isCoopWaiting = false;
+                    if ($t['status'] === 'CHO_TIEP_NHAN' || $t['status'] === 'CHO_XAC_NHAN' || empty($t['status'])) {
+                        $isCoopWaiting = true;
+                    } elseif (!empty($targetUserId)) {
+                        foreach ($t['assignees'] as $asg) {
+                            if ($asg['user_id'] == $targetUserId && $asg['role_type'] === 'COOP' && (empty($asg['is_accepted']) || $asg['is_accepted'] == 0)) {
+                                $isCoopWaiting = true;
+                                break;
+                            }
+                        }
+                    } else {
+                        foreach ($t['assignees'] as $asg) {
+                            if ($asg['role_type'] === 'COOP' && (empty($asg['is_accepted']) || $asg['is_accepted'] == 0)) {
+                                $isCoopWaiting = true;
+                                break;
+                            }
+                        }
+                    }
+                    if ($isCoopWaiting) {
+                        $statusText = 'Chờ tiếp nhận';
+                    }
+                }
+                if (empty($statusText)) {
+                    $statusText = 'Chờ tiếp nhận';
+                }
                 $statusFormatted = '<center>' . htmlspecialchars($statusText, ENT_QUOTES) . '</center>';
 
                 $proofLink = trim($t['proof_link'] ?? '');
                 if (!empty($proofLink)) {
+                    if (!preg_match('#^[a-zA-Z][a-zA-Z0-9+\-.]*://#', $proofLink)) {
+                        $proofLink = 'https://' . $proofLink;
+                    }
                     $proofFormatted = '<a href="' . htmlspecialchars($proofLink, ENT_QUOTES) . '">' . htmlspecialchars($proofLink, ENT_QUOTES) . '</a>';
                 } else {
                     $proofFormatted = '';
@@ -345,9 +377,10 @@ $stmtPaginated = $pdo->prepare($paginatedSql);
 $stmtPaginated->execute($params);
 $previewTasks = $stmtPaginated->fetchAll();
 
-foreach ($previewTasks as &$t) {
-    $t['assignees'] = getTaskAssignees($pdo, $t['id']);
+foreach ($previewTasks as $k => $t) {
+    $previewTasks[$k]['assignees'] = getTaskAssignees($pdo, $t['id']);
 }
+unset($t);
 
 define('PAGE_TITLE', 'Xuất Báo Cáo');
 require_once __DIR__ . '/includes/header.php';
@@ -435,6 +468,7 @@ require_once __DIR__ . '/includes/header.php';
             <label class="block text-xs font-semibold text-slate-600 mb-1">Trạng thái công việc</label>
             <select name="status" class="w-full p-2.5 border border-slate-300 rounded-xl text-xs outline-none focus:ring-2 focus:ring-indigo-500 bg-white font-medium">
                 <option value="ALL" <?= $status === 'ALL' ? 'selected' : '' ?>>Tất cả trạng thái</option>
+                        <option value="CHO_TIEP_NHAN" <?= $status === 'CHO_TIEP_NHAN' ? 'selected' : '' ?>>Chờ tiếp nhận</option>
                 <option value="DANG_THUC_HIEN" <?= $status === 'DANG_THUC_HIEN' ? 'selected' : '' ?>>Đang thực hiện</option>
                 <option value="HOAN_THANH" <?= $status === 'HOAN_THANH' ? 'selected' : '' ?>>Hoàn thành</option>
                 <option value="CHO_DUYET" <?= $status === 'CHO_DUYET' ? 'selected' : '' ?>>Chờ Trưởng phòng duyệt</option>

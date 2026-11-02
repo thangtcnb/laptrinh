@@ -32,7 +32,7 @@ function getUsers($pdo, $departmentId = null, $excludeSuperAdmin = false) {
 // Get task assignees for a given task
 function getTaskAssignees($pdo, $taskId) {
     $stmt = $pdo->prepare("
-        SELECT ta.role_type, u.id AS user_id, u.fullname, u.email, u.department_id, COALESCE(d.name, 'Chưa phân công') AS department_name
+        SELECT ta.role_type, ta.is_accepted, ta.accepted_at, u.id AS user_id, u.fullname, u.email, u.department_id, COALESCE(d.name, 'Chưa phân công') AS department_name
         FROM task_assignees ta
         JOIN users u ON ta.user_id = u.id
         LEFT JOIN departments d ON u.department_id = d.id
@@ -169,6 +169,8 @@ function renderStatusBadge($status, $dueDate = null) {
                         <i class="fa-solid fa-hourglass-half"></i> Chờ Trưởng phòng duyệt
                     </span>';
             break;
+        case '':
+        case null:
         case 'CHO_TIEP_NHAN':
             $html = '<span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium bg-cyan-100 text-cyan-800 border border-cyan-200">
                         <i class="fa-solid fa-clock"></i> Chờ tiếp nhận
@@ -587,12 +589,13 @@ function getTasksFiltered($pdo, $filters = [], $limit = 15, $offset = 0, $curren
     $tasks = $stmtData->fetchAll();
 
     // Populate assignees, attachments, formatted leader comment & timeline logs for each task
-    foreach ($tasks as &$task) {
-        $task['assignees'] = getTaskAssignees($pdo, $task['id']);
-        $task['attachments'] = getTaskAttachments($pdo, $task['id']);
-        $task['formatted_leader_comment'] = formatLeaderComment($task);
-        $task['timeline_logs'] = getTaskTimelineLogs($pdo, $task['id']);
+    foreach ($tasks as $k => $task) {
+        $tasks[$k]['assignees'] = getTaskAssignees($pdo, $task['id']);
+        $tasks[$k]['attachments'] = getTaskAttachments($pdo, $task['id']);
+        $tasks[$k]['formatted_leader_comment'] = formatLeaderComment($task);
+        $tasks[$k]['timeline_logs'] = getTaskTimelineLogs($pdo, $task['id']);
     }
+    unset($task);
 
     return [
         'data' => $tasks,
