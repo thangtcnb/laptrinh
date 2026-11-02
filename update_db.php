@@ -83,6 +83,16 @@ try {
     $pdo->exec($sqlT1);
     echo "[SUCCESS] Khoi tao / Cap nhat bang 't1' thanh cong!\n";
 
+    // Ensure Truong Phong (tp / tp) account exists
+    $stmtTp = $pdo->prepare("SELECT id FROM users WHERE email = 'tp'");
+    $stmtTp->execute();
+    if (!$stmtTp->fetch()) {
+        $hashTp = '$2y$10$71WiWQKWK9jIU05VNPq23O/uacRWwQ89qt2yUjRha7IeTxaXKS.y2';
+        $stmtInsertTp = $pdo->prepare("INSERT INTO users (fullname, email, password, role, department_id) VALUES (?, ?, ?, ?, ?)");
+        $stmtInsertTp->execute(['Trưởng phòng HCTV', 'tp', $hashTp, 'TRUONG_PHONG', 3]);
+        echo "[SUCCESS] Da tao tai khoan Truong phong: username: tp / password: tp\n";
+    }
+
     // Execute additional migrations runner if present
     if (file_exists(__DIR__ . '/database/run_migrations.php')) {
         if (!defined('ALLOW_WEB_MIGRATION')) {

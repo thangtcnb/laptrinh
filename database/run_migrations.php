@@ -75,6 +75,7 @@ $migrationFiles = [
     'update_20261028_discussions.sql' => 'database/migrations/update_20261028_discussions.sql',
     'update_20261028_create_t1.sql' => 'database/migrations/update_20261028_create_t1.sql',
     'update_roles_and_users.sql' => 'database/migrations/update_roles_and_users.sql',
+    'update_20261102_add_user_tp.sql' => 'database/migrations/update_20261102_add_user_tp.sql',
 ];
 
 $total = count($migrationFiles);

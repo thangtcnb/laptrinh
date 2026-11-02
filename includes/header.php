@@ -241,6 +241,14 @@ if ($roleLabel === 'TRUONG_PHONG') {
                 <span>Xuất Báo Cáo & In Ấn</span>
             </a>
 
+            <!-- Tab 6: Nhật ký công việc (Trưởng phòng) -->
+            <?php if (isset($currentUser['role']) && in_array($currentUser['role'], ['TRUONG_PHONG', 'PHO_PHONG', 'SUPER_ADMIN'])): ?>
+                <a href="tp_report.php" class="px-3.5 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition flex items-center gap-1.5 <?= $currentPage === 'tp_report.php' ? 'bg-indigo-600 text-white shadow-md shadow-indigo-900/50' : 'bg-indigo-950/40 text-indigo-200 hover:bg-indigo-800/50 border border-indigo-800/40' ?>">
+                    <i class="fa-solid fa-file-word"></i>
+                    <span>Nhật Ký Công Việc</span>
+                </a>
+            <?php endif; ?>
+
             <!-- Tab 5: Super Admin -->
             <?php if (isset($currentUser['role']) && $currentUser['role'] === 'SUPER_ADMIN'): ?>
                 <a href="admin.php" class="px-3.5 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition flex items-center gap-1.5 <?= $currentPage === 'admin.php' ? 'bg-rose-600 text-white shadow-md shadow-rose-900/50' : 'bg-rose-950/40 text-rose-200 hover:bg-rose-800/50 border border-rose-800/40' ?>">
