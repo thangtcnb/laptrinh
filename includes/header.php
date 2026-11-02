@@ -163,7 +163,7 @@ if ($roleLabel === 'TRUONG_PHONG') {
                         TRƯỜNG ĐẠI HỌC TÀI CHÍNH - MARKETING
                     </div>
                     <div class="text-lg md:text-xl font-bold tracking-tight text-white flex items-center gap-2">
-                        <span>PHÂN HIỆU TẠI TỈNH QUẢNG NGÃI</span>
+                        <span>PHÂN HIỆU TẠI TỈNH QUẢNG NGÃI ABCD</span>
                     </div>
                     <div class="text-xs text-indigo-200 flex items-center gap-1 font-medium">
                         <i class="fa-solid fa-[#0088cc] fa-list-check"></i>
