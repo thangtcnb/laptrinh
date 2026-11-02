@@ -1561,6 +1561,9 @@ function openDriveProofLink(e, url) {
     if (e) {
         e.stopPropagation();
     }
+    if (typeof handleDriveGoogleLink === 'function') {
+        return handleDriveGoogleLink(url, e);
+    }
     if (!url) return;
     if (!/^https?:\/\//i.test(url)) {
         url = 'https://' + url;

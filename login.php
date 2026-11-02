@@ -51,6 +51,8 @@ if (empty($loginBg)) {
 $loginBgUrl = !empty($loginBg) ? htmlspecialchars($loginBg) . '?v=' . (filemtime(__DIR__ . '/' . $loginBg) ?: time()) : '';
 
 $error = '';
+$email = '';
+$password = '';
 if (false) {
     $error = 'Phiên làm việc đã hết hạn do không thao tác trong 60 phút. Vui lòng đăng nhập lại.';
 }
@@ -133,7 +135,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     <span class="absolute inset-y-0 left-0 pl-3 flex items-center text-slate-400">
                         <i class="fa-solid fa-envelope"></i>
                     </span>
-                    <input type="text" id="loginEmail" name="email" required placeholder="Email" value="" class="w-full pl-9 pr-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none">
+                    <input type="text" id="loginEmail" name="email" required placeholder="Email" value="<?= htmlspecialchars($email ?? '') ?>" class="w-full pl-9 pr-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none">
                 </div>
             </div>
 
@@ -143,8 +145,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     <span class="absolute inset-y-0 left-0 pl-3 flex items-center text-slate-400">
                         <i class="fa-solid fa-lock"></i>
                     </span>
-                    <input type="password" id="loginPassword" name="password" required value="" placeholder="Mật khẩu" class="w-full pl-9 pr-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none">
+                    <input type="password" id="loginPassword" name="password" required value="<?= htmlspecialchars($password ?? '') ?>" placeholder="Mật khẩu" class="w-full pl-9 pr-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none">
                 </div>
+            </div>
+
+            <div class="flex items-center justify-between pt-1">
+                <label class="inline-flex items-center gap-2 cursor-pointer select-none text-xs text-slate-600 hover:text-slate-800 font-medium">
+                    <input type="checkbox" id="showPassword" class="w-4 h-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 cursor-pointer">
+                    <span>Hiển thị mật khẩu</span>
+                </label>
             </div>
 
             <button type="submit" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-2.5 rounded-lg text-sm transition shadow-lg shadow-indigo-200 flex items-center justify-center gap-2">
@@ -153,5 +162,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             </button>
         </form>
 
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        var showPasswordCheckbox = document.getElementById('showPassword');
+        var passwordInput = document.getElementById('loginPassword');
+        if (showPasswordCheckbox && passwordInput) {
+            showPasswordCheckbox.addEventListener('change', function() {
+                passwordInput.type = this.checked ? 'text' : 'password';
+            });
+        }
+    });
+</script>
 </body>
 </html>
