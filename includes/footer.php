@@ -20,11 +20,11 @@
 <script>
 /**
  * Tự động xử lý khi click vào các liên kết có chứa drive.google.com:
- * 1. Chặn toàn bộ hành vi mở tab mới bên trong ứng dụng (e.preventDefault(), e.stopPropagation())
- * 2. Giữ nguyên trang web hiện tại chạy bình thường mà không reload/navigate
- * 3. Gửi yêu cầu ngầm qua bridge (hidden iframe scheme open-external://)
- *    để ứng dụng Desktop Python kích hoạt mở trực tiếp bằng trình duyệt Google Chrome mặc định của hệ thống
- * 4. Fallback: Nếu không phải trong ứng dụng Desktop (người dùng mở qua trình duyệt web thông thường), mở tab mới như bình thường
+ * 1. Chặn toàn bộ hành vi mở tab mới hoặc reload bên trong ứng dụng (e.preventDefault(), e.stopPropagation())
+ * 2. Giữ nguyên trang web hiện tại chạy bình thường bên trong ứng dụng
+ * 3. Gửi yêu cầu ngầm qua bridge (hidden iframe với URL http://open-external/?url=...)
+ *    để ứng dụng Desktop Python kích hoạt mở trực tiếp bằng trình duyệt Google Chrome bên ngoài
+ * 4. Fallback: Nếu mở trên trình duyệt web thông thường, mở tab mới bình thường
  */
 function handleDriveGoogleLink(url, event) {
     if (event) {
@@ -39,27 +39,26 @@ function handleDriveGoogleLink(url, event) {
         targetUrl = 'https://' + targetUrl;
     }
 
-    // Kiểm tra xem đang chạy trong ứng dụng Desktop (PyQt6 WebEngine) hay trình duyệt web thông thường
+    // Kiểm tra xem đang chạy trong Desktop App (PyQt6 WebEngine) hay trình duyệt web thông thường
     var isDesktopApp = (window.IS_DESKTOP_APP === true) || 
-                       (typeof window.pyBridge !== 'undefined') ||
                        (navigator.userAgent && (navigator.userAgent.indexOf('UFMTaskApp') !== -1 || navigator.userAgent.indexOf('QtWebEngine') !== -1));
 
-    // 1. Gửi yêu cầu ngầm thông qua hidden iframe để ứng dụng Desktop Python bắt qua bridge
+    // 1. Tạo iframe ẩn gửi yêu cầu ngầm tới bridge để ứng dụng Python mở Chrome
     var hiddenFrame = document.createElement('iframe');
     hiddenFrame.style.display = 'none';
     hiddenFrame.style.width = '0px';
     hiddenFrame.style.height = '0px';
     hiddenFrame.style.border = 'none';
-    hiddenFrame.src = 'open-external://' + encodeURIComponent(targetUrl);
+    hiddenFrame.src = 'http://open-external/?url=' + encodeURIComponent(targetUrl);
     document.body.appendChild(hiddenFrame);
 
     setTimeout(function() {
         if (hiddenFrame && hiddenFrame.parentNode) {
             hiddenFrame.parentNode.removeChild(hiddenFrame);
         }
-    }, 1200);
+    }, 1000);
 
-    // 2. Fallback: Nếu không phải trong Desktop App (ví dụ người dùng mở website qua trình duyệt web Chrome/Edge bên ngoài)
+    // 2. Nếu người dùng đang dùng trình duyệt ngoài bình thường (không phải Desktop app QtWebEngine):
     if (!isDesktopApp) {
         window.open(targetUrl, '_blank', 'noopener,noreferrer');
     }

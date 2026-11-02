@@ -639,7 +639,7 @@ if ($deepLinkTaskId > 0) {
                                             <a href="<?= htmlspecialchars($rawDriveUrl) ?>" 
                                                target="_blank" 
                                                rel="noopener noreferrer" 
-                                               onclick="openDriveProofLink(event, '<?= htmlspecialchars(addslashes($rawDriveUrl)) ?>')" 
+                                               onclick="return openDriveProofLink(event, '<?= htmlspecialchars(addslashes($rawDriveUrl)) ?>')" 
                                                class="inline-flex items-center gap-1.5 text-xs text-emerald-700 font-semibold hover:text-emerald-900 bg-emerald-50 hover:bg-emerald-100 px-2 py-0.5 rounded border border-emerald-200 transition shadow-xs cursor-pointer" 
                                                title="Mở link Google Drive minh chứng">
                                                 <i class="fa-brands fa-google-drive text-emerald-600 text-sm"></i>
