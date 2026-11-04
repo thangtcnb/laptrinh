@@ -243,8 +243,15 @@ if (isset($_GET['export']) && $_GET['export'] === 'word') {
                             }
                             $proofDisplay = implode("<br>", $proofParts);
 
-                            // Cột Ghi chú: Nội dung ý kiến của Trưởng phòng hoặc BGĐ
-                            $noteDisplay = htmlspecialchars($task['leader_comments'] ?? '');
+                            // Cột Ghi chú: Nội dung ý kiến của Trưởng phòng/BGĐ và Ghi chú của nhân viên
+                            $noteParts = [];
+                            if (!empty($task['leader_comments'])) {
+                                $noteParts[] = 'Ý kiến CĐ: ' . htmlspecialchars($task['leader_comments']);
+                            }
+                            if (!empty($task['notes'])) {
+                                $noteParts[] = 'Ghi chú NV: ' . htmlspecialchars($task['notes']);
+                            }
+                            $noteDisplay = implode('<br>', $noteParts);
                             ?>
                             <tr>
                                 <td class="text-center"><?= $index++ ?></td>
@@ -427,7 +434,14 @@ require_once __DIR__ . '/includes/header.php';
                             }
                             $proofHtml = implode("<br>", $proofParts);
 
-                            $noteHtml = !empty($task['leader_comments']) ? nl2br(htmlspecialchars($task['leader_comments'])) : '';
+                            $noteParts = [];
+                            if (!empty($task['leader_comments'])) {
+                                $noteParts[] = '<b>Ý kiến CĐ:</b> ' . htmlspecialchars($task['leader_comments']);
+                            }
+                            if (!empty($task['notes'])) {
+                                $noteParts[] = '<b>Ghi chú NV:</b> ' . htmlspecialchars($task['notes']);
+                            }
+                            $noteHtml = implode('<br>', $noteParts);
                             ?>
                             <tr class="hover:bg-slate-50/80 transition">
                                 <td class="border border-slate-900 py-3 px-2 text-center font-bold text-slate-700"><?= $index++ ?></td>

@@ -85,6 +85,7 @@ if ($action === 'update_progress') {
     $taskId = (int)($_POST['task_id'] ?? 0);
     $progress = min(100, max(0, (int)($_POST['progress'] ?? 0)));
     $proofLink = trim($_POST['proof_link'] ?? '');
+    $notes = trim($_POST['notes'] ?? '');
     if (!empty($proofLink) && !preg_match('#^[a-zA-Z][a-zA-Z0-9+\-.]*://#', $proofLink)) {
         $proofLink = 'https://' . $proofLink;
     }
@@ -101,12 +102,25 @@ if ($action === 'update_progress') {
         $newStatus = 'DANG_THUC_HIEN';
     }
 
-    $stmtUpdate = $pdo->prepare("UPDATE tasks SET progress = ?, proof_link = ?, status = ? WHERE id = ?");
-    $stmtUpdate->execute([$progress, $proofLink ?: null, $newStatus, $taskId]);
+    try {
+        $stmtUpdate = $pdo->prepare("UPDATE tasks SET progress = ?, proof_link = ?, notes = ?, status = ? WHERE id = ?");
+        $stmtUpdate->execute([$progress, $proofLink ?: null, $notes ?: null, $newStatus, $taskId]);
+    } catch (\PDOException $e) {
+        $stmtUpdate = $pdo->prepare("UPDATE tasks SET progress = ?, proof_link = ?, status = ? WHERE id = ?");
+        $stmtUpdate->execute([$progress, $proofLink ?: null, $newStatus, $taskId]);
+    }
+    $timelineDesc = "Cập nhật tiến độ $progress%";
+    if (!empty($notes)) {
+        $timelineDesc .= " (Ghi chú: $notes)";
+    }
+    if (!empty($proofLink)) {
+        $timelineDesc .= " kèm link minh chứng";
+    }
 
-    logTaskTimeline($pdo, $taskId, $currentUser['id'], 'UPDATE_PROGRESS', "Cập nhật tiến độ $progress%" . ($proofLink ? " kèm link minh chứng" : ""));
+    logTaskTimeline($pdo, $taskId, $currentUser['id'], 'UPDATE_PROGRESS', $timelineDesc);
+    $_SESSION['flash_success'] = "Đã cập nhật tiến độ (" . $progress . "%), ghi chú và minh chứng thành công!";
 
-    $_SESSION['flash_success'] = "Đã cập nhật tiến độ (" . $progress . "%) và minh chứng thành công!";
+    
     header("Location: index.php");
     exit;
 }
@@ -316,7 +330,7 @@ if ($action === 'save_task') {
 
     if ($taskId > 0) {
         // Edit existing task permission check
-        $stmtExisting = $pdo->prepare("SELECT created_by, status, target_status FROM tasks WHERE id = ?");
+        $stmtExisting = $pdo->prepare("SELECT created_by, status, target_status, due_date FROM tasks WHERE id = ?");
         $stmtExisting->execute([$taskId]);
         $existingTask = $stmtExisting->fetch();
 
@@ -331,6 +345,13 @@ if ($action === 'save_task') {
             $_SESSION['flash_error'] = "Bạn chỉ có quyền chỉnh sửa công việc do chính mình đã tạo!";
             header("Location: index.php");
             exit;
+        }
+
+        // Khóa hạn chót: Khi nhân viên đăng ký công việc và đã được trưởng phòng phê duyệt thì không được phép chỉnh sửa hạn chót
+        $isEmployee = in_array($currentUser['role'], ['NHAN_VIEN', 'HO_TRO']);
+        $isApproved = !in_array($existingTask['status'], ['CHO_DUYET', 'YEU_CAU_CHINH_SUA']);
+        if ($isEmployee && $isApproved) {
+            $dueDate = $existingTask['due_date'];
         }
 
         // On edit, keep existing status & target_status if standard user, unless super admin

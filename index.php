@@ -570,6 +570,17 @@ if ($deepLinkTaskId > 0) {
                                     </div>
                                 <?php endif; ?>
 
+                                <?php if (!empty($t['notes'])): ?>
+                                    <div class="mt-2 bg-indigo-50/70 border-l-4 border-indigo-500 rounded-r-xl p-2 text-xs text-indigo-950">
+                                        <div class="font-bold text-indigo-800 text-[11px] mb-0.5 flex items-center gap-1">
+                                            <i class="fa-solid fa-note-sticky text-indigo-600"></i>GHI CHÚ NGƯỜI THỰC HIỆN:
+                                        </div>
+                                        <div class="text-slate-800 font-medium whitespace-pre-line leading-relaxed">
+                                            <?= htmlspecialchars($t['notes']) ?>
+                                        </div>
+                                    </div>
+                                <?php endif; ?>
+
                                 <?php if (!empty($t['formatted_leader_comment']) || !empty($t['leader_comments'])): ?>
                                     <div class="mt-2.5 bg-amber-50/90 border-l-4 border-amber-500 rounded-r-xl p-2.5 text-xs text-amber-950 shadow-sm">
                                         <div class="flex items-center gap-1.5 font-bold text-amber-800 text-[11px] mb-1">
@@ -966,13 +977,22 @@ if ($deepLinkTaskId > 0) {
                 </div>
             </div>
 
-            <div class="mb-5">
+            <div class="mb-4">
                 <label class="block text-xs font-semibold text-slate-700 mb-1 flex items-center gap-1.5">
                     <i class="fa-brands fa-google-drive text-emerald-600"></i>
                     <span>Link Minh chứng (Google Drive / Docs / Sheets)</span>
                 </label>
                 <input type="text" name="proof_link" id="prog_proof_link" placeholder="https://drive.google.com/..." class="w-full p-2.5 border border-slate-300 rounded-xl text-xs focus:ring-2 focus:ring-indigo-500 outline-none">
                 <p class="text-[11px] text-slate-400 mt-1">Dán liên kết Google Drive mở quyền xem cho hội đồng/cấp quản lý.</p>
+            </div>
+
+            <div class="mb-5">
+                <label class="block text-xs font-semibold text-slate-700 mb-1 flex items-center gap-1.5">
+                    <i class="fa-solid fa-note-sticky text-amber-500"></i>
+                    <span>Ghi chú của người thực hiện</span>
+                </label>
+                <textarea name="notes" id="prog_notes" rows="3" placeholder="Nhập ghi chú, tiến độ hoặc kết quả thực hiện cụ thể..." class="w-full p-2.5 border border-slate-300 rounded-xl text-xs focus:ring-2 focus:ring-indigo-500 outline-none"></textarea>
+                <p class="text-[11px] text-slate-400 mt-1">Ghi chú tiến trình, giải trình hoặc kết quả chi tiết của công việc.</p>
             </div>
 
             <div class="flex justify-end gap-2 pt-3 border-t border-slate-100">
@@ -1074,8 +1094,16 @@ if ($deepLinkTaskId > 0) {
                 <?php endif; ?>
 
                 <div class="<?= $currentUser['role'] === 'SUPER_ADMIN' ? '' : 'sm:col-span-2' ?>">
-                    <label class="block text-xs font-semibold text-slate-700 mb-1">Hạn chót hoàn thành (dd/mm/yyyy)</label>
+                    <label class="block text-xs font-semibold text-slate-700 mb-1 flex items-center justify-between">
+                        <span>Hạn chót hoàn thành (dd/mm/yyyy)</span>
+                        <span id="due_date_lock_badge" class="hidden text-[10px] bg-amber-100 text-amber-800 px-2 py-0.5 rounded font-bold border border-amber-300">
+                            <i class="fa-solid fa-lock mr-0.5"></i> Đã duyệt - Khóa hạn chót
+                        </span>
+                    </label>
                     <input type="text" name="due_date" id="form_due_date" placeholder="dd/mm/yyyy" class="w-full p-2.5 border border-slate-300 rounded-xl text-xs focus:ring-2 focus:ring-indigo-500 outline-none">
+                    <p id="due_date_lock_msg" class="hidden text-[11px] text-amber-700 font-medium mt-1">
+                        <i class="fa-solid fa-circle-exclamation mr-1"></i>Công việc đã được Trưởng phòng phê duyệt, không thể thay đổi hạn chót.
+                    </p>
                 </div>
             </div>
 
@@ -1157,6 +1185,13 @@ if ($deepLinkTaskId > 0) {
                         <span>Văn bản / Tài liệu chỉ đạo đính kèm:</span>
                     </h5>
                     <div id="detailAttachmentsList" class="space-y-1.5"></div>
+                </div>
+
+                <div id="detailNotesContainer" class="p-2.5 bg-indigo-50 border-l-4 border-indigo-500 rounded-r-xl text-xs text-indigo-950 hidden">
+                    <div class="font-bold text-indigo-800 text-[11px] mb-0.5 flex items-center gap-1">
+                        <i class="fa-solid fa-note-sticky text-indigo-600"></i>GHI CHÚ NGƯỜI THỰC HIỆN:
+                    </div>
+                    <div id="detailNotes" class="text-slate-800 font-medium whitespace-pre-line leading-relaxed"></div>
                 </div>
 
                 <div class="grid grid-cols-2 gap-2 text-slate-500 pt-2 border-t border-slate-200/60">
@@ -1369,6 +1404,17 @@ function openTaskDetailModal(task) {
     document.getElementById('detailDueDate').innerText = task.due_date ? new Date(task.due_date).toLocaleDateString('vi-VN') : 'Không quy định';
     document.getElementById('detailDeptBadge').innerText = '[' + (task.dept_code || '') + '] ' + (task.dept_name || '');
 
+    const detailNotesContainer = document.getElementById('detailNotesContainer');
+    const detailNotesEl = document.getElementById('detailNotes');
+    if (detailNotesContainer && detailNotesEl) {
+        if (task.notes && task.notes.trim() !== '') {
+            detailNotesEl.innerText = task.notes;
+            detailNotesContainer.classList.remove('hidden');
+        } else {
+            detailNotesContainer.classList.add('hidden');
+        }
+    }
+
     // Attachments section
     const attContainer = document.getElementById('detailAttachmentsContainer');
     const attList = document.getElementById('detailAttachmentsList');
@@ -1574,6 +1620,7 @@ function openProgressModal(task) {
     document.getElementById('prog_range').value = task.progress;
     document.getElementById('prog_val').value = task.progress;
     document.getElementById('prog_proof_link').value = task.proof_link || '';
+    document.getElementById('prog_notes').value = task.notes || '';
 
     const leaderContainer = document.getElementById('prog_leader_comments_container');
     const leaderCommentEl = document.getElementById('prog_leader_comments');
@@ -1651,7 +1698,14 @@ function openTaskModal(task = null) {
         if (document.getElementById('form_status')) {
             document.getElementById('form_status').value = task.status;
         }
+        const isEmployeeRole = <?= json_encode(in_array($currentUser['role'], ['NHAN_VIEN', 'HO_TRO'])) ?>;
+        const isApprovedTask = task && task.status !== 'CHO_DUYET' && task.status !== 'YEU_CAU_CHINH_SUA';
+        const lockDueDate = isEmployeeRole && isApprovedTask;
+
         const dueDateInput = document.getElementById('form_due_date');
+        const lockBadge = document.getElementById('due_date_lock_badge');
+        const lockMsg = document.getElementById('due_date_lock_msg');
+
         if (dueDateInput) {
             let dVal = task.due_date || '';
             if (dVal && dVal.includes('-')) {
@@ -1662,6 +1716,26 @@ function openTaskModal(task = null) {
                 dueDateInput._flatpickr.setDate(dVal, true, "d/m/Y");
             } else {
                 dueDateInput.value = dVal;
+            }
+
+            if (lockDueDate) {
+                dueDateInput.setAttribute('readonly', 'readonly');
+                dueDateInput.classList.add('bg-slate-100', 'cursor-not-allowed', 'text-slate-500');
+                dueDateInput.classList.remove('focus:ring-2', 'focus:ring-indigo-500');
+                if (dueDateInput._flatpickr) {
+                    dueDateInput._flatpickr.set('clickOpens', false);
+                }
+                if (lockBadge) lockBadge.classList.remove('hidden');
+                if (lockMsg) lockMsg.classList.remove('hidden');
+            } else {
+                dueDateInput.removeAttribute('readonly');
+                dueDateInput.classList.remove('bg-slate-100', 'cursor-not-allowed', 'text-slate-500');
+                dueDateInput.classList.add('focus:ring-2', 'focus:ring-indigo-500');
+                if (dueDateInput._flatpickr) {
+                    dueDateInput._flatpickr.set('clickOpens', true);
+                }
+                if (lockBadge) lockBadge.classList.add('hidden');
+                if (lockMsg) lockMsg.classList.add('hidden');
             }
         }
 
@@ -1723,10 +1797,21 @@ function openTaskModal(task = null) {
         document.getElementById('form_title').value = '';
         document.getElementById('form_description').value = '';
         const newDueDateInput = document.getElementById('form_due_date');
+        const lockBadge = document.getElementById('due_date_lock_badge');
+        const lockMsg = document.getElementById('due_date_lock_msg');
         if (newDueDateInput) {
-            if (newDueDateInput._flatpickr) newDueDateInput._flatpickr.clear();
-            else newDueDateInput.value = '';
+            newDueDateInput.removeAttribute('readonly');
+            newDueDateInput.classList.remove('bg-slate-100', 'cursor-not-allowed', 'text-slate-500');
+            newDueDateInput.classList.add('focus:ring-2', 'focus:ring-indigo-500');
+            if (newDueDateInput._flatpickr) {
+                newDueDateInput._flatpickr.clear();
+                newDueDateInput._flatpickr.set('clickOpens', true);
+            } else {
+                newDueDateInput.value = '';
+            }
         }
+        if (lockBadge) lockBadge.classList.add('hidden');
+        if (lockMsg) lockMsg.classList.add('hidden');
         document.getElementById('form_main_assignee').value = '<?= $currentUser['id'] ?>';
 
         existingAttContainer.classList.add('hidden');

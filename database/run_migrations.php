@@ -76,6 +76,7 @@ $migrationFiles = [
     'update_20261028_create_t1.sql' => 'database/migrations/update_20261028_create_t1.sql',
     'update_roles_and_users.sql' => 'database/migrations/update_roles_and_users.sql',
     'update_20261102_add_user_tp.sql' => 'database/migrations/update_20261102_add_user_tp.sql',
+    'update_20261104_add_task_notes.sql' => 'database/migrations/update_20261104_add_task_notes.sql',
 ];
 
 // Tu dong quet them bat ky file migration moi nao trong database/migrations/

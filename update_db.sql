@@ -55,3 +55,18 @@ SET @preparedStatement = (SELECT IF(
 PREPARE sync_msg FROM @preparedStatement;
 EXECUTE sync_msg;
 DEALLOCATE PREPARE sync_msg;
+
+-- Check va add notes column cho tasks
+SET @tablename = "tasks";
+SET @columnname = "notes";
+SET @preparedStatement = (SELECT IF(
+  (
+    SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS
+    WHERE TABLE_SCHEMA = @dbname AND TABLE_NAME = @tablename AND COLUMN_NAME = @columnname
+  ) > 0,
+  "SELECT 1",
+  "ALTER TABLE tasks ADD COLUMN notes TEXT DEFAULT NULL COMMENT 'Ghi chu tien do hoac ket qua cua nguoi thuc hien' AFTER proof_link;"
+));
+PREPARE add_notes_col FROM @preparedStatement;
+EXECUTE add_notes_col;
+DEALLOCATE PREPARE add_notes_col;

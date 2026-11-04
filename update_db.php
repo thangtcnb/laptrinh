@@ -102,6 +102,17 @@ try {
         // ignore if already done
     }
 
+    // Ensure tasks table has 'notes' column
+    try {
+        $stmtCheckNotes = $pdo->query("SHOW COLUMNS FROM `tasks` LIKE 'notes'");
+        if ($stmtCheckNotes->rowCount() === 0) {
+            $pdo->exec("ALTER TABLE `tasks` ADD COLUMN `notes` TEXT DEFAULT NULL COMMENT 'Ghi chu tien do hoac ket qua cua nguoi thuc hien' AFTER `proof_link`");
+            echo "[SUCCESS] Da bo sung cot 'notes' vao bang 'tasks'.\n";
+        }
+    } catch (\PDOException $e) {
+        // ignore
+    }
+
     // Ensure Truong Phong (tp / tp) account exists and is synchronized
     $hashTp = '$2y$10$71WiWQKWK9jIU05VNPq23O/uacRWwQ89qt2yUjRha7IeTxaXKS.y2';
     $stmtTp = $pdo->prepare("SELECT id FROM users WHERE email = 'tp' OR email = 'tp@ufm.edu.vn'");
