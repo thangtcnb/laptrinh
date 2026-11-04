@@ -170,10 +170,25 @@ if ($action === 'save_leader_comment' || $action === 'approve') {
         $stmtUpdate = $pdo->prepare("UPDATE tasks SET status = ?, target_status = ?, leader_comments = ?, leader_comment_user_id = ? WHERE id = ?");
         $stmtUpdate->execute([$actualStatus, $targetStatus, $leaderComment ?: null, $currentUser['id'], $taskId]);
 
-        $statusName = $actualStatus === 'DANG_THUC_HIEN' ? 'Đã duyệt' : ($actualStatus === 'CHO_TIEP_NHAN' ? 'Chờ tiếp nhận (Trình BGD)' : ($actualStatus === 'CHO_BGD_DUYET' ? 'Trình BGD duyệt' : 'Yêu cầu chỉnh sửa'));
-        logTaskTimeline($pdo, $taskId, $currentUser['id'], 'LEADER_APPROVAL', "Cập nhật trạng thái: $statusName" . ($leaderComment ? ". Ý kiến: $leaderComment" : ""));
-
-        $_SESSION['flash_success'] = "Đã lưu ý kiến chỉ đạo và cập nhật phê duyệt!";
+        if ($actualStatus === 'YEU_CAU_CHINH_SUA') {
+            // Gửi thông báo đến nhân viên đăng ký công việc khi bị từ chối
+            $stmtTaskCreator = $pdo->prepare("SELECT title, created_by FROM tasks WHERE id = ?");
+            $stmtTaskCreator->execute([$taskId]);
+            $tcInfo = $stmtTaskCreator->fetch();
+            if ($tcInfo && $tcInfo['created_by']) {
+                $notifTitle = "Công việc bị từ chối phê duyệt";
+                $reasonStr = $leaderComment ? "Ý kiến chỉ đạo: " . $leaderComment : "Trưởng phòng chưa chấp nhận công việc này.";
+                $notifContent = "Công việc '{$tcInfo['title']}' đã bị Trưởng phòng từ chối phê duyệt. $reasonStr. Bạn có thể chỉnh sửa lại nội dung hoặc xóa công việc này.";
+                $stmtNotif = $pdo->prepare("INSERT INTO notifications (user_id, task_id, title, content, is_read, created_at) VALUES (?, ?, ?, ?, 0, NOW())");
+                $stmtNotif->execute([$tcInfo['created_by'], $taskId, $notifTitle, $notifContent]);
+            }
+            logTaskTimeline($pdo, $taskId, $currentUser['id'], 'REJECT_TASK', "Trưởng phòng từ chối phê duyệt" . ($leaderComment ? ". Ý kiến: $leaderComment" : ""));
+            $_SESSION['flash_success'] = "Đã từ chối phê duyệt công việc. Nhân viên đã nhận được thông báo để chỉnh sửa hoặc xóa công việc!";
+        } else {
+            $statusName = $actualStatus === 'DANG_THUC_HIEN' ? 'Đã duyệt' : ($actualStatus === 'CHO_TIEP_NHAN' ? 'Chờ tiếp nhận (Trình BGD)' : ($actualStatus === 'CHO_BGD_DUYET' ? 'Trình BGD duyệt' : 'Đã duyệt'));
+            logTaskTimeline($pdo, $taskId, $currentUser['id'], 'LEADER_APPROVAL', "Cập nhật trạng thái: $statusName" . ($leaderComment ? ". Ý kiến: $leaderComment" : ""));
+            $_SESSION['flash_success'] = "Đã lưu ý kiến chỉ đạo và cập nhật phê duyệt thành công!";
+        }
     } else {
         $_SESSION['flash_error'] = "Bạn chỉ có quyền cho ý kiến/duyệt các công việc thuộc phòng ban của mình!";
     }
@@ -355,9 +370,17 @@ if ($action === 'save_task') {
         }
 
         // On edit, keep existing status & target_status if standard user, unless super admin
+        $wasRejected = false;
         if ($currentUser['role'] !== 'SUPER_ADMIN') {
-            $status = $existingTask['status'];
-            $targetStatus = $existingTask['target_status'];
+            if ($existingTask['status'] === 'YEU_CAU_CHINH_SUA') {
+                // Sau khi nhân viên chỉnh sửa lại công việc bị từ chối, gửi lại cho Trưởng phòng phê duyệt
+                $status = 'CHO_DUYET';
+                $targetStatus = null;
+                $wasRejected = true;
+            } else {
+                $status = $existingTask['status'];
+                $targetStatus = $existingTask['target_status'];
+            }
         }
 
         // Edit existing task
@@ -370,7 +393,21 @@ if ($action === 'save_task') {
 
         // Reassign assignees
         $pdo->prepare("DELETE FROM task_assignees WHERE task_id = ?")->execute([$taskId]);
-        logTaskTimeline($pdo, $taskId, $currentUser['id'], 'UPDATE_TASK', "Chỉnh sửa thông tin công việc");
+
+        if ($wasRejected) {
+            logTaskTimeline($pdo, $taskId, $currentUser['id'], 'RESUBMIT_TASK', "Đã chỉnh sửa lại công việc sau khi bị từ chối và gửi lại cho Trưởng phòng phê duyệt");
+            // Gửi thông báo đến Lãnh đạo đơn vị
+            $stmtLeaders = $pdo->prepare("SELECT id FROM users WHERE department_id = ? AND role IN ('TRUONG_PHONG', 'PHO_PHONG')");
+            $stmtLeaders->execute([$departmentId]);
+            $leaders = $stmtLeaders->fetchAll();
+            foreach ($leaders as $ld) {
+                $stmtNotif = $pdo->prepare("INSERT INTO notifications (user_id, task_id, title, content, is_read, created_at) VALUES (?, ?, ?, ?, 0, NOW())");
+                $stmtNotif->execute([$ld['id'], $taskId, "Nhân viên đã gửi lại công việc sau chỉnh sửa", "Nhân viên {$currentUser['fullname']} vừa cập nhật lại công việc '{$title}' sau khi bị từ chối phê duyệt. Vui lòng xem xét phê duyệt lại."]);
+            }
+            $_SESSION['flash_success'] = "Đã chỉnh sửa công việc thành công và gửi lại cho Trưởng phòng phê duyệt!";
+        } else {
+            logTaskTimeline($pdo, $taskId, $currentUser['id'], 'UPDATE_TASK', "Chỉnh sửa thông tin công việc");
+        }
     } else {
         // Insert new task
         $stmt = $pdo->prepare("
@@ -493,10 +530,11 @@ if ($action === 'respond_all_assigned_tasks') {
     exit;
 }
 
-// BATCH APPROVAL OF TASKS BY LEADERS (TRƯỞNG PHÒNG & BGD)
+// BATCH APPROVAL / REJECTION OF TASKS BY LEADERS (TRƯỞNG PHÒNG & BGD)
 if ($action === 'batch_approve_tasks') {
     $taskIds = $_POST['task_ids'] ?? [];
     $generalComment = trim($_POST['leader_comments_general'] ?? '');
+    $batchActionType = $_POST['batch_action_type'] ?? 'approve';
 
     if (!in_array($currentUser['role'], ['TRUONG_PHONG', 'PHO_PHONG', 'BGD', 'SUPER_ADMIN'])) {
         $_SESSION['flash_error'] = "Bạn không có quyền thực hiện chức năng phê duyệt hàng loạt!";
@@ -510,8 +548,65 @@ if ($action === 'batch_approve_tasks') {
         exit;
     }
 
+    $stmtCheck = $pdo->prepare("SELECT id, title, department_id, status, leader_comments, created_by FROM tasks WHERE id = ?");
+
+    if ($batchActionType === 'reject') {
+        $rejectedCount = 0;
+        $stmtReject = $pdo->prepare("
+            UPDATE tasks
+            SET status = 'YEU_CAU_CHINH_SUA', target_status = NULL, leader_comments = ?, leader_comment_user_id = ?
+            WHERE id = ?
+        ");
+        $stmtNotif = $pdo->prepare("
+            INSERT INTO notifications (user_id, task_id, title, content, is_read, created_at)
+            VALUES (?, ?, ?, ?, 0, NOW())
+        ");
+
+        foreach ($taskIds as $taskId) {
+            $taskId = (int)$taskId;
+            $stmtCheck->execute([$taskId]);
+            $task = $stmtCheck->fetch();
+
+            if (!$task) continue;
+
+            $canReject = false;
+            if (in_array($currentUser['role'], ['BGD', 'SUPER_ADMIN'])) {
+                if ($task['status'] === 'CHO_BGD_DUYET' || $task['status'] === 'CHO_DUYET') {
+                    $canReject = true;
+                }
+            } elseif (in_array($currentUser['role'], ['TRUONG_PHONG', 'PHO_PHONG'])) {
+                if ($task['status'] === 'CHO_DUYET' && $task['department_id'] == $currentUser['department_id']) {
+                    $canReject = true;
+                }
+            }
+
+            if ($canReject) {
+                $reasonText = $generalComment ?: 'Trưởng phòng chưa chấp nhận công việc này.';
+                $stmtReject->execute([$reasonText, $currentUser['id'], $taskId]);
+                $rejectedCount++;
+
+                if (!empty($task['created_by'])) {
+                    $notifTitle = "Công việc bị từ chối phê duyệt";
+                    $notifContent = "Công việc '{$task['title']}' đã bị Trưởng phòng từ chối phê duyệt. Ý kiến: {$reasonText}. Bạn có thể chỉnh sửa lại nội dung hoặc xóa công việc này.";
+                    $stmtNotif->execute([$task['created_by'], $taskId, $notifTitle, $notifContent]);
+                }
+
+                logTaskTimeline($pdo, $taskId, $currentUser['id'], 'REJECT_TASK', "Trưởng phòng từ chối phê duyệt hàng loạt" . ($generalComment ? ". Ý kiến: $generalComment" : ""));
+                logActivity($pdo, $currentUser['id'], 'BATCH_REJECT_TASK', "Đã từ chối phê duyệt công việc ID #$taskId: {$task['title']}");
+            }
+        }
+
+        if ($rejectedCount > 0) {
+            $_SESSION['flash_success'] = "Đã từ chối phê duyệt $rejectedCount công việc thành công! Các nhân viên liên quan đã nhận được thông báo để chỉnh sửa hoặc xóa công việc.";
+        } else {
+            $_SESSION['flash_error'] = "Không có công việc nào bị từ chối (kiểm tra lại quyền hoặc trạng thái công việc).";
+        }
+
+        header("Location: index.php");
+        exit;
+    }
+
     $approvedCount = 0;
-    $stmtCheck = $pdo->prepare("SELECT id, title, department_id, status, leader_comments FROM tasks WHERE id = ?");
 
     $stmtUpdateWithComment = $pdo->prepare("
         UPDATE tasks
@@ -620,6 +715,20 @@ if ($action === 'respond_assigned_task') {
     }
 
     header("Location: index.php");
+    exit;
+}
+
+// 8. MARK ALL NOTIFICATIONS AS READ
+if ($action === 'mark_notifications_read') {
+    if ($currentUser) {
+        $pdo->prepare("UPDATE notifications SET is_read = 1 WHERE user_id = ?")->execute([$currentUser['id']]);
+    }
+    if (!empty($_SERVER['HTTP_X_REQUESTED_WITH']) && strtolower($_SERVER['HTTP_X_REQUESTED_WITH']) === 'xmlhttprequest') {
+        header('Content-Type: application/json; charset=utf-8');
+        echo json_encode(['success' => true]);
+        exit;
+    }
+    header("Location: " . ($_SERVER['HTTP_REFERER'] ?? 'index.php'));
     exit;
 }
 

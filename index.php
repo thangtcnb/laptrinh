@@ -89,6 +89,26 @@ if ($currentUser) {
         $pendingAssignedTasks[$k]['attachments'] = getTaskAttachments($pdo, $pt['id']);
     }
     unset($pt);
+
+    // Truy vấn các công việc do người dùng tạo bị Trưởng phòng Từ chối / Yêu cầu chỉnh sửa
+    $stmtRejected = $pdo->prepare("
+        SELECT t.*, d.name AS dept_name, lc.fullname AS leader_name
+        FROM tasks t
+        JOIN departments d ON t.department_id = d.id
+        LEFT JOIN users lc ON t.leader_comment_user_id = lc.id
+        WHERE t.created_by = ? AND t.status = 'YEU_CAU_CHINH_SUA'
+        ORDER BY t.id DESC
+    ");
+    $stmtRejected->execute([$currentUser['id']]);
+    $rejectedTasksForUser = $stmtRejected->fetchAll();
+    foreach ($rejectedTasksForUser as $k => $rt) {
+        $rejectedTasksForUser[$k]['attachments'] = getTaskAttachments($pdo, $rt['id']);
+        $rejectedTasksForUser[$k]['assignees'] = getTaskAssignees($pdo, $rt['id']);
+        $rejectedTasksForUser[$k]['formatted_leader_comment'] = formatLeaderComment($rt);
+    }
+    unset($rt);
+} else {
+    $rejectedTasksForUser = [];
 }
 
 // Check if current logged-in user (Trưởng/Phó phòng) has pending approval tasks (CHO_DUYET) from their department
@@ -236,6 +256,51 @@ if ($deepLinkTaskId > 0) {
 <?php endif; ?>
 
 <!-- WORKFLOW NOTIFICATION BANNER / MODAL FOR NEWLY ASSIGNED TASKS (NHÂN VIÊN) -->
+<?php if (!empty($rejectedTasksForUser) && count($rejectedTasksForUser) > 0): ?>
+    <div class="mb-5 bg-gradient-to-r from-rose-50 via-rose-100/70 to-amber-50 border-l-4 border-rose-500 p-4 rounded-2xl shadow-sm text-slate-800 no-print">
+        <div class="flex items-start gap-3 w-full">
+            <div class="w-9 h-9 rounded-xl bg-rose-500 text-white flex items-center justify-center shrink-0 shadow-sm mt-0.5">
+                <i class="fa-solid fa-circle-exclamation text-lg"></i>
+            </div>
+            <div class="flex-1">
+                <h4 class="font-bold text-rose-900 text-sm flex items-center gap-2">
+                    <span>Bạn có <span class="underline font-extrabold text-rose-700"><?= count($rejectedTasksForUser) ?> công việc</span> bị Trưởng phòng từ chối phê duyệt / yêu cầu chỉnh sửa</span>
+                </h4>
+                <p class="text-xs text-rose-700 mt-0.5 leading-relaxed">
+                    Vui lòng xem ý kiến chỉ đạo để <strong>chỉnh sửa lại nội dung</strong> (công việc sẽ tự động chuyển lại trạng thái <i>Chờ duyệt</i> để Trưởng phòng phê duyệt lại) hoặc <strong>xóa công việc</strong> nếu không còn thực hiện:
+                </p>
+                <div class="mt-3 space-y-2">
+                    <?php foreach ($rejectedTasksForUser as $rt): ?>
+                        <div class="bg-white/95 p-3 rounded-xl border border-rose-200 text-xs flex flex-col md:flex-row md:items-center justify-between gap-2.5 shadow-xs hover:border-rose-300 transition">
+                            <div class="flex-1">
+                                <div class="font-bold text-slate-900 text-xs flex items-center gap-2">
+                                    <span class="text-rose-600 font-extrabold">#<?= $rt['id'] ?></span>
+                                    <span><?= htmlspecialchars($rt['title']) ?></span>
+                                </div>
+                                <?php if (!empty($rt['formatted_leader_comment']) || !empty($rt['leader_comments'])): ?>
+                                    <div class="mt-1 bg-amber-50 border-l-2 border-amber-500 px-2 py-1 rounded text-[11px] text-amber-950">
+                                        <i class="fa-solid fa-comment-dots text-amber-600 mr-1"></i><strong>Ý kiến chỉ đạo:</strong> <?= htmlspecialchars($rt['formatted_leader_comment'] ?: $rt['leader_comments']) ?>
+                                    </div>
+                                <?php endif; ?>
+                            </div>
+                            <div class="flex items-center gap-2 shrink-0">
+                                <button type="button" onclick='openTaskModal(<?= htmlspecialchars(json_encode($rt), ENT_QUOTES, "UTF-8") ?>)' class="px-3 py-1.5 bg-amber-500 hover:bg-amber-600 text-white font-bold rounded-xl text-xs transition flex items-center gap-1.5 shadow-sm">
+                                    <i class="fa-solid fa-pen-to-square"></i>
+                                    <span>Chỉnh sửa lại</span>
+                                </button>
+                                <a href="task_actions.php?action=delete&task_id=<?= $rt['id'] ?>" onclick="return sysConfirmLink(event, this, 'Bạn có chắc chắn muốn xóa công việc bị từ chối này không?');" class="px-3 py-1.5 bg-rose-600 hover:bg-rose-700 text-white font-bold rounded-xl text-xs transition flex items-center gap-1.5 shadow-sm">
+                                    <i class="fa-solid fa-trash"></i>
+                                    <span>Xóa</span>
+                                </a>
+                            </div>
+                        </div>
+                    <?php endforeach; ?>
+                </div>
+            </div>
+        </div>
+    </div>
+<?php endif; ?>
+
 <?php if (count($pendingAssignedTasks) > 0): ?>
     <div class="mb-6 bg-gradient-to-r from-amber-500 via-orange-500 to-indigo-600 rounded-2xl p-5 text-white shadow-xl relative overflow-hidden border border-amber-300 animate-pulse-subtle">
         <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
@@ -927,12 +992,18 @@ if ($deepLinkTaskId > 0) {
                 <textarea name="leader_comments" id="leader_comments" rows="4" placeholder="Nhập ý kiến chỉ đạo, hướng dẫn thực hiện cho nhân viên..." class="w-full p-2.5 border border-slate-300 rounded-xl text-xs focus:ring-2 focus:ring-indigo-500 outline-none font-medium"></textarea>
             </div>
 
-            <div class="flex justify-end gap-2 pt-3 border-t border-slate-100">
-                <button type="button" onclick="closeLeaderModal()" class="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold rounded-xl">Hủy</button>
-                <button type="submit" class="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl shadow flex items-center gap-1">
-                    <i class="fa-solid fa-floppy-disk"></i>
-                    <span>Lưu ý kiến & Phê duyệt</span>
+            <div class="flex flex-col sm:flex-row justify-between items-center gap-2 pt-3 border-t border-slate-100">
+                <button type="button" onclick="rejectCurrentTaskFromModal()" class="w-full sm:w-auto px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold rounded-xl shadow flex items-center justify-center gap-1.5 transition">
+                    <i class="fa-solid fa-circle-xmark"></i>
+                    <span>Từ chối phê duyệt</span>
                 </button>
+                <div class="flex items-center gap-2 w-full sm:w-auto justify-end">
+                    <button type="button" onclick="closeLeaderModal()" class="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold rounded-xl">Hủy</button>
+                    <button type="submit" class="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl shadow flex items-center gap-1">
+                        <i class="fa-solid fa-floppy-disk"></i>
+                        <span>Lưu ý kiến & Phê duyệt</span>
+                    </button>
+                </div>
             </div>
         </form>
     </div>
@@ -1246,7 +1317,7 @@ if ($deepLinkTaskId > 0) {
         </div>
 
         <!-- Modal Body / Form -->
-        <form method="POST" action="task_actions.php" id="batchApprovalForm" onsubmit="return validateBatchApprovalForm()" class="flex flex-col flex-1 overflow-hidden">
+        <form method="POST" action="task_actions.php" id="batchApprovalForm" class="flex flex-col flex-1 overflow-hidden">
             <input type="hidden" name="action" value="batch_approve_tasks">
 
             <!-- Directive Comment Box (Optional) -->
@@ -1317,6 +1388,8 @@ if ($deepLinkTaskId > 0) {
                 </table>
             </div>
 
+            <input type="hidden" name="batch_action_type" id="batch_action_type" value="approve">
+
             <!-- Modal Footer / Action Bar -->
             <div class="pt-3 border-t border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shrink-0">
                 <div class="text-xs text-slate-600 font-medium">
@@ -1325,7 +1398,11 @@ if ($deepLinkTaskId > 0) {
                 <div class="flex items-center justify-end gap-2">
                     <button type="button" onclick="closeBatchApprovalModal()" class="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold rounded-xl transition">Đóng</button>
                     <?php if (count($pendingApprovalTasks) > 0): ?>
-                        <button type="submit" id="batchApproveSubmitBtn" class="bg-emerald-600 hover:bg-emerald-700 text-white font-bold px-6 py-2.5 rounded-xl text-xs shadow-md shadow-emerald-200 transition flex items-center gap-2 transform hover:scale-102">
+                        <button type="button" onclick="submitBatchReject()" id="batchRejectSubmitBtn" class="bg-rose-600 hover:bg-rose-700 text-white font-bold px-5 py-2.5 rounded-xl text-xs shadow-md shadow-rose-200 transition flex items-center gap-1.5">
+                            <i class="fa-solid fa-circle-xmark text-sm"></i>
+                            <span id="batchRejectBtnText">Từ chối các mục đã chọn (0)</span>
+                        </button>
+                        <button type="button" onclick="submitBatchApprove()" id="batchApproveSubmitBtn" class="bg-emerald-600 hover:bg-emerald-700 text-white font-bold px-5 py-2.5 rounded-xl text-xs shadow-md shadow-emerald-200 transition flex items-center gap-1.5">
                             <i class="fa-solid fa-check-double text-sm"></i>
                             <span id="batchApproveBtnText">Phê duyệt các mục đã chọn (0)</span>
                         </button>
@@ -1533,9 +1610,13 @@ function updateBatchApproveCount() {
     if (countEl) {
         countEl.innerText = checkedCount;
     }
-    const btnText = document.getElementById('batchApproveBtnText');
-    if (btnText) {
-        btnText.innerText = `Phê duyệt các mục đã chọn (${checkedCount})`;
+    const btnApproveText = document.getElementById('batchApproveBtnText');
+    if (btnApproveText) {
+        btnApproveText.innerText = `Phê duyệt các mục đã chọn (${checkedCount})`;
+    }
+    const btnRejectText = document.getElementById('batchRejectBtnText');
+    if (btnRejectText) {
+        btnRejectText.innerText = `Từ chối các mục đã chọn (${checkedCount})`;
     }
 
     const selectAll = document.getElementById('selectAllApprovalTasks');
@@ -1553,17 +1634,48 @@ function toggleRowCheckbox(event, checkboxId) {
     }
 }
 
-function validateBatchApprovalForm(event) {
-    if (event) event.preventDefault();
+function submitBatchApprove() {
     const checkedCount = document.querySelectorAll('.batch-approval-checkbox:checked').length;
     if (checkedCount === 0) {
         sysAlert('Vui lòng tích chọn ít nhất một công việc để phê duyệt!');
-        return false;
+        return;
     }
-    sysConfirm(`Bạn có chắc chắn muốn phê duyệt ${checkedCount} công việc đã chọn không?`, function() {
+    sysConfirm(`Bạn có chắc chắn muốn <strong>PHÊ DUYỆT ${checkedCount} CÔNG VIỆC</strong> đã chọn không?`, function() {
+        document.getElementById('batch_action_type').value = 'approve';
         document.getElementById('batchApprovalForm').submit();
-    });
-    return false;
+    }, 'Xác nhận Phê duyệt Hàng loạt', 'question');
+}
+
+function submitBatchReject() {
+    const checkedCount = document.querySelectorAll('.batch-approval-checkbox:checked').length;
+    if (checkedCount === 0) {
+        sysAlert('Vui lòng tích chọn các công việc chưa hợp lý để từ chối!');
+        return;
+    }
+    const generalComment = document.querySelector('textarea[name="leader_comments_general"]').value.trim();
+    if (!generalComment) {
+        sysAlert('Vui lòng nhập lý do từ chối vào ô "Ý kiến chỉ đạo chung" để nhân viên biết nội dung chưa hợp lý cần điều chỉnh!');
+        document.querySelector('textarea[name="leader_comments_general"]').focus();
+        return;
+    }
+    sysConfirm(`Bạn có chắc chắn muốn <strong>TỪ CHỐI ${checkedCount} CÔNG VIỆC</strong> đã chọn không?<br><span class="text-xs text-slate-500 mt-1 block">Các nhân viên đăng ký sẽ nhận được thông báo để chỉnh sửa lại hoặc xóa công việc.</span>`, function() {
+        document.getElementById('batch_action_type').value = 'reject';
+        document.getElementById('batchApprovalForm').submit();
+    }, 'Xác nhận Từ chối Hàng loạt', 'warning');
+}
+
+function rejectCurrentTaskFromModal() {
+    const comments = document.getElementById('leader_comments').value.trim();
+    if (!comments) {
+        sysAlert('Vui lòng nhập lý do từ chối vào ô "Ý kiến chỉ đạo của Lãnh đạo" để nhân viên biết nội dung chưa hợp lý cần điều chỉnh!');
+        document.getElementById('leader_comments').focus();
+        return;
+    }
+
+    sysConfirm('Bạn có chắc chắn muốn <strong>TỪ CHỐI PHÊ DUYỆT</strong> công việc này không?<br><span class="text-xs text-slate-500 mt-1 block">Nhân viên đăng ký sẽ nhận được thông báo kèm ý kiến của bạn để chỉnh sửa lại hoặc xóa công việc.</span>', function() {
+        document.getElementById('leader_status').value = 'YEU_CAU_CHINH_SUA';
+        document.getElementById('leaderCommentModal').querySelector('form').submit();
+    }, 'Xác nhận Từ chối Phê duyệt', 'warning');
 }
 
 function openPendingTaskModal() {

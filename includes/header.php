@@ -188,6 +188,100 @@ if ($roleLabel === 'TRUONG_PHONG') {
                 </div>
 
                 <div class="flex items-center gap-1.5 border-l border-white/20 pl-2">
+                    <?php
+                    // Retrieve recent notifications for current user
+                    $headerNotifs = [];
+                    $unreadNotifsCount = 0;
+                    if (!empty($currentUser['id'])) {
+                        try {
+                            $stmtHNotif = $pdo->prepare("SELECT * FROM notifications WHERE user_id = ? ORDER BY is_read ASC, id DESC LIMIT 10");
+                            $stmtHNotif->execute([$currentUser['id']]);
+                            $headerNotifs = $stmtHNotif->fetchAll();
+                            foreach ($headerNotifs as $hn) {
+                                if (!$hn['is_read']) $unreadNotifsCount++;
+                            }
+                        } catch (\PDOException $e) {
+                            $headerNotifs = [];
+                        }
+                    }
+                    ?>
+                    <!-- Notification Bell Dropdown -->
+                    <div class="relative">
+                        <button type="button" onclick="toggleNotifDropdown()" id="notifBellBtn" class="relative p-2 rounded-lg bg-white/10 hover:bg-white/20 text-white transition flex items-center justify-center" title="Thông báo hệ thống">
+                            <i class="fa-solid fa-bell text-sm"></i>
+                            <?php if ($unreadNotifsCount > 0): ?>
+                                <span class="absolute -top-1 -right-1 bg-rose-500 text-white text-[10px] font-extrabold w-4 h-4 rounded-full flex items-center justify-center animate-pulse shadow-sm">
+                                    <?= $unreadNotifsCount > 9 ? '9+' : $unreadNotifsCount ?>
+                                </span>
+                            <?php endif; ?>
+                        </button>
+
+                        <!-- Dropdown Menu -->
+                        <div id="notifDropdownMenu" class="hidden absolute right-0 mt-2 w-80 sm:w-96 bg-white rounded-2xl shadow-2xl border border-slate-200 z-50 text-slate-800 overflow-hidden transform transition-all">
+                            <div class="p-3 bg-slate-900 text-white flex items-center justify-between border-b border-slate-800">
+                                <div class="flex items-center gap-1.5 font-bold text-xs">
+                                    <i class="fa-solid fa-bell text-amber-400"></i>
+                                    <span>Thông báo</span>
+                                    <?php if ($unreadNotifsCount > 0): ?>
+                                        <span class="bg-rose-500 text-white text-[10px] px-1.5 py-0.5 rounded-full font-bold ml-1"><?= $unreadNotifsCount ?> mới</span>
+                                    <?php endif; ?>
+                                </div>
+                                <?php if ($unreadNotifsCount > 0): ?>
+                                    <a href="task_actions.php?action=mark_notifications_read" class="text-[11px] text-indigo-300 hover:text-white font-medium underline">
+                                        Đã đọc tất cả
+                                    </a>
+                                <?php endif; ?>
+                            </div>
+
+                            <div class="max-h-80 overflow-y-auto divide-y divide-slate-100">
+                                <?php if (count($headerNotifs) > 0): ?>
+                                    <?php foreach ($headerNotifs as $hn): ?>
+                                        <?php
+                                        $isUnread = !$hn['is_read'];
+                                        $targetLink = $hn['task_id'] ? "index.php?task_id={$hn['task_id']}" : "#";
+                                        $isReject = (strpos($hn['title'], 'từ chối') !== false || strpos($hn['content'], 'từ chối') !== false);
+                                        ?>
+                                        <a href="<?= htmlspecialchars($targetLink) ?>" class="block p-3 hover:bg-slate-50 transition <?= $isUnread ? ($isReject ? 'bg-rose-50/70 border-l-2 border-rose-500' : 'bg-blue-50/60 border-l-2 border-indigo-500') : '' ?>">
+                                            <div class="flex items-start gap-2.5">
+                                                <div class="w-7 h-7 rounded-lg <?= $isReject ? 'bg-rose-100 text-rose-600' : 'bg-indigo-100 text-indigo-600' ?> flex items-center justify-center shrink-0 mt-0.5 text-xs font-bold">
+                                                    <i class="fa-solid <?= $isReject ? 'fa-circle-xmark' : 'fa-clipboard-list' ?>"></i>
+                                                </div>
+                                                <div class="flex-1 min-w-0">
+                                                    <div class="font-bold text-xs text-slate-900 flex items-center justify-between">
+                                                        <span class="truncate <?= $isReject ? 'text-rose-900' : '' ?>"><?= htmlspecialchars($hn['title'] ?: 'Thông báo công việc') ?></span>
+                                                        <span class="text-[10px] text-slate-400 font-normal shrink-0 ml-1"><?= date('H:i d/m', strtotime($hn['created_at'])) ?></span>
+                                                    </div>
+                                                    <p class="text-[11px] text-slate-600 mt-0.5 leading-snug line-clamp-2">
+                                                        <?= htmlspecialchars($hn['content']) ?>
+                                                    </p>
+                                                </div>
+                                            </div>
+                                        </a>
+                                    <?php endforeach; ?>
+                                <?php else: ?>
+                                    <div class="p-6 text-center text-slate-400 text-xs">
+                                        <i class="fa-solid fa-inbox text-2xl mb-1 text-slate-300"></i>
+                                        <p>Không có thông báo nào.</p>
+                                    </div>
+                                <?php endif; ?>
+                            </div>
+                        </div>
+                    </div>
+
+                    <script>
+                    function toggleNotifDropdown() {
+                        const m = document.getElementById('notifDropdownMenu');
+                        if (m) m.classList.toggle('hidden');
+                    }
+                    document.addEventListener('click', function(e) {
+                        const btn = document.getElementById('notifBellBtn');
+                        const menu = document.getElementById('notifDropdownMenu');
+                        if (btn && menu && !btn.contains(e.target) && !menu.contains(e.target)) {
+                            menu.classList.add('hidden');
+                        }
+                    });
+                    </script>
+
                     <!-- Change Password Button (NGAY TRƯỚC nút Đăng xuất) -->
                     <a href="profile.php" class="bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-1.5 rounded-lg text-xs font-semibold transition flex items-center gap-1.5 shadow" title="Đổi mật khẩu">
                         <i class="fa-solid fa-key"></i>

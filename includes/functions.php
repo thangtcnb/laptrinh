@@ -177,8 +177,8 @@ function renderStatusBadge($status, $dueDate = null) {
                     </span>';
             break;
         case 'YEU_CAU_CHINH_SUA':
-            $html = '<span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium bg-orange-100 text-orange-800 border border-orange-300">
-                        <i class="fa-solid fa-pen-to-square"></i> Yêu cầu chỉnh sửa
+            $html = '<span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold bg-rose-100 text-rose-800 border border-rose-300 shadow-xs">
+                        <i class="fa-solid fa-circle-xmark text-rose-600"></i> Từ chối - Yêu cầu chỉnh sửa
                     </span>';
             break;
         case 'CHO_XAC_NHAN':
