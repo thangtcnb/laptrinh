@@ -1069,7 +1069,7 @@ if ($deepLinkTaskId > 0) {
                                 <i class="fa-solid fa-cloud-arrow-up text-indigo-600"></i>
                                 <span>Tải lên file Hồ sơ Minh chứng</span>
                             </div>
-                            <p class="text-[10px] text-slate-500 mt-0.5">Tự động lưu vào <code class="bg-white px-1 py-0.5 rounded border border-slate-200 text-indigo-600 font-mono">D:\web\minhchung</code> và đồng bộ lên Google Drive (Dung lượng &lt; 50MB)</p>
+                            <p class="text-[10px] text-slate-500 mt-0.5">Hỗ trợ định dạng: PDF, Word, Excel, PowerPoint, Ảnh (Dung lượng &lt; 50MB)</p>
                         </div>
                         <div class="shrink-0 flex items-center gap-2">
                             <input type="file" id="prog_proof_file_input" name="proof_file" accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.png,.jpg,.jpeg,.zip,.rar,.7z,.txt" class="hidden" onchange="uploadProofFileDirectly(this)">
@@ -1084,7 +1084,7 @@ if ($deepLinkTaskId > 0) {
                     <div id="prog_uploading_box" class="hidden mt-2.5 pt-2 border-t border-slate-200">
                         <div class="flex items-center gap-2 text-xs text-indigo-700 font-semibold">
                             <i class="fa-solid fa-circle-notch fa-spin text-indigo-600"></i>
-                            <span id="prog_uploading_text">Đang tải file vào ổ D: và đồng bộ lên Google Drive...</span>
+                            <span id="prog_uploading_text">Đang tải lên...</span>
                         </div>
                         <div class="w-full bg-slate-200 h-1.5 rounded-full overflow-hidden mt-1.5">
                             <div class="bg-indigo-600 h-full w-2/3 animate-pulse"></div>
@@ -1817,7 +1817,7 @@ function uploadProofFileDirectly(fileInput) {
 
     if (uploadBox) uploadBox.classList.remove('hidden');
     if (successBox) successBox.classList.add('hidden');
-    if (uploadText) uploadText.innerText = 'Đang lưu vào ổ D:\\web\\minhchung và đồng bộ lên Google Drive...';
+    if (uploadText) uploadText.innerText = 'Đang tải lên...';
     if (uploadBtn) uploadBtn.disabled = true;
 
     const formData = new FormData();

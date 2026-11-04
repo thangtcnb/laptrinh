@@ -686,6 +686,10 @@ function getSystemDataVersion($pdo) {
  * Tải file Hồ sơ Minh chứng lên ổ D:\web\minhchung và đồng bộ lên Google Drive qua Webhook
  */
 function uploadProofFileToDrive($file) {
+    // Tăng thời gian thực thi và bộ nhớ để xử lý file dung lượng lớn
+    @set_time_limit(180);
+    @ini_set('memory_limit', '256M');
+
     if (empty($file) || $file['error'] !== UPLOAD_ERR_OK) {
         return ['success' => false, 'error' => 'Vui lòng chọn file hợp lệ để tải lên.'];
     }
@@ -742,42 +746,87 @@ function uploadProofFileToDrive($file) {
     $curlErr = '';
 
     if (function_exists('curl_init')) {
+        // BƯỚC 1: POST payload sang Google Apps Script (tắt follow location để tránh lỗi 411 Length Required)
         $ch = curl_init($webhookUrl);
         curl_setopt_array($ch, [
             CURLOPT_RETURNTRANSFER => true,
             CURLOPT_POST => true,
             CURLOPT_POSTFIELDS => $postPayload,
-            CURLOPT_HTTPHEADER => ['Content-Type: application/json'],
-            CURLOPT_FOLLOWLOCATION => true,
-            CURLOPT_AUTOREFERER => true,
-            CURLOPT_TIMEOUT => 90,
+            CURLOPT_HTTPHEADER => [
+                'Content-Type: application/json',
+                'Content-Length: ' . strlen($postPayload)
+            ],
+            CURLOPT_FOLLOWLOCATION => false,
+            CURLOPT_TIMEOUT => 120,
+            CURLOPT_CONNECTTIMEOUT => 15,
             CURLOPT_SSL_VERIFYPEER => false,
             CURLOPT_SSL_VERIFYHOST => false
         ]);
-        $response = curl_exec($ch);
+        $rawPost = curl_exec($ch);
+        $httpCode = (int)curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        $redirectUrl = curl_getinfo($ch, CURLINFO_REDIRECT_URL);
         $curlErr = curl_error($ch);
         curl_close($ch);
+
+        // BƯỚC 2: Google Apps Script luôn trả về mã 302 redirect sang googleusercontent echo
+        if (($httpCode === 301 || $httpCode === 302 || $httpCode === 303 || $httpCode === 307) && !empty($redirectUrl)) {
+            $chGet = curl_init($redirectUrl);
+            curl_setopt_array($chGet, [
+                CURLOPT_RETURNTRANSFER => true,
+                CURLOPT_HTTPGET => true,
+                CURLOPT_FOLLOWLOCATION => true,
+                CURLOPT_TIMEOUT => 30,
+                CURLOPT_CONNECTTIMEOUT => 15,
+                CURLOPT_SSL_VERIFYPEER => false,
+                CURLOPT_SSL_VERIFYHOST => false
+            ]);
+            $response = curl_exec($chGet);
+            $getErr = curl_error($chGet);
+            curl_close($chGet);
+            if (!empty($getErr)) {
+                $curlErr = $getErr;
+            }
+        } else {
+            $response = $rawPost;
+        }
     } else {
+        // Fallback dùng stream_context nếu máy chủ không có curl extension
         $context = stream_context_create([
             'http' => [
                 'method' => 'POST',
-                'header' => "Content-Type: application/json\r\n",
+                'header' => "Content-Type: application/json\r\nContent-Length: " . strlen($postPayload) . "\r\n",
                 'content' => $postPayload,
-                'timeout' => 90,
-                'follow_location' => 1
+                'timeout' => 120,
+                'follow_location' => 0
             ],
             'ssl' => [
                 'verify_peer' => false,
                 'verify_peer_name' => false
             ]
         ]);
-        $response = @file_get_contents($webhookUrl, false, $context);
+        $raw = @file_get_contents($webhookUrl, false, $context);
+        $redirectUrl = null;
+        if (!empty($http_response_header)) {
+            foreach ($http_response_header as $hdr) {
+                if (stripos($hdr, 'Location:') === 0) {
+                    $redirectUrl = trim(substr($hdr, 9));
+                    break;
+                }
+            }
+        }
+        if (!empty($redirectUrl)) {
+            $response = @file_get_contents($redirectUrl, false, stream_context_create([
+                'ssl' => ['verify_peer' => false, 'verify_peer_name' => false]
+            ]));
+        } else {
+            $response = $raw;
+        }
     }
 
     if (!$response) {
         return [
             'success' => false,
-            'error' => 'Đã lưu file nội bộ nhưng chưa thể kết nối đến Google Drive. ' . $curlErr,
+            'error' => 'Đã lưu file nội bộ nhưng chưa thể kết nối đến Google Drive. ' . ($curlErr ? "($curlErr)" : ''),
             'localPath' => $targetPath
         ];
     }
