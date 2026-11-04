@@ -694,9 +694,9 @@ function uploadProofFileToDrive($file) {
         return ['success' => false, 'error' => 'Vui lòng chọn file hợp lệ để tải lên.'];
     }
 
-    // Giới hạn dung lượng tối đa 50MB
-    if ($file['size'] > 50 * 1024 * 1024) {
-        return ['success' => false, 'error' => 'Dung lượng file vượt quá giới hạn 50MB.'];
+    // Giới hạn dung lượng tối đa 30MB
+    if ($file['size'] > 30 * 1024 * 1024) {
+        return ['success' => false, 'error' => 'Dung lượng file vượt quá giới hạn 30MB.'];
     }
 
     $allowedExts = ['pdf', 'doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx', 'png', 'jpg', 'jpeg', 'zip', 'rar', '7z', 'txt'];

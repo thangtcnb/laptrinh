@@ -1061,6 +1061,13 @@ if ($deepLinkTaskId > 0) {
                 </div>
                 <input type="text" name="proof_link" id="prog_proof_link" oninput="updateProofPreviewBtn(this.value)" placeholder="https://drive.google.com/..." class="w-full p-2.5 border border-slate-300 rounded-xl text-xs focus:ring-2 focus:ring-indigo-500 outline-none">
                 
+                <!-- Dòng chữ "HOẶC" in đậm màu đỏ ở giữa -->
+                <div class="relative flex py-2 items-center">
+                    <div class="flex-grow border-t border-slate-200"></div>
+                    <span class="flex-shrink mx-3 text-xs font-black text-rose-600 tracking-wider">HOẶC</span>
+                    <div class="flex-grow border-t border-slate-200"></div>
+                </div>
+
                 <!-- Khu vực tải file trực tiếp lên D:\web\minhchung & đồng bộ Google Drive -->
                 <div class="mt-2.5 p-3 bg-slate-50 border border-dashed border-slate-300 rounded-xl">
                     <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
@@ -1069,7 +1076,7 @@ if ($deepLinkTaskId > 0) {
                                 <i class="fa-solid fa-cloud-arrow-up text-indigo-600"></i>
                                 <span>Tải lên file Hồ sơ Minh chứng</span>
                             </div>
-                            <p class="text-[10px] text-slate-500 mt-0.5">Hỗ trợ định dạng: PDF, Word, Excel, PowerPoint, Ảnh (Dung lượng &lt; 50MB)</p>
+                            <p class="text-[10px] text-slate-500 mt-0.5">Hỗ trợ định dạng: PDF, Word, Excel, PowerPoint, Ảnh (Dung lượng &lt; 30MB)</p>
                         </div>
                         <div class="shrink-0 flex items-center gap-2">
                             <input type="file" id="prog_proof_file_input" name="proof_file" accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.png,.jpg,.jpeg,.zip,.rar,.7z,.txt" class="hidden" onchange="uploadProofFileDirectly(this)">
@@ -1802,8 +1809,8 @@ function uploadProofFileDirectly(fileInput) {
     if (!fileInput || !fileInput.files || fileInput.files.length === 0) return;
     const file = fileInput.files[0];
 
-    if (file.size > 50 * 1024 * 1024) {
-        sysAlert('Dung lượng file (' + (file.size / (1024 * 1024)).toFixed(1) + ' MB) vượt quá giới hạn cho phép (tối đa 50MB).');
+    if (file.size > 30 * 1024 * 1024) {
+        sysAlert('Dung lượng file (' + (file.size / (1024 * 1024)).toFixed(1) + ' MB) vượt quá giới hạn cho phép (tối đa 30MB).');
         fileInput.value = '';
         return;
     }

@@ -8,6 +8,39 @@ require_once __DIR__ . '/includes/functions.php';
 requireLogin();
 $currentUser = getCurrentUser($pdo);
 
+$isChangelogAdmin = ($currentUser['role'] === 'SUPER_ADMIN' || strtolower($currentUser['email'] ?? '') === 'thangtcnb@gmail.com');
+
+// Đảm bảo bảng system_changelogs luôn tồn tại
+try {
+    $pdo->exec("
+        CREATE TABLE IF NOT EXISTS `system_changelogs` (
+            `id` INT AUTO_INCREMENT PRIMARY KEY,
+            `version` VARCHAR(50) NULL COMMENT 'Phiên bản',
+            `title` VARCHAR(255) NOT NULL COMMENT 'Tiêu đề thay đổi',
+            `description` TEXT NOT NULL COMMENT 'Chi tiết thay đổi',
+            `category` VARCHAR(50) DEFAULT 'FEATURE' COMMENT 'FEATURE, ENHANCEMENT, BUGFIX, SECURITY, UI',
+            `released_date` DATE NOT NULL COMMENT 'Ngày áp dụng',
+            `created_by` INT NULL,
+            `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            `updated_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            INDEX (`released_date`)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+    ");
+
+    $countLogs = (int)$pdo->query("SELECT COUNT(*) FROM system_changelogs")->fetchColumn();
+    if ($countLogs === 0) {
+        $pdo->exec("
+            INSERT INTO `system_changelogs` (`version`, `title`, `description`, `category`, `released_date`)
+            VALUES
+            ('v2.5', 'Tích hợp Hồ sơ Minh chứng Google Drive & Tự động làm mới thời gian thực', '1. Tự động lưu bản sao minh chứng vào thư mục D:\\web\\minhchung và đồng bộ trực tiếp lên Google Drive qua Webhook.\n2. Tự động lấy link xem trực tiếp trả về giao diện người dùng.\n3. Bổ sung dòng phân cách HOẶC nổi bật và giới hạn dung lượng tải lên tối đa 30MB.\n4. Cơ chế Auto-Refresh thời gian thực cập nhật trạng thái công việc khi có phát sinh dữ liệu mới.', 'FEATURE', '2026-11-04'),
+            ('v2.4', 'Nâng cấp tính năng Từ chối phê duyệt công việc cho Trưởng phòng', '1. Bổ sung nút Từ chối phê duyệt trong cả form duyệt đơn lẻ và duyệt hàng loạt.\n2. Trưởng phòng nhập ý kiến chỉ đạo lý do từ chối.\n3. Nhân viên nhận thông báo và có quyền chỉnh sửa lại (tự động gửi lại Chờ duyệt) hoặc xóa công việc.', 'FEATURE', '2026-11-04'),
+            ('v2.3', 'Khóa hạn chót sau khi Trưởng phòng duyệt & Bổ sung ô Ghi chú', '1. Khi Trưởng phòng đã phê duyệt, nhân viên không được phép tự ý thay đổi hạn chót (due date).\n2. Thêm ô Ghi chú của người thực hiện trong form Cập nhật tiến độ & Hồ sơ minh chứng.', 'ENHANCEMENT', '2026-11-04');
+        ");
+    }
+} catch (\PDOException $e) {
+    // ignore
+}
+
 // 1. AJAX Endpoint: Fetch Message List
 if (isset($_GET['action']) && $_GET['action'] === 'fetch_messages') {
     header('Content-Type: application/json; charset=utf-8');
@@ -131,6 +164,90 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         header("Location: discussion.php");
         exit;
     }
+
+    // Xử lý thêm / sửa nhật ký thay đổi hệ thống
+    if ($action === 'save_changelog') {
+        if (!$isChangelogAdmin) {
+            if ($isAjax) {
+                header('Content-Type: application/json; charset=utf-8');
+                echo json_encode(['success' => false, 'message' => 'Bạn không có quyền thực hiện thao tác này!']);
+                exit;
+            }
+            $_SESSION['flash_error'] = "Bạn không có quyền thực hiện thao tác này!";
+            header("Location: discussion.php");
+            exit;
+        }
+
+        $id = (int)($_POST['changelog_id'] ?? 0);
+        $version = trim($_POST['version'] ?? '');
+        $title = trim($_POST['title'] ?? '');
+        $description = trim($_POST['description'] ?? '');
+        $category = trim($_POST['category'] ?? 'FEATURE');
+        $releasedDate = trim($_POST['released_date'] ?? date('Y-m-d'));
+
+        if (empty($title) || empty($description)) {
+            if ($isAjax) {
+                header('Content-Type: application/json; charset=utf-8');
+                echo json_encode(['success' => false, 'message' => 'Vui lòng nhập đầy đủ tiêu đề và nội dung thay đổi!']);
+                exit;
+            }
+            $_SESSION['flash_error'] = "Vui lòng nhập đầy đủ tiêu đề và nội dung thay đổi!";
+            header("Location: discussion.php");
+            exit;
+        }
+
+        if ($id > 0) {
+            $stmt = $pdo->prepare("UPDATE system_changelogs SET version = ?, title = ?, description = ?, category = ?, released_date = ? WHERE id = ?");
+            $stmt->execute([$version ?: null, $title, $description, $category, $releasedDate, $id]);
+            logActivity($pdo, $currentUser['id'], 'UPDATE_CHANGELOG', "Cập nhật nhật ký thay đổi hệ thống ID #$id: $title");
+            $msg = "Cập nhật nhật ký thay đổi hệ thống thành công!";
+        } else {
+            $stmt = $pdo->prepare("INSERT INTO system_changelogs (version, title, description, category, released_date, created_by, created_at) VALUES (?, ?, ?, ?, ?, ?, NOW())");
+            $stmt->execute([$version ?: null, $title, $description, $category, $releasedDate, $currentUser['id']]);
+            $newId = $pdo->lastInsertId();
+            logActivity($pdo, $currentUser['id'], 'CREATE_CHANGELOG', "Thêm nhật ký thay đổi hệ thống ID #$newId: $title");
+            $msg = "Thêm mới nhật ký thay đổi hệ thống thành công!";
+        }
+
+        if ($isAjax) {
+            header('Content-Type: application/json; charset=utf-8');
+            echo json_encode(['success' => true, 'message' => $msg]);
+            exit;
+        }
+        $_SESSION['flash_success'] = $msg;
+        header("Location: discussion.php");
+        exit;
+    }
+
+    // Xử lý xóa nhật ký thay đổi hệ thống
+    if ($action === 'delete_changelog') {
+        if (!$isChangelogAdmin) {
+            if ($isAjax) {
+                header('Content-Type: application/json; charset=utf-8');
+                echo json_encode(['success' => false, 'message' => 'Bạn không có quyền xóa nhật ký thay đổi hệ thống!']);
+                exit;
+            }
+            $_SESSION['flash_error'] = "Bạn không có quyền xóa nhật ký thay đổi hệ thống!";
+            header("Location: discussion.php");
+            exit;
+        }
+
+        $id = (int)($_POST['id'] ?? 0);
+        if ($id > 0) {
+            $stmt = $pdo->prepare("DELETE FROM system_changelogs WHERE id = ?");
+            $stmt->execute([$id]);
+            logActivity($pdo, $currentUser['id'], 'DELETE_CHANGELOG', "Đã xóa nhật ký thay đổi hệ thống ID #$id");
+            $msg = "Đã xóa nhật ký thay đổi hệ thống thành công!";
+            if ($isAjax) {
+                header('Content-Type: application/json; charset=utf-8');
+                echo json_encode(['success' => true, 'message' => $msg]);
+                exit;
+            }
+            $_SESSION['flash_success'] = $msg;
+        }
+        header("Location: discussion.php");
+        exit;
+    }
 }
 
 // Flash alerts for direct POST page reloads
@@ -151,6 +268,15 @@ $sqlInitial = "
 $stmtInit = $pdo->prepare($sqlInitial);
 $stmtInit->execute();
 $initialMessages = $stmtInit->fetchAll(PDO::FETCH_ASSOC);
+
+// Truy vấn danh sách Nhật ký thay đổi hệ thống cho tất cả người dùng
+$changelogs = [];
+try {
+    $stmtLogs = $pdo->query("SELECT * FROM system_changelogs ORDER BY released_date DESC, id DESC");
+    $changelogs = $stmtLogs->fetchAll(PDO::FETCH_ASSOC);
+} catch (\PDOException $e) {
+    $changelogs = [];
+}
 
 require_once __DIR__ . '/includes/header.php';
 ?>
@@ -329,7 +455,177 @@ require_once __DIR__ . '/includes/header.php';
 
     </div>
 
+    <!-- ==================== BẢNG: NHẬT KÍ THAY ĐỔI HỆ THỐNG ==================== -->
+    <div class="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+        <!-- Header bảng -->
+        <div class="p-4 sm:p-5 border-b border-slate-200 bg-gradient-to-r from-slate-900 via-slate-800 to-teal-950 text-white flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div class="flex items-center gap-3">
+                <div class="w-9 h-9 rounded-xl bg-teal-500/20 border border-teal-400/40 text-teal-300 flex items-center justify-center font-bold">
+                    <i class="fa-solid fa-clock-rotate-left text-base"></i>
+                </div>
+                <div>
+                    <div class="flex items-center gap-2">
+                        <h3 class="text-sm sm:text-base font-extrabold uppercase tracking-wide text-white">
+                            NHẬT KÍ THAY ĐỔI HỆ THỐNG
+                        </h3>
+                        <span class="px-2 py-0.5 rounded-full bg-teal-500/20 text-teal-300 text-[11px] font-bold border border-teal-500/30">
+                            <?= count($changelogs) ?> bản ghi
+                        </span>
+                    </div>
+                    <p class="text-[11px] text-slate-300 mt-0.5">
+                        Theo dõi toàn bộ lịch sử cải tiến, tính năng mới và các bản cập nhật của Hệ thống Quản lý Công việc.
+                    </p>
+                </div>
+            </div>
+
+            <?php if ($isChangelogAdmin): ?>
+                <button type="button" onclick="openChangelogModal()" class="px-3.5 py-2 bg-teal-600 hover:bg-teal-500 text-white font-bold text-xs rounded-xl shadow-md transition flex items-center gap-1.5 shrink-0 border border-teal-400/40">
+                    <i class="fa-solid fa-plus text-xs"></i>
+                    <span>Thêm Thay Đổi Mới</span>
+                </button>
+            <?php endif; ?>
+        </div>
+
+        <!-- Bảng danh sách nhật ký -->
+        <div class="overflow-x-auto">
+            <table class="w-full text-left text-xs border-collapse">
+                <thead>
+                    <tr class="bg-slate-100/80 text-slate-700 font-bold border-b border-slate-200 uppercase tracking-wider text-[11px]">
+                        <th class="py-3 px-4 w-12 text-center">STT</th>
+                        <th class="py-3 px-4 w-28 text-center">Phiên bản</th>
+                        <th class="py-3 px-4 w-28 text-center">Ngày áp dụng</th>
+                        <th class="py-3 px-4 w-32 text-center">Phân loại</th>
+                        <th class="py-3 px-4 min-w-[320px]">Nội dung thay đổi & nâng cấp</th>
+                        <?php if ($isChangelogAdmin): ?>
+                            <th class="py-3 px-4 w-24 text-center">Thao tác</th>
+                        <?php endif; ?>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-slate-100 text-slate-800">
+                    <?php if (empty($changelogs)): ?>
+                        <tr>
+                            <td colspan="<?= $isChangelogAdmin ? 6 : 5 ?>" class="py-8 text-center text-slate-400 italic">
+                                <i class="fa-solid fa-folder-open text-3xl mb-2 text-slate-300 block"></i>
+                                Chưa có nhật ký thay đổi hệ thống nào được ghi nhận.
+                            </td>
+                        </tr>
+                    <?php else: ?>
+                        <?php foreach ($changelogs as $idx => $log): ?>
+                            <?php
+                            $cat = $log['category'] ?? 'FEATURE';
+                            if ($cat === 'FEATURE') {
+                                $catBadge = '<span class="px-2.5 py-1 rounded-full text-[10px] font-extrabold bg-emerald-100 text-emerald-800 border border-emerald-300">Tính năng mới</span>';
+                            } elseif ($cat === 'ENHANCEMENT') {
+                                $catBadge = '<span class="px-2.5 py-1 rounded-full text-[10px] font-extrabold bg-blue-100 text-blue-800 border border-blue-300">Cải tiến</span>';
+                            } elseif ($cat === 'BUGFIX') {
+                                $catBadge = '<span class="px-2.5 py-1 rounded-full text-[10px] font-extrabold bg-amber-100 text-amber-800 border border-amber-300">Sửa lỗi</span>';
+                            } elseif ($cat === 'SECURITY') {
+                                $catBadge = '<span class="px-2.5 py-1 rounded-full text-[10px] font-extrabold bg-rose-100 text-rose-800 border border-rose-300">Bảo mật</span>';
+                            } else {
+                                $catBadge = '<span class="px-2.5 py-1 rounded-full text-[10px] font-extrabold bg-slate-100 text-slate-800 border border-slate-300">' . htmlspecialchars($cat) . '</span>';
+                            }
+                            ?>
+                            <tr class="hover:bg-teal-50/20 transition">
+                                <td class="py-3.5 px-4 text-center font-bold text-slate-400"><?= $idx + 1 ?></td>
+                                <td class="py-3.5 px-4 text-center">
+                                    <span class="inline-block px-2.5 py-1 rounded-lg bg-slate-900 text-white font-mono font-bold text-[11px] shadow-xs">
+                                        <?= htmlspecialchars($log['version'] ?: 'v' . ($idx + 1) . '.0') ?>
+                                    </span>
+                                </td>
+                                <td class="py-3.5 px-4 text-center font-semibold text-slate-600 whitespace-nowrap">
+                                    <i class="fa-regular fa-calendar-days text-slate-400 mr-1"></i>
+                                    <?= date('d/m/Y', strtotime($log['released_date'])) ?>
+                                </td>
+                                <td class="py-3.5 px-4 text-center whitespace-nowrap">
+                                    <?= $catBadge ?>
+                                </td>
+                                <td class="py-3.5 px-4">
+                                    <div class="font-extrabold text-slate-900 text-xs mb-1 flex items-center gap-1.5">
+                                        <i class="fa-solid fa-angles-right text-teal-600 text-[10px]"></i>
+                                        <span><?= htmlspecialchars($log['title']) ?></span>
+                                    </div>
+                                    <div class="text-[11px] text-slate-600 leading-relaxed whitespace-pre-line bg-slate-50 p-2.5 rounded-xl border border-slate-200/70 font-normal">
+                                        <?= nl2br(htmlspecialchars($log['description'])) ?>
+                                    </div>
+                                </td>
+                                <?php if ($isChangelogAdmin): ?>
+                                    <td class="py-3.5 px-4 text-center whitespace-nowrap">
+                                        <div class="flex items-center justify-center gap-1.5">
+                                            <button type="button" onclick='editChangelog(<?= htmlspecialchars(json_encode($log), ENT_QUOTES, "UTF-8") ?>)' class="p-1.5 bg-amber-50 hover:bg-amber-100 text-amber-700 rounded-lg transition" title="Chỉnh sửa">
+                                                <i class="fa-solid fa-pen-to-square"></i>
+                                            </button>
+                                            <button type="button" onclick="deleteChangelog(<?= (int)$log['id'] ?>)" class="p-1.5 bg-rose-50 hover:bg-rose-100 text-rose-700 rounded-lg transition" title="Xóa">
+                                                <i class="fa-solid fa-trash-can"></i>
+                                            </button>
+                                        </div>
+                                    </td>
+                                <?php endif; ?>
+                            </tr>
+                        <?php endforeach; ?>
+                    <?php endif; ?>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
 </div>
+
+<!-- ==================== MODAL: THÊM / SỬA NHẬT KÍ THAY ĐỔI (DÀNH CHO SUPER ADMIN) ==================== -->
+<?php if ($isChangelogAdmin): ?>
+<div id="changelogModal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm hidden items-center justify-center p-4 z-50">
+    <div class="bg-white rounded-2xl shadow-2xl max-w-lg w-full p-6 border border-slate-200 transform transition-all">
+        <div class="flex items-center justify-between pb-3 border-b border-slate-100 mb-4">
+            <h3 id="changelogModalTitle" class="font-bold text-slate-900 text-base flex items-center gap-2">
+                <i class="fa-solid fa-clock-rotate-left text-teal-600"></i>
+                <span>Thêm Nhật Ký Thay Đổi Mới</span>
+            </h3>
+            <button onclick="closeChangelogModal()" class="text-slate-400 hover:text-slate-600"><i class="fa-solid fa-xmark text-lg"></i></button>
+        </div>
+
+        <form method="POST" action="discussion.php" class="space-y-3.5">
+            <input type="hidden" name="action" value="save_changelog">
+            <input type="hidden" name="changelog_id" id="form_changelog_id" value="0">
+
+            <div class="grid grid-cols-2 gap-3">
+                <div>
+                    <label class="block text-xs font-semibold text-slate-700 mb-1">Phiên bản</label>
+                    <input type="text" name="version" id="form_changelog_version" placeholder="vd: v2.5, Update 04/11" class="w-full p-2.5 border border-slate-300 rounded-xl text-xs focus:ring-2 focus:ring-teal-500 outline-none">
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-slate-700 mb-1">Ngày áp dụng <span class="text-rose-500">*</span></label>
+                    <input type="date" name="released_date" id="form_changelog_date" required value="<?= date('Y-m-d') ?>" class="w-full p-2.5 border border-slate-300 rounded-xl text-xs focus:ring-2 focus:ring-teal-500 outline-none bg-white">
+                </div>
+            </div>
+
+            <div>
+                <label class="block text-xs font-semibold text-slate-700 mb-1">Phân loại thay đổi</label>
+                <select name="category" id="form_changelog_category" class="w-full p-2.5 border border-slate-300 rounded-xl text-xs focus:ring-2 focus:ring-teal-500 outline-none bg-white font-medium">
+                    <option value="FEATURE">Tính năng mới (Feature)</option>
+                    <option value="ENHANCEMENT">Cải tiến tính năng (Enhancement)</option>
+                    <option value="BUGFIX">Sửa lỗi (Bug fix)</option>
+                    <option value="SECURITY">Bảo mật (Security)</option>
+                    <option value="UI">Giao diện (UI/UX)</option>
+                </select>
+            </div>
+
+            <div>
+                <label class="block text-xs font-semibold text-slate-700 mb-1">Tiêu đề thay đổi <span class="text-rose-500">*</span></label>
+                <input type="text" name="title" id="form_changelog_title" required placeholder="Tóm tắt ngắn gọn nội dung thay đổi..." class="w-full p-2.5 border border-slate-300 rounded-xl text-xs focus:ring-2 focus:ring-teal-500 outline-none font-semibold">
+            </div>
+
+            <div>
+                <label class="block text-xs font-semibold text-slate-700 mb-1">Nội dung chi tiết thay đổi <span class="text-rose-500">*</span></label>
+                <textarea name="description" id="form_changelog_desc" rows="4" required placeholder="Ghi chi tiết các nội dung cập nhật, gạch đầu dòng từng mục..." class="w-full p-2.5 border border-slate-300 rounded-xl text-xs focus:ring-2 focus:ring-teal-500 outline-none leading-relaxed"></textarea>
+            </div>
+
+            <div class="flex justify-end gap-2 pt-3 border-t border-slate-100">
+                <button type="button" onclick="closeChangelogModal()" class="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold rounded-xl">Hủy</button>
+                <button type="submit" class="px-4 py-2 bg-teal-600 hover:bg-teal-700 text-white text-xs font-bold rounded-xl shadow">Lưu Nhật Ký</button>
+            </div>
+        </form>
+    </div>
+</div>
+<?php endif; ?>
 
 <script>
 let lastMessageCount = 0;
@@ -564,6 +860,64 @@ document.addEventListener('DOMContentLoaded', function() {
     // Auto-refresh / Real-time Polling every 3 seconds
     setInterval(fetchMessages, 3000);
 });
-</script>
 
+// ==================== QUẢN LÝ NHẬT KÍ THAY ĐỔI HỆ THỐNG ====================
+function openChangelogModal() {
+    const modal = document.getElementById('changelogModal');
+    if (!modal) return;
+    document.getElementById('form_changelog_id').value = '0';
+    document.getElementById('form_changelog_version').value = '';
+    document.getElementById('form_changelog_date').value = '<?= date('Y-m-d') ?>';
+    document.getElementById('form_changelog_category').value = 'FEATURE';
+    document.getElementById('form_changelog_title').value = '';
+    document.getElementById('form_changelog_desc').value = '';
+    document.getElementById('changelogModalTitle').querySelector('span').innerText = 'Thêm Nhật Ký Thay Đổi Mới';
+
+    modal.classList.remove('hidden');
+    modal.classList.add('flex');
+}
+
+function closeChangelogModal() {
+    const modal = document.getElementById('changelogModal');
+    if (!modal) return;
+    modal.classList.add('hidden');
+    modal.classList.remove('flex');
+}
+
+function editChangelog(log) {
+    const modal = document.getElementById('changelogModal');
+    if (!modal) return;
+    document.getElementById('form_changelog_id').value = log.id;
+    document.getElementById('form_changelog_version').value = log.version || '';
+    document.getElementById('form_changelog_date').value = log.released_date || '<?= date('Y-m-d') ?>';
+    document.getElementById('form_changelog_category').value = log.category || 'FEATURE';
+    document.getElementById('form_changelog_title').value = log.title || '';
+    document.getElementById('form_changelog_desc').value = log.description || '';
+    document.getElementById('changelogModalTitle').querySelector('span').innerText = 'Chỉnh Sửa Nhật Ký Thay Đổi #' + log.id;
+
+    modal.classList.remove('hidden');
+    modal.classList.add('flex');
+}
+
+function deleteChangelog(id) {
+    if (!id) return;
+    const confirmDelete = () => {
+        const form = document.createElement('form');
+        form.method = 'POST';
+        form.action = 'discussion.php';
+        form.innerHTML = `
+            <input type="hidden" name="action" value="delete_changelog">
+            <input type="hidden" name="id" value="${id}">
+        `;
+        document.body.appendChild(form);
+        form.submit();
+    };
+
+    if (typeof sysConfirm === 'function') {
+        sysConfirm('Bạn có chắc chắn muốn xóa bản ghi nhật ký thay đổi này không?', confirmDelete);
+    } else if (confirm('Bạn có chắc chắn muốn xóa bản ghi nhật ký thay đổi này không?')) {
+        confirmDelete();
+    }
+}
+</script>
 <?php require_once __DIR__ . '/includes/footer.php'; ?>
