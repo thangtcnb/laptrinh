@@ -717,9 +717,9 @@ if ($deepLinkTaskId > 0) {
                                                rel="noopener noreferrer" 
                                                onclick="return openDriveProofLink(event, '<?= htmlspecialchars(addslashes($rawDriveUrl)) ?>')" 
                                                class="inline-flex items-center gap-1.5 text-xs text-emerald-700 font-semibold hover:text-emerald-900 bg-emerald-50 hover:bg-emerald-100 px-2 py-0.5 rounded border border-emerald-200 transition shadow-xs cursor-pointer" 
-                                               title="Mở link Google Drive minh chứng">
+                                               title="Mở link Hồ sơ Minh chứng">
                                                 <i class="fa-brands fa-google-drive text-emerald-600 text-sm"></i>
-                                                <span>Minh chứng Drive</span>
+                                                <span>Hồ sơ Minh chứng</span>
                                                 <i class="fa-solid fa-arrow-up-right-from-square text-[9px]"></i>
                                             </a>
                                         <?php else: ?>
@@ -1015,12 +1015,12 @@ if ($deepLinkTaskId > 0) {
         <div class="flex items-center justify-between pb-3 border-b border-slate-100 mb-4">
             <h3 class="font-bold text-slate-900 text-base flex items-center gap-2">
                 <i class="fa-solid fa-chart-line text-indigo-600"></i>
-                <span>Cập Nhật Tiến Độ & Minh Chứng</span>
+                <span>Cập Nhật Tiến Độ & Hồ Sơ Minh Chứng</span>
             </h3>
             <button onclick="closeProgressModal()" class="text-slate-400 hover:text-slate-600"><i class="fa-solid fa-xmark text-lg"></i></button>
         </div>
 
-        <form method="POST" action="task_actions.php">
+        <form method="POST" action="task_actions.php" enctype="multipart/form-data">
             <input type="hidden" name="action" value="update_progress">
             <input type="hidden" name="task_id" id="prog_task_id">
 
@@ -1049,12 +1049,59 @@ if ($deepLinkTaskId > 0) {
             </div>
 
             <div class="mb-4">
-                <label class="block text-xs font-semibold text-slate-700 mb-1 flex items-center gap-1.5">
-                    <i class="fa-brands fa-google-drive text-emerald-600"></i>
-                    <span>Link Minh chứng (Google Drive / Docs / Sheets)</span>
-                </label>
-                <input type="text" name="proof_link" id="prog_proof_link" placeholder="https://drive.google.com/..." class="w-full p-2.5 border border-slate-300 rounded-xl text-xs focus:ring-2 focus:ring-indigo-500 outline-none">
-                <p class="text-[11px] text-slate-400 mt-1">Dán liên kết Google Drive mở quyền xem cho hội đồng/cấp quản lý.</p>
+                <div class="flex items-center justify-between mb-1">
+                    <label class="block text-xs font-semibold text-slate-700 flex items-center gap-1.5">
+                        <i class="fa-brands fa-google-drive text-emerald-600"></i>
+                        <span>Hồ sơ Minh chứng (Google Drive)</span>
+                    </label>
+                    <a id="btn_preview_proof" href="#" target="_blank" onclick="return openDriveProofLink(event, this.href)" class="hidden text-xs text-indigo-600 hover:text-indigo-800 font-bold flex items-center gap-1">
+                        <i class="fa-solid fa-arrow-up-right-from-square text-[10px]"></i>
+                        <span>Xem thử link</span>
+                    </a>
+                </div>
+                <input type="text" name="proof_link" id="prog_proof_link" oninput="updateProofPreviewBtn(this.value)" placeholder="https://drive.google.com/..." class="w-full p-2.5 border border-slate-300 rounded-xl text-xs focus:ring-2 focus:ring-indigo-500 outline-none">
+                
+                <!-- Khu vực tải file trực tiếp lên D:\web\minhchung & đồng bộ Google Drive -->
+                <div class="mt-2.5 p-3 bg-slate-50 border border-dashed border-slate-300 rounded-xl">
+                    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                        <div>
+                            <div class="text-[11px] font-bold text-slate-800 flex items-center gap-1.5">
+                                <i class="fa-solid fa-cloud-arrow-up text-indigo-600"></i>
+                                <span>Tải lên file Hồ sơ Minh chứng</span>
+                            </div>
+                            <p class="text-[10px] text-slate-500 mt-0.5">Tự động lưu vào <code class="bg-white px-1 py-0.5 rounded border border-slate-200 text-indigo-600 font-mono">D:\web\minhchung</code> và đồng bộ lên Google Drive (Dung lượng &lt; 50MB)</p>
+                        </div>
+                        <div class="shrink-0 flex items-center gap-2">
+                            <input type="file" id="prog_proof_file_input" name="proof_file" accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.png,.jpg,.jpeg,.zip,.rar,.7z,.txt" class="hidden" onchange="uploadProofFileDirectly(this)">
+                            <button type="button" id="prog_proof_upload_btn" onclick="document.getElementById('prog_proof_file_input').click()" class="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl text-xs transition flex items-center gap-1.5 shadow-sm">
+                                <i class="fa-solid fa-file-arrow-up"></i>
+                                <span>Chọn file tải lên</span>
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Trạng thái Uploading -->
+                    <div id="prog_uploading_box" class="hidden mt-2.5 pt-2 border-t border-slate-200">
+                        <div class="flex items-center gap-2 text-xs text-indigo-700 font-semibold">
+                            <i class="fa-solid fa-circle-notch fa-spin text-indigo-600"></i>
+                            <span id="prog_uploading_text">Đang tải file vào ổ D: và đồng bộ lên Google Drive...</span>
+                        </div>
+                        <div class="w-full bg-slate-200 h-1.5 rounded-full overflow-hidden mt-1.5">
+                            <div class="bg-indigo-600 h-full w-2/3 animate-pulse"></div>
+                        </div>
+                    </div>
+
+                    <!-- Trạng thái Upload thành công -->
+                    <div id="prog_upload_success_box" class="hidden mt-2.5 p-2.5 bg-emerald-50 border border-emerald-200 rounded-xl text-xs text-emerald-800 flex items-center justify-between gap-2">
+                        <div class="flex items-center gap-1.5 overflow-hidden">
+                            <i class="fa-solid fa-circle-check text-emerald-600 text-sm shrink-0"></i>
+                            <span class="font-bold truncate" id="prog_uploaded_filename"></span>
+                        </div>
+                        <span class="text-[10px] font-bold bg-emerald-200/70 text-emerald-800 px-2 py-0.5 rounded-full shrink-0">
+                            Đã đồng bộ Drive thành công
+                        </span>
+                    </div>
+                </div>
             </div>
 
             <div class="mb-5">
@@ -1726,6 +1773,85 @@ function openDriveProofLink(e, url) {
     return false;
 }
 
+function updateProofPreviewBtn(url) {
+    const btn = document.getElementById('btn_preview_proof');
+    if (!btn) return;
+    if (url && url.trim() !== '') {
+        btn.href = url.trim();
+        btn.classList.remove('hidden');
+        btn.classList.add('flex');
+    } else {
+        btn.href = '#';
+        btn.classList.add('hidden');
+        btn.classList.remove('flex');
+    }
+}
+
+function resetProofUploadUI() {
+    const fileInput = document.getElementById('prog_proof_file_input');
+    if (fileInput) fileInput.value = '';
+    const uploadBox = document.getElementById('prog_uploading_box');
+    if (uploadBox) uploadBox.classList.add('hidden');
+    const successBox = document.getElementById('prog_upload_success_box');
+    if (successBox) successBox.classList.add('hidden');
+    const btn = document.getElementById('prog_proof_upload_btn');
+    if (btn) btn.disabled = false;
+}
+
+function uploadProofFileDirectly(fileInput) {
+    if (!fileInput || !fileInput.files || fileInput.files.length === 0) return;
+    const file = fileInput.files[0];
+
+    if (file.size > 50 * 1024 * 1024) {
+        sysAlert('Dung lượng file (' + (file.size / (1024 * 1024)).toFixed(1) + ' MB) vượt quá giới hạn cho phép (tối đa 50MB).');
+        fileInput.value = '';
+        return;
+    }
+
+    const taskId = document.getElementById('prog_task_id').value;
+    const uploadBox = document.getElementById('prog_uploading_box');
+    const uploadText = document.getElementById('prog_uploading_text');
+    const successBox = document.getElementById('prog_upload_success_box');
+    const successName = document.getElementById('prog_uploaded_filename');
+    const uploadBtn = document.getElementById('prog_proof_upload_btn');
+
+    if (uploadBox) uploadBox.classList.remove('hidden');
+    if (successBox) successBox.classList.add('hidden');
+    if (uploadText) uploadText.innerText = 'Đang lưu vào ổ D:\\web\\minhchung và đồng bộ lên Google Drive...';
+    if (uploadBtn) uploadBtn.disabled = true;
+
+    const formData = new FormData();
+    formData.append('proof_file', file);
+    formData.append('task_id', taskId);
+
+    fetch('task_actions.php?action=upload_proof_file', {
+        method: 'POST',
+        body: formData
+    })
+    .then(res => res.json())
+    .then(data => {
+        if (uploadBox) uploadBox.classList.add('hidden');
+        if (uploadBtn) uploadBtn.disabled = false;
+
+        if (data.success && data.fileUrl) {
+            document.getElementById('prog_proof_link').value = data.fileUrl;
+            updateProofPreviewBtn(data.fileUrl);
+
+            if (successBox && successName) {
+                successName.innerText = data.fileName || file.name;
+                successBox.classList.remove('hidden');
+            }
+        } else {
+            sysAlert(data.error || 'Có lỗi xảy ra khi tải file lên Google Drive.');
+        }
+    })
+    .catch(err => {
+        if (uploadBox) uploadBox.classList.add('hidden');
+        if (uploadBtn) uploadBtn.disabled = false;
+        sysAlert('Không thể kết nối đến máy chủ: ' + err);
+    });
+}
+
 function openProgressModal(task) {
     document.getElementById('prog_task_id').value = task.id;
     document.getElementById('prog_task_title').innerText = task.title;
@@ -1733,6 +1859,9 @@ function openProgressModal(task) {
     document.getElementById('prog_val').value = task.progress;
     document.getElementById('prog_proof_link').value = task.proof_link || '';
     document.getElementById('prog_notes').value = task.notes || '';
+
+    resetProofUploadUI();
+    updateProofPreviewBtn(task.proof_link || '');
 
     const leaderContainer = document.getElementById('prog_leader_comments_container');
     const leaderCommentEl = document.getElementById('prog_leader_comments');
@@ -2154,4 +2283,84 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 </script>
 
+
+<!-- FLOATING TOAST: REALTIME DATA UPDATE NOTIFICATION -->
+<div id="realtimeUpdateToast" class="fixed bottom-6 right-6 z-50 transform translate-y-28 opacity-0 transition-all duration-300 pointer-events-none no-print">
+    <div class="bg-slate-900/95 backdrop-blur-md text-white px-4 py-3 rounded-2xl shadow-2xl border border-slate-700 flex items-center gap-3 pointer-events-auto">
+        <div class="w-8 h-8 rounded-xl bg-indigo-600 text-white flex items-center justify-center shrink-0">
+            <i class="fa-solid fa-arrows-rotate fa-spin text-sm"></i>
+        </div>
+        <div>
+            <p class="text-xs font-bold text-white">Có phát sinh dữ liệu mới!</p>
+            <p class="text-[11px] text-slate-300">Đang có công việc mới hoặc cập nhật trạng thái hệ thống.</p>
+        </div>
+        <button type="button" onclick="window.location.reload()" class="ml-2 px-3 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs rounded-xl transition shadow">
+            Làm mới ngay
+        </button>
+        <button type="button" onclick="dismissRealtimeToast()" class="text-slate-400 hover:text-white p-1">
+            <i class="fa-solid fa-xmark text-sm"></i>
+        </button>
+    </div>
+</div>
+<script>
+
+// ==================== AUTO-REFRESH & REALTIME SYNC LISTENER ====================
+window.currentSystemVersion = <?= json_encode(getSystemDataVersion($pdo)) ?>;
+let isCheckingVersion = false;
+let hasNewDataPending = false;
+
+function checkSystemVersion() {
+    if (isCheckingVersion) return;
+    isCheckingVersion = true;
+
+    fetch('task_actions.php?action=check_data_version', { cache: 'no-store' })
+        .then(res => res.json())
+        .then(data => {
+            isCheckingVersion = false;
+            if (data && data.version && data.version !== window.currentSystemVersion) {
+                hasNewDataPending = true;
+                triggerAutoRefreshOrToast();
+            }
+        })
+        .catch(() => {
+            isCheckingVersion = false;
+        });
+}
+
+function triggerAutoRefreshOrToast() {
+    if (!hasNewDataPending) return;
+
+    // Kiểm tra xem người dùng có đang mở modal nào hoặc đang nhập liệu không
+    const openModals = document.querySelectorAll(
+        '#taskModal:not(.hidden), #progressModal:not(.hidden), #leaderCommentModal:not(.hidden), #batchApprovalModal:not(.hidden), #rejectionReasonModal:not(.hidden), #taskDetailModal:not(.hidden), #pendingTaskModal:not(.hidden)'
+    );
+    const isInputActive = ['INPUT', 'TEXTAREA', 'SELECT'].includes(document.activeElement ? document.activeElement.tagName : '');
+
+    if (openModals.length === 0 && !isInputActive) {
+        // Không có modal mở và không đang gõ phím -> Tự động reload trang ngay
+        window.location.reload();
+    } else {
+        // Đang thao tác dở dang -> Hiển thị Toast thông báo để không làm gián đoạn
+        const toast = document.getElementById('realtimeUpdateToast');
+        if (toast) {
+            toast.classList.remove('translate-y-28', 'opacity-0', 'pointer-events-none');
+        }
+    }
+}
+
+function dismissRealtimeToast() {
+    const toast = document.getElementById('realtimeUpdateToast');
+    if (toast) {
+        toast.classList.add('translate-y-28', 'opacity-0', 'pointer-events-none');
+    }
+}
+
+// Kiểm tra định kỳ mỗi 15 giây
+setInterval(checkSystemVersion, 15000);
+
+// Khi người dùng chuyển tab quay lại, lập tức kiểm tra phiên bản mới
+window.addEventListener('focus', function() {
+    checkSystemVersion();
+});
+</script>
 <?php require_once __DIR__ . '/includes/footer.php'; ?>

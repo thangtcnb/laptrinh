@@ -655,3 +655,147 @@ function resolveLoginBackground($dbValue) {
         'is_custom' => $isCustom
     ];
 }
+if (!defined('GOOGLE_APPS_SCRIPT_UPLOAD_URL')) {
+    define('GOOGLE_APPS_SCRIPT_UPLOAD_URL', 'https://script.google.com/macros/s/AKfycbyPLd8DzOsfXP4808SXZXCaPvHEOWJhtFPrqvuuW8eR5vA-Bb6rbF0-tI_Jjh-TLOC-/exec');
+}
+if (!defined('PROOF_UPLOAD_DIR')) {
+    define('PROOF_UPLOAD_DIR', 'D:/web/minhchung');
+}
+
+/**
+ * Lấy mã phiên bản dữ liệu hệ thống để hỗ trợ tự động làm mới (Auto-refresh)
+ */
+function getSystemDataVersion($pdo) {
+    try {
+        $stmt = $pdo->query("
+            SELECT CONCAT(
+                COALESCE((SELECT MAX(id) FROM audit_logs), 0), ':',
+                COALESCE((SELECT COUNT(*) FROM tasks), 0), ':',
+                COALESCE((SELECT MAX(id) FROM task_timeline), 0), ':',
+                COALESCE((SELECT MAX(progress) FROM tasks), 0), ':',
+                COALESCE((SELECT MAX(id) FROM notifications), 0)
+            ) AS v
+        ");
+        return $stmt->fetchColumn() ?: '0';
+    } catch (\Exception $e) {
+        return '0';
+    }
+}
+
+/**
+ * Tải file Hồ sơ Minh chứng lên ổ D:\web\minhchung và đồng bộ lên Google Drive qua Webhook
+ */
+function uploadProofFileToDrive($file) {
+    if (empty($file) || $file['error'] !== UPLOAD_ERR_OK) {
+        return ['success' => false, 'error' => 'Vui lòng chọn file hợp lệ để tải lên.'];
+    }
+
+    // Giới hạn dung lượng tối đa 50MB
+    if ($file['size'] > 50 * 1024 * 1024) {
+        return ['success' => false, 'error' => 'Dung lượng file vượt quá giới hạn 50MB.'];
+    }
+
+    $allowedExts = ['pdf', 'doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx', 'png', 'jpg', 'jpeg', 'zip', 'rar', '7z', 'txt'];
+    $origName = basename($file['name']);
+    $ext = strtolower(pathinfo($origName, PATHINFO_EXTENSION));
+    if (!in_array($ext, $allowedExts)) {
+        return ['success' => false, 'error' => 'Định dạng file không được hỗ trợ (chỉ chấp nhận: PDF, Word, Excel, PowerPoint, Ảnh, Zip, Rar).'];
+    }
+
+    // 1. Tạo thư mục D:\web\minhchung nếu chưa tồn tại
+    $targetDir = PROOF_UPLOAD_DIR;
+    if (!is_dir($targetDir)) {
+        @mkdir($targetDir, 0777, true);
+    }
+    // Fallback nếu ổ D không ghi được (trường hợp chạy trên môi trường Linux khác)
+    if (!is_dir($targetDir) || !is_writable($targetDir)) {
+        $targetDir = dirname(__DIR__) . '/uploads/minhchung';
+        if (!is_dir($targetDir)) {
+            @mkdir($targetDir, 0777, true);
+        }
+    }
+
+    // Tên file lưu trên ổ đĩa để tránh trùng lặp
+    $safeName = preg_replace('/[^\w\.\-\p{L}]/u', '_', $origName);
+    $diskFileName = date('Ymd_His') . '_' . $safeName;
+    $targetPath = rtrim($targetDir, '/\\') . DIRECTORY_SEPARATOR . $diskFileName;
+
+    if (!move_uploaded_file($file['tmp_name'], $targetPath)) {
+        return ['success' => false, 'error' => 'Không thể lưu file vào thư mục máy chủ (' . $targetDir . ').'];
+    }
+
+    // 2. Đọc nội dung file chuyển sang base64 để gửi sang Google Apps Script
+    $fileContent = @file_get_contents($targetPath);
+    if ($fileContent === false) {
+        return ['success' => false, 'error' => 'Không thể đọc nội dung file từ máy chủ.'];
+    }
+
+    $mimeType = $file['type'] ?: 'application/octet-stream';
+    $postPayload = json_encode([
+        'base64' => base64_encode($fileContent),
+        'fileName' => $origName,
+        'mimeType' => $mimeType
+    ]);
+
+    $webhookUrl = GOOGLE_APPS_SCRIPT_UPLOAD_URL;
+    $response = false;
+    $curlErr = '';
+
+    if (function_exists('curl_init')) {
+        $ch = curl_init($webhookUrl);
+        curl_setopt_array($ch, [
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_POST => true,
+            CURLOPT_POSTFIELDS => $postPayload,
+            CURLOPT_HTTPHEADER => ['Content-Type: application/json'],
+            CURLOPT_FOLLOWLOCATION => true,
+            CURLOPT_AUTOREFERER => true,
+            CURLOPT_TIMEOUT => 90,
+            CURLOPT_SSL_VERIFYPEER => false,
+            CURLOPT_SSL_VERIFYHOST => false
+        ]);
+        $response = curl_exec($ch);
+        $curlErr = curl_error($ch);
+        curl_close($ch);
+    } else {
+        $context = stream_context_create([
+            'http' => [
+                'method' => 'POST',
+                'header' => "Content-Type: application/json\r\n",
+                'content' => $postPayload,
+                'timeout' => 90,
+                'follow_location' => 1
+            ],
+            'ssl' => [
+                'verify_peer' => false,
+                'verify_peer_name' => false
+            ]
+        ]);
+        $response = @file_get_contents($webhookUrl, false, $context);
+    }
+
+    if (!$response) {
+        return [
+            'success' => false,
+            'error' => 'Đã lưu file nội bộ nhưng chưa thể kết nối đến Google Drive. ' . $curlErr,
+            'localPath' => $targetPath
+        ];
+    }
+
+    $result = json_decode($response, true);
+    if (!empty($result) && ($result['status'] ?? '') === 'success') {
+        return [
+            'success' => true,
+            'fileUrl' => $result['fileUrl'],
+            'fileId' => $result['fileId'] ?? '',
+            'fileName' => $origName,
+            'localPath' => $targetPath
+        ];
+    }
+
+    return [
+        'success' => false,
+        'error' => $result['message'] ?? 'Lỗi không xác định khi đồng bộ file lên Google Drive.',
+        'localPath' => $targetPath
+    ];
+}

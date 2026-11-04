@@ -6,6 +6,39 @@ requireLogin();
 $currentUser = getCurrentUser($pdo);
 
 $action = $_REQUEST['action'] ?? '';
+// 0. CHECK DATA VERSION (FOR AUTO-REFRESH)
+if ($action === 'check_data_version') {
+    header('Content-Type: application/json; charset=utf-8');
+    echo json_encode([
+        'version' => getSystemDataVersion($pdo)
+    ]);
+    exit;
+}
+
+// 0.1 UPLOAD PROOF FILE DIRECTLY & SYNC GOOGLE DRIVE
+if ($action === 'upload_proof_file') {
+    header('Content-Type: application/json; charset=utf-8');
+    if (!$currentUser) {
+        echo json_encode(['success' => false, 'error' => 'Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.']);
+        exit;
+    }
+
+    if (empty($_FILES['proof_file'])) {
+        echo json_encode(['success' => false, 'error' => 'Vui lòng chọn tệp tin Hồ sơ Minh chứng để tải lên.']);
+        exit;
+    }
+
+    $taskId = (int)($_POST['task_id'] ?? 0);
+    $res = uploadProofFileToDrive($_FILES['proof_file']);
+
+    if (!empty($res['success']) && $taskId > 0) {
+        logTaskTimeline($pdo, $taskId, $currentUser['id'], 'UPLOAD_PROOF', "Đã tải lên tệp Hồ sơ Minh chứng '{$res['fileName']}' và đồng bộ lên Google Drive");
+        logActivity($pdo, $currentUser['id'], 'UPLOAD_PROOF', "Đã tải lên Hồ sơ Minh chứng cho công việc ID #$taskId: {$res['fileName']}");
+    }
+
+    echo json_encode($res);
+    exit;
+}
 
 // Helper function to handle attachment files upload
 function handleFileUploads($pdo, $taskId, $userId) {
@@ -86,6 +119,14 @@ if ($action === 'update_progress') {
     $progress = min(100, max(0, (int)($_POST['progress'] ?? 0)));
     $proofLink = trim($_POST['proof_link'] ?? '');
     $notes = trim($_POST['notes'] ?? '');
+
+    // Hỗ trợ tải trực tiếp file minh chứng nếu form gửi đính kèm tệp
+    if (!empty($_FILES['proof_file']) && $_FILES['proof_file']['error'] === UPLOAD_ERR_OK) {
+        $uploadRes = uploadProofFileToDrive($_FILES['proof_file']);
+        if (!empty($uploadRes['success'])) {
+            $proofLink = $uploadRes['fileUrl'];
+        }
+    }
     if (!empty($proofLink) && !preg_match('#^[a-zA-Z][a-zA-Z0-9+\-.]*://#', $proofLink)) {
         $proofLink = 'https://' . $proofLink;
     }
@@ -114,11 +155,11 @@ if ($action === 'update_progress') {
         $timelineDesc .= " (Ghi chú: $notes)";
     }
     if (!empty($proofLink)) {
-        $timelineDesc .= " kèm link minh chứng";
+        $timelineDesc .= " kèm Hồ sơ Minh chứng";
     }
 
     logTaskTimeline($pdo, $taskId, $currentUser['id'], 'UPDATE_PROGRESS', $timelineDesc);
-    $_SESSION['flash_success'] = "Đã cập nhật tiến độ (" . $progress . "%), ghi chú và minh chứng thành công!";
+    $_SESSION['flash_success'] = "Đã cập nhật tiến độ (" . $progress . "%), ghi chú và Hồ sơ Minh chứng thành công!";
 
     
     header("Location: index.php");
