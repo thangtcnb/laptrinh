@@ -555,7 +555,23 @@ require_once __DIR__ . '/includes/header.php';
                                 <?= formatAssigneesHtml($t['assignees']) ?>
                             </td>
                             <td class="py-3.5 px-3 text-center border-r border-slate-100">
-                                <?= renderStatusBadge($t['status'], $t['due_date']) ?>
+                                <?php
+                                $exportDisplayStatus = $t['status'];
+                                $unacceptedExportList = [];
+                                if (!empty($t['assignees'])) {
+                                    foreach ($t['assignees'] as $asg) {
+                                        if (empty($asg['is_accepted']) || (int)$asg['is_accepted'] === 0) {
+                                            $unacceptedExportList[] = $asg['fullname'];
+                                        }
+                                    }
+                                }
+                                if (empty($unacceptedExportList) && ($exportDisplayStatus === 'CHO_TIEP_NHAN' || empty($exportDisplayStatus))) {
+                                    $exportDisplayStatus = !empty($t['target_status']) ? $t['target_status'] : 'DANG_THUC_HIEN';
+                                } elseif (!empty($unacceptedExportList) && in_array($exportDisplayStatus, ['CHO_TIEP_NHAN', 'CHO_XAC_NHAN', 'DANG_THUC_HIEN', ''])) {
+                                    $exportDisplayStatus = 'CHO_TIEP_NHAN';
+                                }
+                                ?>
+                                <?= renderStatusBadge($exportDisplayStatus, $t['due_date'], $unacceptedExportList) ?>
                             </td>
                             <td class="py-3.5 px-3 text-center border-r border-slate-100 font-bold text-indigo-700">
                                 <?= (int)$t['progress'] ?>%

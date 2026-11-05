@@ -155,68 +155,115 @@ function renderDepartmentBadge($code, $name, $colorTheme, $icon) {
             </span>';
 }
 
-// Render status badge (including prominent "Quá hạn" warning badge when overdue)
-function renderStatusBadge($status, $dueDate = null) {
-    $html = '';
+// Render status badge (including prominent "Quá hạn" warning badge when overdue and unaccepted assignees)
+function renderStatusBadge($status, $dueDate = null, $unacceptedAssignees = []) {
+    $unacceptedNames = [];
+    if (is_array($unacceptedAssignees)) {
+        foreach ($unacceptedAssignees as $item) {
+            if (is_array($item) && !empty($item['fullname'])) {
+                $unacceptedNames[] = trim($item['fullname']);
+            } elseif (is_string($item) && trim($item) !== '') {
+                $unacceptedNames[] = trim($item);
+            }
+        }
+    }
+    $unacceptedNames = array_unique(array_filter($unacceptedNames));
+
+    $unacceptedPill = '';
+    $badge = '';
+
     switch ($status) {
         case 'CHO_BGD_DUYET':
-            $html = '<span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium bg-amber-100 text-amber-800 border border-amber-200">
+            $badge = '<span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium bg-amber-100 text-amber-800 border border-amber-200">
                         <i class="fa-solid fa-clock-rotate-left"></i> Chờ BGD duyệt
                     </span>';
             break;
         case 'CHO_DUYET':
-            $html = '<span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800 border border-yellow-200">
+            $badge = '<span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800 border border-yellow-200">
                         <i class="fa-solid fa-hourglass-half"></i> Chờ Trưởng phòng duyệt
                     </span>';
             break;
         case '':
         case null:
         case 'CHO_TIEP_NHAN':
-            $html = '<span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium bg-cyan-100 text-cyan-800 border border-cyan-200">
+            $badge = '<span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium bg-cyan-100 text-cyan-800 border border-cyan-200 shadow-2xs">
                         <i class="fa-solid fa-clock"></i> Chờ tiếp nhận
                     </span>';
+            if (!empty($unacceptedNames)) {
+                $allNamesStr = implode(', ', $unacceptedNames);
+                $allNamesEsc = htmlspecialchars($allNamesStr, ENT_QUOTES, 'UTF-8');
+                if (count($unacceptedNames) > 2) {
+                    $firstTwo = array_slice($unacceptedNames, 0, 2);
+                    $displayNamesStr = implode(', ', $firstTwo) . ' (+' . (count($unacceptedNames) - 2) . ')';
+                } else {
+                    $displayNamesStr = $allNamesStr;
+                }
+                $displayNamesEsc = htmlspecialchars($displayNamesStr, ENT_QUOTES, 'UTF-8');
+                $unacceptedPill = '<div class="mt-1 text-[11px] text-amber-800 bg-amber-50 px-2 py-0.5 rounded-lg border border-amber-200 font-semibold inline-flex items-center gap-1 shadow-2xs max-w-[210px] cursor-help" title="Nhân viên chưa tiếp nhận: ' . $allNamesEsc . '">
+                                        <i class="fa-solid fa-user-clock text-amber-600 text-[10px] shrink-0"></i>
+                                        <span class="truncate">Chưa nhận: <strong class="font-bold text-amber-900">' . $displayNamesEsc . '</strong></span>
+                                   </div>';
+            }
             break;
         case 'YEU_CAU_CHINH_SUA':
-            $html = '<span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold bg-rose-100 text-rose-800 border border-rose-300 shadow-xs">
+            $badge = '<span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold bg-rose-100 text-rose-800 border border-rose-300 shadow-xs">
                         <i class="fa-solid fa-circle-xmark text-rose-600"></i> Từ chối - Yêu cầu chỉnh sửa
                     </span>';
             break;
         case 'CHO_XAC_NHAN':
-            $html = '<span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800 border border-blue-200">
+            $badge = '<span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800 border border-blue-200">
                         <i class="fa-solid fa-envelope-open-text"></i> Chờ NV xác nhận
                     </span>';
             break;
         case 'TU_CHOI_CHO_TP_XAC_NHAN':
-            $html = '<span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium bg-rose-100 text-rose-800 border border-rose-200">
+            $badge = '<span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium bg-rose-100 text-rose-800 border border-rose-200">
                         <i class="fa-solid fa-circle-xmark"></i> Từ chối - Chờ TP xác nhận
                     </span>';
             break;
         case 'DANG_THUC_HIEN':
-            $html = '<span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium bg-sky-100 text-sky-800 border border-sky-200">
+            $badge = '<span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium bg-sky-100 text-sky-800 border border-sky-200">
                         <i class="fa-solid fa-spinner fa-spin text-xs"></i> Đang thực hiện
                     </span>';
             break;
         case 'HOAN_THANH':
-            $html = '<span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium bg-emerald-100 text-emerald-800 border border-emerald-200">
+            $badge = '<span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium bg-emerald-100 text-emerald-800 border border-emerald-200">
                         <i class="fa-solid fa-circle-check"></i> Hoàn thành
                     </span>';
             break;
         default:
-            $html = '<span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-800">' . htmlspecialchars($status) . '</span>';
+            $badge = '<span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-800">' . htmlspecialchars($status) . '</span>';
             break;
     }
 
+    $overdueHtml = '';
     if (!empty($dueDate) && $status !== 'HOAN_THANH') {
         $today = date('Y-m-d');
         $due = date('Y-m-d', strtotime($dueDate));
         if ($due < $today) {
-            $html .= ' <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold bg-rose-600 text-white shadow-sm border border-rose-700 animate-pulse" title="Công việc đã quá hạn">
+            $overdueHtml = '<span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-rose-600 text-white shadow-sm border border-rose-700 animate-pulse" title="Công việc đã quá hạn">
                         <i class="fa-solid fa-triangle-exclamation text-xs"></i> Quá hạn
                     </span>';
         }
     }
 
-    return $html;
+    if (!empty($unacceptedPill)) {
+        return '<div class="inline-flex flex-col items-center">
+                    <div class="inline-flex items-center gap-1.5 flex-wrap justify-center">
+                        ' . $badge . '
+                        ' . $overdueHtml . '
+                    </div>
+                    ' . $unacceptedPill . '
+                </div>';
+    }
+
+    if (!empty($overdueHtml)) {
+        return '<div class="inline-flex items-center gap-1.5 flex-wrap justify-center">
+                    ' . $badge . '
+                    ' . $overdueHtml . '
+                </div>';
+    }
+
+    return $badge;
 }
 
 // Render priority badge
@@ -496,6 +543,22 @@ function getTaskTimelineLogs($pdo, $taskId) {
 
 // Get tasks query with smart filters and pagination
 function getTasksFiltered($pdo, $filters = [], $limit = 15, $offset = 0, $currentUser = null) {
+    // Auto-reconcile tasks stuck in CHO_TIEP_NHAN where all assignees have accepted
+    try {
+        $pdo->exec("
+            UPDATE tasks t
+            SET status = CASE WHEN t.target_status = 'CHO_BGD_DUYET' THEN 'CHO_BGD_DUYET' ELSE 'DANG_THUC_HIEN' END
+            WHERE t.status = 'CHO_TIEP_NHAN'
+              AND EXISTS (SELECT 1 FROM task_assignees WHERE task_id = t.id)
+              AND NOT EXISTS (
+                  SELECT 1 FROM task_assignees ta
+                  WHERE ta.task_id = t.id AND (ta.is_accepted = 0 OR ta.is_accepted IS NULL)
+              )
+        ");
+    } catch (\Exception $e) {
+        // Silently continue
+    }
+
     $where = ["1=1"];
     $params = [];
 

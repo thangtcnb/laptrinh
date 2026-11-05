@@ -79,7 +79,7 @@ if ($currentUser) {
         JOIN task_assignees ta ON t.id = ta.task_id
         WHERE ta.user_id = ?
           AND (ta.is_accepted = 0 OR ta.is_accepted IS NULL)
-          AND t.status IN ('CHO_XAC_NHAN', 'CHO_TIEP_NHAN')
+          AND t.status IN ('CHO_XAC_NHAN', 'CHO_TIEP_NHAN', 'DANG_THUC_HIEN')
         ORDER BY t.id DESC
     ");
     $stmtPending->execute([$currentUser['id']]);
@@ -675,21 +675,26 @@ if ($deepLinkTaskId > 0) {
                             <td class="py-3.5 px-3 text-center border-r border-slate-100">
                                 <?php
                                 $displayStatus = $t['status'];
-                                // Kiểm tra nếu người dùng hiện tại là người phối hợp và đang chờ xác nhận
-                                $isMyCoopPending = false;
+                                
+                                // Thu thập danh sách những người chưa tiếp nhận công việc
+                                $unacceptedList = [];
                                 if (!empty($t['assignees'])) {
                                     foreach ($t['assignees'] as $asg) {
-                                        if ($asg['user_id'] == $currentUser['id'] && $asg['role_type'] === 'COOP' && (empty($asg['is_accepted']) || $asg['is_accepted'] == 0)) {
-                                            $isMyCoopPending = true;
-                                            break;
+                                        if (empty($asg['is_accepted']) || (int)$asg['is_accepted'] === 0) {
+                                            $unacceptedList[] = $asg['fullname'];
                                         }
                                     }
                                 }
-                                if ($isMyCoopPending || $displayStatus === 'CHO_TIEP_NHAN' || empty($displayStatus)) {
+
+                                // Tự động điều chỉnh trạng thái hiển thị:
+                                // Nếu tất cả đã tiếp nhận nhưng trạng thái còn CHO_TIEP_NHAN -> chuyển sang DANG_THUC_HIEN (hoặc target_status)
+                                if (empty($unacceptedList) && ($displayStatus === 'CHO_TIEP_NHAN' || empty($displayStatus))) {
+                                    $displayStatus = !empty($t['target_status']) ? $t['target_status'] : 'DANG_THUC_HIEN';
+                                } elseif (!empty($unacceptedList) && in_array($displayStatus, ['CHO_TIEP_NHAN', 'CHO_XAC_NHAN', 'DANG_THUC_HIEN', ''])) {
                                     $displayStatus = 'CHO_TIEP_NHAN';
                                 }
                                 ?>
-                                <?= renderStatusBadge($displayStatus, $t['due_date']) ?>
+                                <?= renderStatusBadge($displayStatus, $t['due_date'], $unacceptedList) ?>
                             </td>
 
                             <!-- 7. TIẾN ĐỘ & MINH CHỨNG -->
@@ -746,10 +751,14 @@ if ($deepLinkTaskId > 0) {
                                 <div class="flex items-center justify-center gap-1">
                                     <?php
                                     $isAssignee = false;
+                                    $isMyAcceptancePending = false;
                                     if (isset($t['assignees']) && is_array($t['assignees'])) {
                                         foreach ($t['assignees'] as $a) {
                                             if ($a['user_id'] == $currentUser['id']) {
                                                 $isAssignee = true;
+                                                if (empty($a['is_accepted']) || (int)$a['is_accepted'] === 0) {
+                                                    $isMyAcceptancePending = true;
+                                                }
                                                 break;
                                             }
                                         }
@@ -758,6 +767,14 @@ if ($deepLinkTaskId > 0) {
                                     $isLeaderOfDept = (in_array($currentUser['role'], ['TRUONG_PHONG', 'PHO_PHONG']) && $t['department_id'] == $currentUser['department_id']);
                                     $isBgd = ($currentUser['role'] === 'BGD');
                                     ?>
+
+                                    <!-- Quick Accept Task Button (Tiếp nhận nhanh 01 chạm) -->
+                                    <?php if ($isMyAcceptancePending && in_array($displayStatus, ['CHO_TIEP_NHAN', 'CHO_XAC_NHAN', 'DANG_THUC_HIEN'])): ?>
+                                        <button onclick="acceptSingleTaskDirect(<?= $t['id'] ?>)" class="px-2.5 py-1 bg-amber-500 hover:bg-emerald-600 text-white font-bold rounded-lg text-[11px] shadow-sm transition flex items-center gap-1 animate-pulse" title="Bấm 01 chạm để xác nhận tiếp nhận công việc">
+                                            <i class="fa-solid fa-check text-xs"></i>
+                                            <span>Tiếp nhận</span>
+                                        </button>
+                                    <?php endif; ?>
 
                                     <!-- View Detail & Timeline Log Modal Button -->
                                     <button onclick='openTaskDetailModal(<?= htmlspecialchars(json_encode($t), ENT_QUOTES, "UTF-8") ?>)' class="p-1.5 bg-blue-50 hover:bg-blue-600 text-blue-600 hover:text-white rounded-lg transition" title="Xem chi tiết & Lịch sử thao tác (Timeline)">
@@ -943,17 +960,17 @@ if ($deepLinkTaskId > 0) {
                     </button>
                 </div>
             </form>
-
-            <!-- Hidden Form for Individual Row Acceptance -->
-            <form method="POST" action="task_actions.php" id="singleAcceptForm" class="hidden">
-                <input type="hidden" name="action" value="respond_assigned_task">
-                <input type="hidden" name="task_id" id="single_accept_task_id" value="0">
-                <input type="hidden" name="comment_feedback" id="single_accept_feedback" value="">
-                <input type="hidden" name="response" value="ACCEPT">
-            </form>
     </div>
 </div>
 <?php endif; ?>
+
+<!-- Hidden Form for Individual Row Acceptance (Always available on page) -->
+<form method="POST" action="task_actions.php" id="singleAcceptForm" class="hidden">
+    <input type="hidden" name="action" value="respond_assigned_task">
+    <input type="hidden" name="task_id" id="single_accept_task_id" value="0">
+    <input type="hidden" name="comment_feedback" id="single_accept_feedback" value="">
+    <input type="hidden" name="response" value="ACCEPT">
+</form>
 
 <!-- ==================== MODAL: LEADER DIRECTIVE COMMENT & APPROVAL ==================== -->
 <div id="leaderCommentModal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm hidden items-center justify-center p-4 z-50">

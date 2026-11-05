@@ -191,17 +191,25 @@ if ($action === 'save_leader_comment' || $action === 'approve') {
     }
 
     if ($canApprove) {
-        if ($newStatus === 'CHO_BGD_DUYET') {
-            $stmtUnaccepted = $pdo->prepare("SELECT COUNT(*) FROM task_assignees WHERE task_id = ? AND (is_accepted = 0 OR is_accepted IS NULL)");
-            $stmtUnaccepted->execute([$taskId]);
-            $unacceptedCount = (int)$stmtUnaccepted->fetchColumn();
+        $stmtUnaccepted = $pdo->prepare("SELECT COUNT(*) FROM task_assignees WHERE task_id = ? AND (is_accepted = 0 OR is_accepted IS NULL)");
+        $stmtUnaccepted->execute([$taskId]);
+        $unacceptedCount = (int)$stmtUnaccepted->fetchColumn();
 
+        if ($newStatus === 'CHO_BGD_DUYET') {
             if ($unacceptedCount > 0) {
                 $actualStatus = 'CHO_TIEP_NHAN';
                 $targetStatus = 'CHO_BGD_DUYET';
             } else {
                 $actualStatus = 'CHO_BGD_DUYET';
                 $targetStatus = 'CHO_BGD_DUYET';
+            }
+        } elseif ($newStatus === 'DANG_THUC_HIEN') {
+            if ($unacceptedCount > 0) {
+                $actualStatus = 'CHO_TIEP_NHAN';
+                $targetStatus = 'DANG_THUC_HIEN';
+            } else {
+                $actualStatus = 'DANG_THUC_HIEN';
+                $targetStatus = null;
             }
         } else {
             $actualStatus = $newStatus;
@@ -432,6 +440,17 @@ if ($action === 'save_task') {
         ");
         $stmt->execute([$title, $description, $departmentId, $priority, $status, $targetStatus, $startDate, $dueDate, $taskId]);
 
+        // Fetch existing assignees to preserve their acceptance status when editing
+        $existingAssigneesMap = [];
+        $stmtExistingAsg = $pdo->prepare("SELECT user_id, is_accepted, accepted_at FROM task_assignees WHERE task_id = ?");
+        $stmtExistingAsg->execute([$taskId]);
+        foreach ($stmtExistingAsg->fetchAll() as $row) {
+            $existingAssigneesMap[(int)$row['user_id']] = [
+                'is_accepted' => (int)$row['is_accepted'],
+                'accepted_at' => $row['accepted_at']
+            ];
+        }
+
         // Reassign assignees
         $pdo->prepare("DELETE FROM task_assignees WHERE task_id = ?")->execute([$taskId]);
 
@@ -463,23 +482,47 @@ if ($action === 'save_task') {
 
     // Insert MAIN assignee
     if ($mainAssignee > 0) {
-        $isAcceptedMain = ($mainAssignee === $currentUser['id'] && $status !== 'CHO_TIEP_NHAN' && $status !== 'CHO_XAC_NHAN') ? 1 : 0;
-        $acceptedAtMain = $isAcceptedMain ? date('Y-m-d H:i:s') : null;
+        if (!empty($existingAssigneesMap[$mainAssignee]) && $existingAssigneesMap[$mainAssignee]['is_accepted'] == 1) {
+            $isAcceptedMain = 1;
+            $acceptedAtMain = $existingAssigneesMap[$mainAssignee]['accepted_at'] ?: date('Y-m-d H:i:s');
+        } else {
+            $isAcceptedMain = ($mainAssignee === $currentUser['id']) ? 1 : 0;
+            $acceptedAtMain = $isAcceptedMain ? date('Y-m-d H:i:s') : null;
+        }
 
-        $stmtMain = $pdo->prepare("INSERT INTO task_assignees (task_id, user_id, role_type, is_accepted, accepted_at) VALUES (?, ?, 'MAIN', ?, ?) ON DUPLICATE KEY UPDATE role_type = 'MAIN'");
+        $stmtMain = $pdo->prepare("INSERT INTO task_assignees (task_id, user_id, role_type, is_accepted, accepted_at) VALUES (?, ?, 'MAIN', ?, ?) ON DUPLICATE KEY UPDATE role_type = 'MAIN', is_accepted = VALUES(is_accepted), accepted_at = VALUES(accepted_at)");
         $stmtMain->execute([$taskId, $mainAssignee, $isAcceptedMain, $acceptedAtMain]);
     }
 
     // Insert COOP assignees
     if (is_array($coopAssignees)) {
-        $stmtCoop = $pdo->prepare("INSERT IGNORE INTO task_assignees (task_id, user_id, role_type, is_accepted, accepted_at) VALUES (?, ?, 'COOP', ?, ?)");
+        $stmtCoop = $pdo->prepare("INSERT INTO task_assignees (task_id, user_id, role_type, is_accepted, accepted_at) VALUES (?, ?, 'COOP', ?, ?) ON DUPLICATE KEY UPDATE role_type = 'COOP', is_accepted = VALUES(is_accepted), accepted_at = VALUES(accepted_at)");
         foreach ($coopAssignees as $coopId) {
             $coopId = (int)$coopId;
             if ($coopId > 0 && $coopId !== $mainAssignee) {
-                $isAcceptedCoop = ($coopId === $currentUser['id'] && $status !== 'CHO_TIEP_NHAN' && $status !== 'CHO_XAC_NHAN') ? 1 : 0;
-                $acceptedAtCoop = $isAcceptedCoop ? date('Y-m-d H:i:s') : null;
+                if (!empty($existingAssigneesMap[$coopId]) && $existingAssigneesMap[$coopId]['is_accepted'] == 1) {
+                    $isAcceptedCoop = 1;
+                    $acceptedAtCoop = $existingAssigneesMap[$coopId]['accepted_at'] ?: date('Y-m-d H:i:s');
+                } else {
+                    $isAcceptedCoop = ($coopId === $currentUser['id']) ? 1 : 0;
+                    $acceptedAtCoop = $isAcceptedCoop ? date('Y-m-d H:i:s') : null;
+                }
                 $stmtCoop->execute([$taskId, $coopId, $isAcceptedCoop, $acceptedAtCoop]);
             }
+        }
+    }
+
+    // Auto-update task status if all assignees have accepted or if newly unaccepted assignees exist
+    if (!empty($taskId)) {
+        $stmtCountUnaccepted = $pdo->prepare("SELECT COUNT(*) FROM task_assignees WHERE task_id = ? AND (is_accepted = 0 OR is_accepted IS NULL)");
+        $stmtCountUnaccepted->execute([$taskId]);
+        $unacceptedRemaining = (int)$stmtCountUnaccepted->fetchColumn();
+
+        if ($unacceptedRemaining === 0 && in_array($status, ['CHO_TIEP_NHAN', 'CHO_XAC_NHAN'])) {
+            $nextStatus = !empty($targetStatus) ? $targetStatus : 'DANG_THUC_HIEN';
+            $pdo->prepare("UPDATE tasks SET status = ? WHERE id = ?")->execute([$nextStatus, $taskId]);
+        } elseif ($unacceptedRemaining > 0 && $status === 'DANG_THUC_HIEN') {
+            $pdo->prepare("UPDATE tasks SET status = 'CHO_TIEP_NHAN', target_status = 'DANG_THUC_HIEN' WHERE id = ?")->execute([$taskId]);
         }
     }
 
@@ -685,13 +728,23 @@ if ($action === 'batch_approve_tasks') {
         }
 
         if ($canApprove) {
+            $stmtUnaccepted = $pdo->prepare("SELECT COUNT(*) FROM task_assignees WHERE task_id = ? AND (is_accepted = 0 OR is_accepted IS NULL)");
+            $stmtUnaccepted->execute([$taskId]);
+            $unacceptedCount = (int)$stmtUnaccepted->fetchColumn();
+
+            $batchActualStatus = ($unacceptedCount > 0) ? 'CHO_TIEP_NHAN' : 'DANG_THUC_HIEN';
+            $batchTargetStatus = ($unacceptedCount > 0) ? 'DANG_THUC_HIEN' : null;
+
             if (!empty($generalComment)) {
-                $stmtUpdateWithComment->execute([$generalComment, $currentUser['id'], $taskId]);
+                $pdo->prepare("UPDATE tasks SET status = ?, target_status = ?, leader_comments = ?, leader_comment_user_id = ? WHERE id = ?")
+                    ->execute([$batchActualStatus, $batchTargetStatus, $generalComment, $currentUser['id'], $taskId]);
             } else {
-                $stmtUpdateKeepComment->execute([$currentUser['id'], $taskId]);
+                $pdo->prepare("UPDATE tasks SET status = ?, target_status = ?, leader_comment_user_id = ? WHERE id = ?")
+                    ->execute([$batchActualStatus, $batchTargetStatus, $currentUser['id'], $taskId]);
             }
             $approvedCount++;
-            logTaskTimeline($pdo, $taskId, $currentUser['id'], 'BATCH_APPROVE', "Phê duyệt hàng loạt" . ($generalComment ? ". Ý kiến: $generalComment" : ""));
+            $statusLogText = $batchActualStatus === 'CHO_TIEP_NHAN' ? 'Chờ tiếp nhận' : 'Đang thực hiện';
+            logTaskTimeline($pdo, $taskId, $currentUser['id'], 'BATCH_APPROVE', "Phê duyệt hàng loạt: $statusLogText" . ($generalComment ? ". Ý kiến: $generalComment" : ""));
             logActivity($pdo, $currentUser['id'], 'BATCH_APPROVE_TASK', "Đã phê duyệt công việc ID #$taskId: {$task['title']}");
         }
     }
