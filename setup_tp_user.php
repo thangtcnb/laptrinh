@@ -42,7 +42,7 @@ try {
     $pdo = new PDO($dsn, $username, $password, $options);
 
     $hash = password_hash('tp', PASSWORD_BCRYPT);
-    $fullname = 'Trưởng phòng HCTV';
+    $fullname = 'Trần Thị Bích Liên';
     $email = 'tp';
     $role = 'TRUONG_PHONG';
     $deptId = 3;

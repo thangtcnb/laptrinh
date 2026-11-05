@@ -15,6 +15,33 @@ if ($action === 'check_data_version') {
     exit;
 }
 
+// 0.0 SWITCH VIEW AS (FOR SUPER ADMIN TO VIEW AS ANY USER)
+if ($action === 'switch_view_as') {
+    if (!empty($_SESSION['is_real_admin'])) {
+        $targetUserId = (int)($_POST['target_user_id'] ?? $_GET['target_user_id'] ?? 0);
+        if ($targetUserId > 0) {
+            $_SESSION['view_as_user_id'] = $targetUserId;
+            $stmtTarget = $pdo->prepare("SELECT fullname, role FROM users WHERE id = ?");
+            $stmtTarget->execute([$targetUserId]);
+            $tUser = $stmtTarget->fetch();
+            $targetName = $tUser ? $tUser['fullname'] : "ID #$targetUserId";
+            $_SESSION['flash_success'] = "Đang xem hệ thống với tư cách: <strong>{$targetName}</strong>";
+        } else {
+            unset($_SESSION['view_as_user_id']);
+            $_SESSION['flash_success'] = "Đã trở về góc nhìn Quản trị viên cấp cao (Super Admin)";
+        }
+    }
+    header("Location: " . (!empty($_SERVER['HTTP_REFERER']) ? $_SERVER['HTTP_REFERER'] : 'index.php'));
+    exit;
+}
+
+if ($action === 'exit_view_as') {
+    unset($_SESSION['view_as_user_id']);
+    $_SESSION['flash_success'] = "Đã thoát chế độ giả lập, trở về tài khoản Super Admin.";
+    header("Location: index.php");
+    exit;
+}
+
 // 0.1 UPLOAD PROOF FILE DIRECTLY & SYNC GOOGLE DRIVE
 if ($action === 'upload_proof_file') {
     header('Content-Type: application/json; charset=utf-8');

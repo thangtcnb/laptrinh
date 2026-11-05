@@ -72,7 +72,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 if (!$stmtCheckTp->fetch()) {
                     $hashTp = '$2y$10$71WiWQKWK9jIU05VNPq23O/uacRWwQ89qt2yUjRha7IeTxaXKS.y2';
                     $stmtCreateTp = $pdo->prepare("INSERT INTO users (fullname, email, password, role, department_id) VALUES (?, ?, ?, ?, ?)");
-                    $stmtCreateTp->execute(['Trưởng phòng HCTV', 'tp', $hashTp, 'TRUONG_PHONG', 3]);
+                    $stmtCreateTp->execute(['Trần Thị Bích Liên', 'tp', $hashTp, 'TRUONG_PHONG', 3]);
                 }
             } catch (\Exception $e) {
                 // bỏ qua nếu có lỗi

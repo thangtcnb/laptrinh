@@ -543,8 +543,21 @@ function getTaskTimelineLogs($pdo, $taskId) {
 
 // Get tasks query with smart filters and pagination
 function getTasksFiltered($pdo, $filters = [], $limit = 15, $offset = 0, $currentUser = null) {
-    // Auto-reconcile tasks stuck in CHO_TIEP_NHAN where all assignees have accepted
+    // Auto-reconcile database inconsistencies
     try {
+        // 1. Update user fullname if 'Trưởng phòng HCTV'
+        $pdo->exec("UPDATE users SET fullname = 'Trần Thị Bích Liên' WHERE fullname = 'Trưởng phòng HCTV'");
+
+        // 2. Restore is_accepted = 1 for assignees who accepted in task_logs (reversing old edit bug)
+        $pdo->exec("
+            UPDATE task_assignees ta
+            JOIN task_logs tl ON ta.task_id = tl.task_id AND ta.user_id = tl.user_id AND tl.action = 'ACCEPT_TASK'
+            SET ta.is_accepted = 1,
+                ta.accepted_at = COALESCE(ta.accepted_at, tl.created_at)
+            WHERE ta.is_accepted = 0 OR ta.is_accepted IS NULL
+        ");
+
+        // 3. Auto-transition tasks stuck in CHO_TIEP_NHAN where all assignees have accepted
         $pdo->exec("
             UPDATE tasks t
             SET status = CASE WHEN t.target_status = 'CHO_BGD_DUYET' THEN 'CHO_BGD_DUYET' ELSE 'DANG_THUC_HIEN' END
@@ -618,7 +631,7 @@ function getTasksFiltered($pdo, $filters = [], $limit = 15, $offset = 0, $curren
         if ($filters['status'] === 'OVERDUE') {
             $where[] = "(t.due_date IS NOT NULL AND t.due_date < CURDATE() AND t.status != 'HOAN_THANH')";
         } elseif ($filters['status'] === 'CHO_DUYET_ALL') {
-            $where[] = "t.status IN ('CHO_DUYET', 'CHO_BGD_DUYET')";
+            $where[] = "t.status IN ('CHO_DUYET', 'CHO_BGD_DUYET', 'CHO_TIEP_NHAN')";
         } else {
             $where[] = "t.status = ?";
             $params[] = $filters['status'];

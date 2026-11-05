@@ -19,6 +19,23 @@ if ($roleLabel === 'TRUONG_PHONG') {
 } elseif ($roleLabel === 'SUPER_ADMIN') {
     $roleLabel = 'Super Admin';
 }
+
+$isRealAdmin = !empty($_SESSION['is_real_admin']) || (!empty($currentUser['role']) && $currentUser['role'] === 'SUPER_ADMIN');
+$allUsersForViewAs = [];
+if ($isRealAdmin) {
+    try {
+        $stmtAllU = $pdo->prepare("
+            SELECT u.id, u.fullname, u.role, u.department_id, COALESCE(d.name, 'Chưa phân công') AS dept_name, COALESCE(d.code, 'N/A') AS dept_code
+            FROM users u
+            LEFT JOIN departments d ON u.department_id = d.id
+            ORDER BY d.id ASC, FIELD(u.role, 'BGD', 'TRUONG_PHONG', 'PHO_PHONG', 'NHAN_VIEN', 'HO_TRO', 'SUPER_ADMIN'), u.fullname ASC
+        ");
+        $stmtAllU->execute();
+        $allUsersForViewAs = $stmtAllU->fetchAll();
+    } catch (\PDOException $e) {
+        $allUsersForViewAs = [];
+    }
+}
 ?>
 <!DOCTYPE html>
 <html lang="vi">
@@ -148,6 +165,53 @@ if ($roleLabel === 'TRUONG_PHONG') {
 </head>
 <body class="bg-slate-100 font-sans text-slate-800 flex flex-col min-h-screen">
 
+<?php if (!empty($_SESSION['is_real_admin']) && !empty($_SESSION['view_as_user_id'])): ?>
+<!-- Sticky Impersonate / View As Bar for Super Admin -->
+<div class="bg-gradient-to-r from-amber-600 via-orange-600 to-indigo-800 text-white px-4 py-2 text-xs flex flex-wrap items-center justify-between gap-3 shadow-lg sticky top-0 z-50 no-print border-b-2 border-amber-300">
+    <div class="flex items-center gap-2.5">
+        <span class="w-7 h-7 rounded-full bg-white text-amber-600 flex items-center justify-center font-bold text-sm shadow-md animate-pulse">
+            <i class="fa-solid fa-eye"></i>
+        </span>
+        <div>
+            <span class="font-bold text-amber-200 uppercase tracking-wider text-[11px]">Đang giả lập góc nhìn của:</span>
+            <span class="font-extrabold text-white text-sm ml-1.5"><?= htmlspecialchars($currentUser['fullname']) ?></span>
+            <span class="bg-amber-400/30 text-amber-200 px-2 py-0.5 rounded-full text-[11px] font-bold ml-1.5 border border-amber-300/40">
+                <?= htmlspecialchars($roleLabel) ?> • <?= htmlspecialchars($currentUser['department_name']) ?>
+            </span>
+        </div>
+    </div>
+    <div class="flex items-center gap-2">
+        <form method="POST" action="task_actions.php" class="inline-flex items-center gap-1.5 m-0">
+            <input type="hidden" name="action" value="switch_view_as">
+            <label class="text-amber-100 font-semibold text-[11px] hidden sm:inline">Chuyển sang:</label>
+            <select name="target_user_id" onchange="this.form.submit()" class="bg-white text-slate-800 text-xs font-semibold rounded-lg px-2.5 py-1 outline-none border border-amber-300 shadow cursor-pointer max-w-[260px]">
+                <option value="0">-- Thoát về Super Admin --</option>
+                <?php
+                $currDept = '';
+                foreach ($allUsersForViewAs as $uItem):
+                    if ($uItem['role'] === 'SUPER_ADMIN') continue;
+                    if ($uItem['dept_name'] !== $currDept) {
+                        if ($currDept !== '') echo '</optgroup>';
+                        $currDept = $uItem['dept_name'];
+                        echo '<optgroup label="' . htmlspecialchars($currDept) . '">';
+                    }
+                    $isSel = ($uItem['id'] == $currentUser['id']) ? 'selected' : '';
+                    $uRoleName = ($uItem['role'] === 'BGD') ? 'BGD' : (($uItem['role'] === 'TRUONG_PHONG') ? 'Trưởng phòng' : (($uItem['role'] === 'PHO_PHONG') ? 'Phó phòng' : 'Nhân viên'));
+                ?>
+                    <option value="<?= $uItem['id'] ?>" <?= $isSel ?>>
+                        <?= htmlspecialchars($uItem['fullname']) ?> (<?= $uRoleName ?>)
+                    </option>
+                <?php endforeach; if ($currDept !== '') echo '</optgroup>'; ?>
+            </select>
+        </form>
+        <a href="task_actions.php?action=exit_view_as" class="bg-slate-900 hover:bg-black text-amber-300 font-bold px-3 py-1 rounded-lg text-xs transition flex items-center gap-1.5 shadow border border-amber-400/40">
+            <i class="fa-solid fa-arrow-rotate-left"></i>
+            <span>Về Super Admin</span>
+        </a>
+    </div>
+</div>
+<?php endif; ?>
+
 <!-- Top Header / Banner -->
 <header class="bg-gradient-to-r from-blue-900 via-indigo-900 to-slate-900 text-white shadow-lg no-print border-b border-indigo-700">
     <div class="w-full px-4 sm:px-6 lg:px-8 py-3.5">
@@ -171,6 +235,37 @@ if ($roleLabel === 'TRUONG_PHONG') {
                     </div>
                 </div>
             </div>
+
+            <!-- Super Admin View As Selector (Khi không ở chế độ giả lập) -->
+            <?php if ($isRealAdmin && empty($_SESSION['view_as_user_id'])): ?>
+            <form method="POST" action="task_actions.php" class="flex items-center gap-2 m-0 bg-white/10 backdrop-blur-md px-3.5 py-2 rounded-xl border border-amber-400/40 shadow-sm">
+                <input type="hidden" name="action" value="switch_view_as">
+                <div class="w-8 h-8 rounded-lg bg-amber-500 text-white flex items-center justify-center shrink-0 shadow-sm">
+                    <i class="fa-solid fa-users-viewfinder text-sm"></i>
+                </div>
+                <div>
+                    <div class="text-[10px] font-bold text-amber-300 uppercase tracking-wider">Xem với góc nhìn cá nhân:</div>
+                    <select name="target_user_id" onchange="this.form.submit()" class="bg-slate-900 text-white text-xs font-bold rounded-lg px-2.5 py-1 mt-0.5 outline-none border border-amber-300/40 cursor-pointer shadow-inner max-w-[260px]">
+                        <option value="0">-- Toàn quyền Super Admin --</option>
+                        <?php
+                        $currDept = '';
+                        foreach ($allUsersForViewAs as $uItem):
+                            if ($uItem['role'] === 'SUPER_ADMIN') continue;
+                            if ($uItem['dept_name'] !== $currDept) {
+                                if ($currDept !== '') echo '</optgroup>';
+                                $currDept = $uItem['dept_name'];
+                                echo '<optgroup label="' . htmlspecialchars($currDept) . '" class="bg-slate-800 text-amber-300 font-bold">';
+                            }
+                            $uRoleName = ($uItem['role'] === 'BGD') ? 'BGD' : (($uItem['role'] === 'TRUONG_PHONG') ? 'Trưởng phòng' : (($uItem['role'] === 'PHO_PHONG') ? 'Phó phòng' : 'Nhân viên'));
+                        ?>
+                            <option value="<?= $uItem['id'] ?>" class="bg-white text-slate-800 font-medium">
+                                <?= htmlspecialchars($uItem['fullname']) ?> (<?= $uRoleName ?>)
+                            </option>
+                        <?php endforeach; if ($currDept !== '') echo '</optgroup>'; ?>
+                    </select>
+                </div>
+            </form>
+            <?php endif; ?>
 
             <!-- Current User Info Frame -->
             <div class="flex items-center gap-3 bg-white/10 backdrop-blur-md px-3.5 py-2 rounded-xl border border-white/20">

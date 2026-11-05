@@ -425,8 +425,10 @@ if ($deepLinkTaskId > 0) {
                 <option value="HOAN_THANH" <?= $filters['status'] === 'HOAN_THANH' ? 'selected' : '' ?>>CV đã hoàn thành</option>
                 <option value="DANG_THUC_HIEN" <?= $filters['status'] === 'DANG_THUC_HIEN' ? 'selected' : '' ?>>CV đang thực hiện</option>
                 <option value="OVERDUE" <?= $filters['status'] === 'OVERDUE' ? 'selected' : '' ?>>CV quá hạn</option>
-                <option value="CHO_DUYET_ALL" <?= $filters['status'] === 'CHO_DUYET_ALL' ? 'selected' : '' ?>>CV đang chờ duyệt</option>
+                <option value="CHO_DUYET_ALL" <?= $filters['status'] === 'CHO_DUYET_ALL' ? 'selected' : '' ?>>CV đang chờ duyệt & tiếp nhận</option>
+                <option value="CHO_DUYET" <?= $filters['status'] === 'CHO_DUYET' ? 'selected' : '' ?>>Chờ Trưởng phòng duyệt</option>
                 <option value="CHO_BGD_DUYET" <?= $filters['status'] === 'CHO_BGD_DUYET' ? 'selected' : '' ?>>Chờ BGD duyệt</option>
+                <option value="CHO_TIEP_NHAN" <?= $filters['status'] === 'CHO_TIEP_NHAN' ? 'selected' : '' ?>>Chờ tiếp nhận</option>
                 <option value="YEU_CAU_CHINH_SUA" <?= $filters['status'] === 'YEU_CAU_CHINH_SUA' ? 'selected' : '' ?>>Yêu cầu chỉnh sửa</option>
             </select>
         </div>
@@ -519,7 +521,7 @@ if ($deepLinkTaskId > 0) {
                     <i class="fa-solid fa-hourglass-half"></i>
                 </div>
                 <div>
-                    <div class="text-[11px] font-semibold text-amber-800">CV đang chờ duyệt</div>
+                    <div class="text-[11px] font-semibold text-amber-800">CV chờ duyệt / tiếp nhận</div>
                     <div class="text-lg font-black text-amber-950 leading-tight"><?= $kpiStats['pending'] ?> <span class="text-xs font-normal text-amber-700">công việc</span></div>
                 </div>
             </a>
