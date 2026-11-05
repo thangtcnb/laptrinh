@@ -1049,7 +1049,7 @@ if ($deepLinkTaskId > 0) {
             <button onclick="closeProgressModal()" class="text-slate-400 hover:text-slate-600"><i class="fa-solid fa-xmark text-lg"></i></button>
         </div>
 
-        <form method="POST" action="task_actions.php" enctype="multipart/form-data">
+        <form id="progressForm" method="POST" action="task_actions.php" enctype="multipart/form-data" onsubmit="return handleProgressFormSubmit(event)">
             <input type="hidden" name="action" value="update_progress">
             <input type="hidden" name="task_id" id="prog_task_id">
 
@@ -1109,7 +1109,7 @@ if ($deepLinkTaskId > 0) {
                         </div>
                         <div class="shrink-0 flex items-center gap-2">
                             <input type="file" id="prog_proof_file_input" name="proof_file" accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.png,.jpg,.jpeg,.zip,.rar,.7z,.txt" class="hidden" onchange="uploadProofFileDirectly(this)">
-                            <button type="button" id="prog_proof_upload_btn" onclick="document.getElementById('prog_proof_file_input').click()" class="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl text-xs transition flex items-center gap-1.5 shadow-sm">
+                            <button type="button" id="prog_proof_upload_btn" onclick="triggerProofFileInput()" class="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl text-xs transition flex items-center gap-1.5 shadow-sm">
                                 <i class="fa-solid fa-file-arrow-up"></i>
                                 <span>Chọn file tải lên</span>
                             </button>
@@ -1151,7 +1151,10 @@ if ($deepLinkTaskId > 0) {
 
             <div class="flex justify-end gap-2 pt-3 border-t border-slate-100">
                 <button type="button" onclick="closeProgressModal()" class="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold rounded-xl">Hủy</button>
-                <button type="submit" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold rounded-xl shadow">Lưu cập nhật</button>
+                <button type="submit" id="prog_save_btn" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold rounded-xl shadow flex items-center gap-1.5 transition disabled:opacity-50 disabled:cursor-not-allowed">
+                    <i class="fa-solid fa-floppy-disk text-xs"></i>
+                    <span>Lưu cập nhật</span>
+                </button>
             </div>
         </form>
     </div>
@@ -1823,23 +1826,73 @@ function updateProofPreviewBtn(url) {
     }
 }
 
+let isProofUploading = false;
+
+function triggerProofFileInput() {
+    if (isProofUploading) {
+        if (typeof sysAlert === 'function') {
+            sysAlert('Tệp Hồ sơ Minh chứng đang được tải lên, vui lòng chờ trong giây lát!');
+        } else {
+            alert('Tệp Hồ sơ Minh chứng đang được tải lên, vui lòng chờ trong giây lát!');
+        }
+        return;
+    }
+    const fileInput = document.getElementById('prog_proof_file_input');
+    if (fileInput) fileInput.click();
+}
+
 function resetProofUploadUI() {
     const fileInput = document.getElementById('prog_proof_file_input');
-    if (fileInput) fileInput.value = '';
+    if (fileInput) {
+        fileInput.value = '';
+        fileInput.disabled = false;
+    }
     const uploadBox = document.getElementById('prog_uploading_box');
     if (uploadBox) uploadBox.classList.add('hidden');
     const successBox = document.getElementById('prog_upload_success_box');
     if (successBox) successBox.classList.add('hidden');
-    const btn = document.getElementById('prog_proof_upload_btn');
-    if (btn) btn.disabled = false;
+    const uploadBtn = document.getElementById('prog_proof_upload_btn');
+    if (uploadBtn) uploadBtn.disabled = false;
+    const saveBtn = document.getElementById('prog_save_btn');
+    if (saveBtn) {
+        saveBtn.disabled = false;
+        saveBtn.innerHTML = '<i class="fa-solid fa-floppy-disk text-xs"></i><span>Lưu cập nhật</span>';
+        saveBtn.title = '';
+    }
+    isProofUploading = false;
+}
+
+function handleProgressFormSubmit(e) {
+    if (isProofUploading) {
+        if (e && e.preventDefault) e.preventDefault();
+        if (typeof sysAlert === 'function') {
+            sysAlert('Tệp Hồ sơ Minh chứng đang được tải lên Google Drive. Vui lòng chờ hoàn tất trước khi lưu!');
+        } else {
+            alert('Tệp Hồ sơ Minh chứng đang được tải lên Google Drive. Vui lòng chờ hoàn tất trước khi lưu!');
+        }
+        return false;
+    }
+
+    const saveBtn = document.getElementById('prog_save_btn');
+    if (saveBtn) {
+        saveBtn.disabled = true;
+        saveBtn.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin text-xs mr-1"></i><span>Đang lưu...</span>';
+    }
+    return true;
 }
 
 function uploadProofFileDirectly(fileInput) {
     if (!fileInput || !fileInput.files || fileInput.files.length === 0) return;
+    if (isProofUploading) return;
+
     const file = fileInput.files[0];
 
     if (file.size > 30 * 1024 * 1024) {
-        sysAlert('Dung lượng file (' + (file.size / (1024 * 1024)).toFixed(1) + ' MB) vượt quá giới hạn cho phép (tối đa 30MB).');
+        if (typeof sysAlert === 'function') {
+            sysAlert('Dung lượng file (' + (file.size / (1024 * 1024)).toFixed(1) + ' MB) vượt quá giới hạn cho phép (tối đa 30MB).');
+        } else {
+            alert('Dung lượng file (' + (file.size / (1024 * 1024)).toFixed(1) + ' MB) vượt quá giới hạn cho phép (tối đa 30MB).');
+        }
         fileInput.value = '';
         return;
     }
@@ -1850,11 +1903,19 @@ function uploadProofFileDirectly(fileInput) {
     const successBox = document.getElementById('prog_upload_success_box');
     const successName = document.getElementById('prog_uploaded_filename');
     const uploadBtn = document.getElementById('prog_proof_upload_btn');
+    const saveBtn = document.getElementById('prog_save_btn');
 
+    isProofUploading = true;
     if (uploadBox) uploadBox.classList.remove('hidden');
     if (successBox) successBox.classList.add('hidden');
     if (uploadText) uploadText.innerText = 'Đang tải lên...';
     if (uploadBtn) uploadBtn.disabled = true;
+    fileInput.disabled = true;
+
+    if (saveBtn) {
+        saveBtn.disabled = true;
+        saveBtn.title = 'Đang tải tệp minh chứng lên Google Drive...';
+    }
 
     const formData = new FormData();
     formData.append('proof_file', file);
@@ -1866,8 +1927,14 @@ function uploadProofFileDirectly(fileInput) {
     })
     .then(res => res.json())
     .then(data => {
+        isProofUploading = false;
+        fileInput.disabled = false;
         if (uploadBox) uploadBox.classList.add('hidden');
         if (uploadBtn) uploadBtn.disabled = false;
+        if (saveBtn) {
+            saveBtn.disabled = false;
+            saveBtn.title = '';
+        }
 
         if (data.success && data.fileUrl) {
             document.getElementById('prog_proof_link').value = data.fileUrl;
@@ -1877,14 +1944,34 @@ function uploadProofFileDirectly(fileInput) {
                 successName.innerText = data.fileName || file.name;
                 successBox.classList.remove('hidden');
             }
+            // QUAN TRỌNG: Làm sạch file input sau khi upload thành công qua AJAX
+            // Tránh việc form submit gửi lại file nhị phân lần 2 gây trùng lặp file (1), (2)...
+            // và giúp thao tác "Lưu cập nhật" hoàn tất tức thì (< 50ms) không bị treo/delay
+            fileInput.value = '';
         } else {
-            sysAlert(data.error || 'Có lỗi xảy ra khi tải file lên Google Drive.');
+            fileInput.value = '';
+            if (typeof sysAlert === 'function') {
+                sysAlert(data.error || 'Có lỗi xảy ra khi tải file lên Google Drive.');
+            } else {
+                alert(data.error || 'Có lỗi xảy ra khi tải file lên Google Drive.');
+            }
         }
     })
     .catch(err => {
+        isProofUploading = false;
+        fileInput.disabled = false;
+        fileInput.value = '';
         if (uploadBox) uploadBox.classList.add('hidden');
         if (uploadBtn) uploadBtn.disabled = false;
-        sysAlert('Không thể kết nối đến máy chủ: ' + err);
+        if (saveBtn) {
+            saveBtn.disabled = false;
+            saveBtn.title = '';
+        }
+        if (typeof sysAlert === 'function') {
+            sysAlert('Không thể kết nối đến máy chủ: ' + err);
+        } else {
+            alert('Không thể kết nối đến máy chủ: ' + err);
+        }
     });
 }
 
@@ -1914,8 +2001,14 @@ function openProgressModal(task) {
 }
 
 function closeProgressModal() {
+    if (isProofUploading) {
+        if (!confirm('Tệp Hồ sơ Minh chứng đang được tải lên. Bạn có chắc chắn muốn hủy không?')) {
+            return;
+        }
+    }
     document.getElementById('progressModal').classList.add('hidden');
     document.getElementById('progressModal').classList.remove('flex');
+    resetProofUploadUI();
 }
 
 function openLeaderModal(task) {

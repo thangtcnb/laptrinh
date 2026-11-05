@@ -147,8 +147,8 @@ if ($action === 'update_progress') {
     $proofLink = trim($_POST['proof_link'] ?? '');
     $notes = trim($_POST['notes'] ?? '');
 
-    // Hỗ trợ tải trực tiếp file minh chứng nếu form gửi đính kèm tệp
-    if (!empty($_FILES['proof_file']) && $_FILES['proof_file']['error'] === UPLOAD_ERR_OK) {
+    // Chỉ tải lên khi chưa có link minh chứng (tránh upload lần 2 gây nhân bản file và làm đơ/delay nút Lưu)
+    if (empty($proofLink) && !empty($_FILES['proof_file']) && $_FILES['proof_file']['error'] === UPLOAD_ERR_OK) {
         $uploadRes = uploadProofFileToDrive($_FILES['proof_file']);
         if (!empty($uploadRes['success'])) {
             $proofLink = $uploadRes['fileUrl'];
