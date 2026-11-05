@@ -547,6 +547,16 @@ require_once __DIR__ . '/includes/header.php';
                                         <?= htmlspecialchars($t['description']) ?>
                                     </div>
                                 <?php endif; ?>
+
+                                <!-- BADGE NGÀY TẠO CÔNG VIỆC -->
+                                <?php if (!empty($t['created_at'])): ?>
+                                    <div class="mt-2 flex items-center">
+                                        <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-medium bg-slate-100 text-slate-600 border border-slate-200">
+                                            <i class="fa-regular fa-calendar-plus text-slate-500 text-[9px]"></i>
+                                            <span>Ngày tạo: <strong class="text-slate-800 font-semibold"><?= date('d/m/Y', strtotime($t['created_at'])) ?></strong></span>
+                                        </span>
+                                    </div>
+                                <?php endif; ?>
                             </td>
                             <td class="py-3.5 px-3 text-center border-r border-slate-100 font-semibold">
                                 <?= renderDepartmentBadge($t['dept_code'], $t['dept_name'], $t['dept_color'], $t['dept_icon']) ?>

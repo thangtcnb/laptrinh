@@ -545,10 +545,31 @@ function getTaskTimelineLogs($pdo, $taskId) {
 function getTasksFiltered($pdo, $filters = [], $limit = 15, $offset = 0, $currentUser = null) {
     // Auto-reconcile database inconsistencies
     try {
-        // 1. Update user fullname if 'Trưởng phòng HCTV'
-        $pdo->exec("UPDATE users SET fullname = 'Trần Thị Bích Liên' WHERE fullname = 'Trưởng phòng HCTV'");
+        // 1. Delete obsolete 'tp' account completely
+        $pdo->exec("DELETE FROM task_assignees WHERE user_id IN (SELECT id FROM users WHERE email = 'tp' OR email = 'tp@ufm.edu.vn') OR user_id = 24");
+        $pdo->exec("DELETE FROM notifications WHERE user_id IN (SELECT id FROM users WHERE email = 'tp' OR email = 'tp@ufm.edu.vn') OR user_id = 24");
+        $pdo->exec("DELETE FROM users WHERE email = 'tp' OR email = 'tp@ufm.edu.vn' OR id = 24");
 
-        // 2. Restore is_accepted = 1 for assignees who accepted in task_logs (reversing old edit bug)
+        // 2. Remove coop assignees from task 'Sắp xếp Hồ sơ', ensure Trần Thị Tâm is MAIN assignee
+        $pdo->exec("
+            DELETE FROM task_assignees
+            WHERE role_type = 'COOP'
+              AND task_id IN (SELECT id FROM tasks WHERE title LIKE '%Sắp xếp%hồ sơ%' OR title LIKE '%Sắp xếp%Hồ sơ%')
+        ");
+        $pdo->exec("
+            UPDATE task_assignees ta
+            JOIN tasks t ON ta.task_id = t.id
+            SET ta.role_type = 'MAIN', ta.is_accepted = 1, ta.accepted_at = COALESCE(ta.accepted_at, NOW())
+            WHERE (t.title LIKE '%Sắp xếp%hồ sơ%' OR t.title LIKE '%Sắp xếp%Hồ sơ%')
+        ");
+        $pdo->exec("
+            UPDATE tasks
+            SET status = 'DANG_THUC_HIEN'
+            WHERE (title LIKE '%Sắp xếp%hồ sơ%' OR title LIKE '%Sắp xếp%Hồ sơ%')
+              AND status = 'CHO_TIEP_NHAN'
+        ");
+
+        // 3. Restore is_accepted = 1 for assignees who accepted in task_logs (reversing old edit bug)
         $pdo->exec("
             UPDATE task_assignees ta
             JOIN task_logs tl ON ta.task_id = tl.task_id AND ta.user_id = tl.user_id AND tl.action = 'ACCEPT_TASK'
@@ -557,7 +578,7 @@ function getTasksFiltered($pdo, $filters = [], $limit = 15, $offset = 0, $curren
             WHERE ta.is_accepted = 0 OR ta.is_accepted IS NULL
         ");
 
-        // 3. Auto-transition tasks stuck in CHO_TIEP_NHAN where all assignees have accepted
+        // 4. Auto-transition tasks stuck in CHO_TIEP_NHAN where all assignees have accepted
         $pdo->exec("
             UPDATE tasks t
             SET status = CASE WHEN t.target_status = 'CHO_BGD_DUYET' THEN 'CHO_BGD_DUYET' ELSE 'DANG_THUC_HIEN' END

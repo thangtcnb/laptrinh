@@ -17,7 +17,6 @@ INSERT INTO `users` (`id`, `fullname`, `email`, `password`, `role`, `department_
 
 -- PHÒNG HÀNH CHÍNH – TÀI VỤ
 (3, 'Trần Thị Bích Liên', 'tranthibichlien@ufm.edu.vn', '$2y$10$nqS0vtSgJqksgXn8g2LeK.j9Nt40MF5zfx.x18ToNBMhSKYBBKqJC', 'TRUONG_PHONG', 3),
-(24, 'Trưởng phòng HCTV', 'tp', '$2y$10$71WiWQKWK9jIU05VNPq23O/uacRWwQ89qt2yUjRha7IeTxaXKS.y2', 'TRUONG_PHONG', 3),
 (4, 'Nguyễn Thị Phương Thảo', 'nguyenthiphuongthao@ufm.edu.vn', '$2y$10$nqS0vtSgJqksgXn8g2LeK.j9Nt40MF5zfx.x18ToNBMhSKYBBKqJC', 'TRUONG_PHONG', 3),
 (5, 'Trần Thị Tâm', 'tranthitam@ufm.edu.vn', '$2y$10$nqS0vtSgJqksgXn8g2LeK.j9Nt40MF5zfx.x18ToNBMhSKYBBKqJC', 'NHAN_VIEN', 3),
 (6, 'Huỳnh Thị Anh Tùng', 'huynhthianhtung@ufm.edu.vn', '$2y$10$nqS0vtSgJqksgXn8g2LeK.j9Nt40MF5zfx.x18ToNBMhSKYBBKqJC', 'NHAN_VIEN', 3),

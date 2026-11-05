@@ -661,6 +661,16 @@ if ($deepLinkTaskId > 0) {
                                         </div>
                                     </div>
                                 <?php endif; ?>
+
+                                <!-- BADGE NGÀY TẠO CÔNG VIỆC -->
+                                <?php if (!empty($t['created_at'])): ?>
+                                    <div class="mt-2.5 pt-1.5 border-t border-slate-100 flex items-center">
+                                        <span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-md text-[11px] font-semibold bg-slate-100/90 text-slate-600 border border-slate-200 shadow-2xs hover:bg-slate-200 transition" title="Thời gian tạo công việc: <?= date('H:i:s d/m/Y', strtotime($t['created_at'])) ?>">
+                                            <i class="fa-regular fa-calendar-plus text-slate-500 text-[10px]"></i>
+                                            <span>Ngày tạo: <strong class="text-slate-800 font-bold"><?= date('d/m/Y', strtotime($t['created_at'])) ?></strong></span>
+                                        </span>
+                                    </div>
+                                <?php endif; ?>
                             </td>
 
                             <!-- 3. ĐƠN VỊ CHỦ TRÌ -->

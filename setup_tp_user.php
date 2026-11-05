@@ -41,27 +41,11 @@ try {
     ];
     $pdo = new PDO($dsn, $username, $password, $options);
 
-    $hash = password_hash('tp', PASSWORD_BCRYPT);
-    $fullname = 'Trần Thị Bích Liên';
-    $email = 'tp';
-    $role = 'TRUONG_PHONG';
-    $deptId = 3;
-
-    // Kiem tra ton tai
-    $stmtCheck = $pdo->prepare("SELECT id FROM users WHERE email = ?");
-    $stmtCheck->execute([$email]);
-    $existing = $stmtCheck->fetch();
-
-    if ($existing) {
-        $stmtUpdate = $pdo->prepare("UPDATE users SET fullname = ?, password = ?, role = ?, department_id = ? WHERE id = ?");
-        $stmtUpdate->execute([$fullname, $hash, $role, $deptId, $existing['id']]);
-        echo "[SUCCESS] Da cap nhat tai khoan Truong phong (ID: {$existing['id']}): username: tp / password: tp\n";
-    } else {
-        $stmtInsert = $pdo->prepare("INSERT INTO users (fullname, email, password, role, department_id) VALUES (?, ?, ?, ?, ?)");
-        $stmtInsert->execute([$fullname, $email, $hash, $role, $deptId]);
-        $newId = $pdo->lastInsertId();
-        echo "[SUCCESS] Da tao moi tai khoan Truong phong thanh cong (ID: {$newId}): username: tp / password: tp\n";
-    }
+    // Xoa bo tai khoan phu tp theo yeu cau
+    $pdo->exec("DELETE FROM task_assignees WHERE user_id IN (SELECT id FROM users WHERE email = 'tp' OR email = 'tp@ufm.edu.vn') OR user_id = 24");
+    $pdo->exec("DELETE FROM notifications WHERE user_id IN (SELECT id FROM users WHERE email = 'tp' OR email = 'tp@ufm.edu.vn') OR user_id = 24");
+    $pdo->exec("DELETE FROM users WHERE email = 'tp' OR email = 'tp@ufm.edu.vn' OR id = 24");
+    echo "[SUCCESS] Da xoa bo tai khoan tp khoi he thong.\n";
     exit(0);
 } catch (\PDOException $e) {
     echo "[ERROR] Loi ket noi/cap nhat CSDL: " . $e->getMessage() . "\n";

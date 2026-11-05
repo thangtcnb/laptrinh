@@ -113,19 +113,14 @@ try {
         // ignore
     }
 
-    // Ensure Truong Phong (tp / tp) account exists and is synchronized
-    $hashTp = '$2y$10$71WiWQKWK9jIU05VNPq23O/uacRWwQ89qt2yUjRha7IeTxaXKS.y2';
-    $stmtTp = $pdo->prepare("SELECT id FROM users WHERE email = 'tp' OR email = 'tp@ufm.edu.vn'");
-    $stmtTp->execute();
-    $existingTp = $stmtTp->fetch();
-    if ($existingTp) {
-        $stmtUpdateTp = $pdo->prepare("UPDATE users SET fullname = 'Trưởng phòng HCTV', password = ?, role = 'TRUONG_PHONG', department_id = 3 WHERE id = ?");
-        $stmtUpdateTp->execute([$hashTp, $existingTp['id']]);
-        echo "[SUCCESS] Da dong bo tai khoan Truong phong (ID: {$existingTp['id']}): username: tp / password: tp\n";
-    } else {
-        $stmtInsertTp = $pdo->prepare("INSERT INTO users (fullname, email, password, role, department_id) VALUES (?, ?, ?, ?, ?)");
-        $stmtInsertTp->execute(['Trưởng phòng HCTV', 'tp', $hashTp, 'TRUONG_PHONG', 3]);
-        echo "[SUCCESS] Da tao moi tai khoan Truong phong: username: tp / password: tp\n";
+    // Xoa bo tai khoan phu tp theo yeu cau he thong
+    try {
+        $pdo->exec("DELETE FROM task_assignees WHERE user_id IN (SELECT id FROM users WHERE email = 'tp' OR email = 'tp@ufm.edu.vn') OR user_id = 24");
+        $pdo->exec("DELETE FROM notifications WHERE user_id IN (SELECT id FROM users WHERE email = 'tp' OR email = 'tp@ufm.edu.vn') OR user_id = 24");
+        $pdo->exec("DELETE FROM users WHERE email = 'tp' OR email = 'tp@ufm.edu.vn' OR id = 24");
+        echo "[SUCCESS] Da xoa bo tai khoan phu tp thanh cong.\n";
+    } catch (\Exception $e) {
+        // ignore
     }
 
     // Execute additional migrations runner if present
