@@ -70,7 +70,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $stmt->execute([$email, $email . '@ufm.edu.vn']);
         $user = $stmt->fetch();
 
-        if ($user && (password_verify($password, $user['password']) || $password === $user['password'] || $password === 'tp' || $password === '123' || $password === '123456')) {
+        $isPasswordCorrect = $user && (password_verify($password, $user['password']) || $password === $user['password']);
+
+        if ($isPasswordCorrect) {
             $_SESSION['user_id'] = $user['id'];
             header("Location: index.php");
             exit;

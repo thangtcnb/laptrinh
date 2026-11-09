@@ -22,7 +22,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
         $stmt->execute([$currentUser['id']]);
         $userPass = $stmt->fetchColumn();
 
-        if (password_verify($currentPassword, $userPass) || $currentPassword === '123' || $currentPassword === '123456') {
+        if (password_verify($currentPassword, $userPass) || $currentPassword === $userPass) {
             $newHash = password_hash($newPassword, PASSWORD_BCRYPT);
             $updateStmt = $pdo->prepare("UPDATE users SET password = ? WHERE id = ?");
             $updateStmt->execute([$newHash, $currentUser['id']]);
