@@ -140,8 +140,8 @@ if ($exportType === 'excel') {
     if (strpos($scope, 'USER_') === 0) {
         $targetUserId = (int)str_replace('USER_', '', $scope);
         foreach ($allTasksForExcel as $t) {
-            $mains = array_filter($t['assignees'], fn($a) => $a['role_type'] === 'MAIN');
-            $coops = array_filter($t['assignees'], fn($a) => $a['role_type'] === 'COOP');
+            $mains = array_filter($t['assignees'], function($a) { return $a['role_type'] === 'MAIN'; });
+            $coops = array_filter($t['assignees'], function($a) { return $a['role_type'] === 'COOP'; });
 
             $isMain = in_array($targetUserId, array_column($mains, 'user_id'));
             $isCoop = in_array($targetUserId, array_column($coops, 'user_id'));
@@ -157,8 +157,8 @@ if ($exportType === 'excel') {
         $targetDeptId = (int)str_replace('DEPT_', '', $scope);
         $deptUserIds = array_column(getUsers($pdo, $targetDeptId), 'id');
         foreach ($allTasksForExcel as $t) {
-            $mains = array_filter($t['assignees'], fn($a) => $a['role_type'] === 'MAIN');
-            $coops = array_filter($t['assignees'], fn($a) => $a['role_type'] === 'COOP');
+            $mains = array_filter($t['assignees'], function($a) { return $a['role_type'] === 'MAIN'; });
+            $coops = array_filter($t['assignees'], function($a) { return $a['role_type'] === 'COOP'; });
 
             $mainUserIds = array_column($mains, 'user_id');
             $coopUserIds = array_column($coops, 'user_id');
@@ -175,7 +175,7 @@ if ($exportType === 'excel') {
         }
     } else {
         foreach ($allTasksForExcel as $t) {
-            $coops = array_filter($t['assignees'], fn($a) => $a['role_type'] === 'COOP');
+            $coops = array_filter($t['assignees'], function($a) { return $a['role_type'] === 'COOP'; });
 
             $part1Tasks[] = $t;
             if (!empty($coops)) {
@@ -233,8 +233,8 @@ if ($exportType === 'excel') {
 
         if (!empty($tasks)) {
             foreach ($tasks as $t) {
-                $mains = array_filter($t['assignees'], fn($a) => $a['role_type'] === 'MAIN');
-                $coops = array_filter($t['assignees'], fn($a) => $a['role_type'] === 'COOP');
+                $mains = array_filter($t['assignees'], function($a) { return $a['role_type'] === 'MAIN'; });
+                $coops = array_filter($t['assignees'], function($a) { return $a['role_type'] === 'COOP'; });
                 $mainNames = implode(', ', array_column($mains, 'fullname'));
                 $coopNames = implode(', ', array_column($coops, 'fullname'));
 
@@ -430,9 +430,9 @@ require_once __DIR__ . '/includes/header.php';
                 <?php elseif (in_array($currentUser['role'], ['TRUONG_PHONG', 'PHO_PHONG'])): ?>
                     <?php
                     $myDeptId = $currentUser['department_id'];
-                    $deptObjArr = array_filter($departmentsList, fn($d) => $d['id'] == $myDeptId);
+                    $deptObjArr = array_filter($departmentsList, function($d) use ($myDeptId) { return $d['id'] == $myDeptId; });
                     $myDept = reset($deptObjArr);
-                    $deptUsers = array_filter($usersList, fn($u) => $u['department_id'] == $myDeptId);
+                    $deptUsers = array_filter($usersList, function($u) use ($myDeptId) { return $u['department_id'] == $myDeptId; });
                     ?>
                     <option value="DEPT_<?= $myDeptId ?>" <?= $scope === 'DEPT_' . $myDeptId ? 'selected' : '' ?>>
                         🏢 Toàn phòng: <?= htmlspecialchars($myDept['name'] ?? '') ?>

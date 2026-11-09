@@ -66,7 +66,7 @@ $assignableUsers = getUsers($pdo, null, true); // Exclude Super Admin from assig
 $deptEmployeesForMain = in_array($currentUser['role'], ['TRUONG_PHONG', 'PHO_PHONG'])
     ? getUsers($pdo, $currentUser['department_id'], true)
     : $assignableUsers;
-$coopUsersList = array_filter($assignableUsers, fn($u) => $u['role'] !== 'BGD'); // Exclude BGD from COOP
+$coopUsersList = array_filter($assignableUsers, function($u) { return $u['role'] !== 'BGD'; }); // Exclude BGD from COOP
 
 // Check if current logged-in user has pending assigned tasks (CHO_TIEP_NHAN / CHO_XAC_NHAN where user has not accepted yet)
 $pendingAssignedTasks = [];
@@ -453,7 +453,7 @@ if ($deepLinkTaskId > 0) {
     if ($filters['dept_filter'] === 'MY_TASKS') {
         $scopeLabel = '📌 Công việc của tôi';
     } elseif (!empty($filters['dept_filter']) && is_numeric($filters['dept_filter'])) {
-        $matchedDept = array_filter($departmentsList, fn($d) => $d['id'] == $filters['dept_filter']);
+        $matchedDept = array_filter($departmentsList, function($d) use ($filters) { return $d['id'] == $filters['dept_filter']; });
         $deptObj = reset($matchedDept);
         $scopeLabel = 'Phòng: ' . htmlspecialchars($deptObj['name'] ?? '');
     }
@@ -540,7 +540,7 @@ if ($deepLinkTaskId > 0) {
                     if ($filters['dept_filter'] === 'MY_TASKS') {
                         echo 'CÔNG VIỆC CỦA TÔI';
                     } elseif (!empty($filters['dept_filter']) && is_numeric($filters['dept_filter'])) {
-                        $matchedDept = array_filter($departmentsList, fn($d) => $d['id'] == $filters['dept_filter']);
+                        $matchedDept = array_filter($departmentsList, function($d) use ($filters) { return $d['id'] == $filters['dept_filter']; });
                         $deptObj = reset($matchedDept);
                         echo 'DANH SÁCH CÔNG VIỆC - ' . mb_strtoupper($deptObj['name'] ?? '', 'UTF-8');
                     } else {
@@ -1212,7 +1212,7 @@ if ($deepLinkTaskId > 0) {
                     <label class="block text-xs font-semibold text-slate-700 mb-1">Đơn vị chủ trì</label>
                     <?php if (in_array($currentUser['role'], ['TRUONG_PHONG', 'PHO_PHONG', 'NHAN_VIEN', 'HO_TRO'])): ?>
                         <?php
-                        $userDept = array_filter($departmentsList, fn($d) => $d['id'] == $currentUser['department_id']);
+                        $userDept = array_filter($departmentsList, function($d) use ($currentUser) { return $d['id'] == $currentUser['department_id']; });
                         $userDeptObj = reset($userDept);
                         ?>
                         <input type="hidden" name="department_id" id="form_department_id" value="<?= $currentUser['department_id'] ?>">

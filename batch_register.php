@@ -21,7 +21,7 @@ $assignableUsers = getUsers($pdo, null, true); // Exclude Super Admin
 $deptEmployeesForMain = in_array($currentUser['role'], ['TRUONG_PHONG', 'PHO_PHONG'])
     ? getUsers($pdo, $currentUser['department_id'], true)
     : $assignableUsers;
-$coopUsersList = array_filter($assignableUsers, fn($u) => $u['role'] !== 'BGD');
+$coopUsersList = array_filter($assignableUsers, function($u) { return $u['role'] !== 'BGD'; });
 
 $errorMsg = '';
 
@@ -196,7 +196,7 @@ require_once __DIR__ . '/includes/header.php';
                 <div>
                     <label class="block text-xs font-semibold text-slate-600 mb-1">Đơn vị chủ trì</label>
                     <?php
-                    $deptArr = array_filter($departmentsList, fn($d) => $d['id'] == $currentUser['department_id']);
+                    $deptArr = array_filter($departmentsList, function($d) use ($currentUser) { return $d['id'] == $currentUser['department_id']; });
                     $deptObj = reset($deptArr);
                     ?>
                     <input type="text" readonly value="[<?= htmlspecialchars($deptObj['code'] ?? '') ?>] <?= htmlspecialchars($deptObj['name'] ?? '') ?>" class="w-full p-2.5 border border-slate-200 bg-slate-100 text-slate-600 rounded-xl text-xs font-bold cursor-not-allowed outline-none">
