@@ -5,6 +5,27 @@ require_once __DIR__ . '/includes/functions.php';
 requireLogin();
 $currentUser = getCurrentUser($pdo);
 
+function getRedirectUrl($default = 'index.php') {
+    $target = $_REQUEST['return_url'] ?? '';
+    if (empty($target) && !empty($_SERVER['HTTP_REFERER'])) {
+        $target = $_SERVER['HTTP_REFERER'];
+    }
+    if (!empty($target)) {
+        if (preg_match('#^(javascript|data):#i', $target)) {
+            return $default;
+        }
+        if (!preg_match('#^https?://#i', $target)) {
+            return $target;
+        }
+        $currentHost = $_SERVER['HTTP_HOST'] ?? '';
+        $targetHost = parse_url($target, PHP_URL_HOST);
+        if (empty($targetHost) || strcasecmp($targetHost, $currentHost) === 0) {
+            return $target;
+        }
+    }
+    return $default;
+}
+
 $action = $_REQUEST['action'] ?? '';
 // 0. CHECK DATA VERSION (FOR AUTO-REFRESH)
 if ($action === 'check_data_version') {
@@ -31,14 +52,14 @@ if ($action === 'switch_view_as') {
             $_SESSION['flash_success'] = "Đã trở về góc nhìn Quản trị viên cấp cao (Super Admin)";
         }
     }
-    header("Location: " . (!empty($_SERVER['HTTP_REFERER']) ? $_SERVER['HTTP_REFERER'] : 'index.php'));
+    header("Location: " . getRedirectUrl());
     exit;
 }
 
 if ($action === 'exit_view_as') {
     unset($_SESSION['view_as_user_id']);
     $_SESSION['flash_success'] = "Đã thoát chế độ giả lập, trở về tài khoản Super Admin.";
-    header("Location: index.php");
+    header("Location: " . getRedirectUrl());
     exit;
 }
 
@@ -154,7 +175,7 @@ if ($action === 'update_progress') {
 
     if (!$taskRow) {
         $_SESSION['flash_error'] = "Không tìm thấy công việc!";
-        header("Location: index.php");
+        header("Location: " . getRedirectUrl());
         exit;
     }
 
@@ -166,7 +187,7 @@ if ($action === 'update_progress') {
 
     if ($isEmployee && $isOverdue) {
         $_SESSION['flash_error'] = "Công việc đã quá hạn hoàn thành (" . date('d/m/Y', strtotime($dueDate)) . "). Nhân viên không có quyền cập nhật tiến độ!";
-        header("Location: index.php");
+        header("Location: " . getRedirectUrl());
         exit;
     }
 
@@ -227,7 +248,7 @@ if ($action === 'update_progress') {
     $_SESSION['flash_success'] = "Đã cập nhật tiến độ (" . $progress . "%" . ($newStatus === 'HOAN_THANH' ? ' - Hoàn thành' : ' - Đang thực hiện') . "), ghi chú và Hồ sơ Minh chứng thành công!";
 
     
-    header("Location: index.php");
+    header("Location: " . getRedirectUrl());
     exit;
 }
 
@@ -244,7 +265,7 @@ if ($action === 'save_leader_comment' || $action === 'approve') {
 
     if (!$task) {
         $_SESSION['flash_error'] = "Không tìm thấy công việc!";
-        header("Location: index.php");
+        header("Location: " . getRedirectUrl());
         exit;
     }
 
@@ -307,7 +328,7 @@ if ($action === 'save_leader_comment' || $action === 'approve') {
         $_SESSION['flash_error'] = "Bạn chỉ có quyền cho ý kiến/duyệt các công việc thuộc phòng ban của mình!";
     }
 
-    header("Location: index.php");
+    header("Location: " . getRedirectUrl());
     exit;
 }
 
@@ -321,7 +342,7 @@ if ($action === 'delete') {
 
     if (!$task) {
         $_SESSION['flash_error'] = "Không tìm thấy công việc!";
-        header("Location: index.php");
+        header("Location: " . getRedirectUrl());
         exit;
     }
 
@@ -350,7 +371,7 @@ if ($action === 'delete') {
     } else {
         $_SESSION['flash_error'] = "Bạn chỉ có quyền xóa công việc do chính mình đã tạo!";
     }
-    header("Location: index.php");
+    header("Location: " . getRedirectUrl());
     exit;
 }
 
@@ -369,7 +390,7 @@ if ($action === 'delete_attachment') {
 
     if (!$attachment) {
         $_SESSION['flash_error'] = "Không tìm thấy file văn bản đính kèm!";
-        header("Location: index.php");
+        header("Location: " . getRedirectUrl());
         exit;
     }
 
@@ -390,7 +411,7 @@ if ($action === 'delete_attachment') {
         $_SESSION['flash_error'] = "Bạn không có quyền xóa file đính kèm này!";
     }
 
-    header("Location: index.php");
+    header("Location: " . getRedirectUrl());
     exit;
 }
 
@@ -453,7 +474,7 @@ if ($action === 'save_task') {
 
     if (empty($title)) {
         $_SESSION['flash_error'] = "Tiêu đề công việc không được để trống.";
-        header("Location: index.php");
+        header("Location: " . getRedirectUrl());
         exit;
     }
 
@@ -465,14 +486,14 @@ if ($action === 'save_task') {
 
         if (!$existingTask) {
             $_SESSION['flash_error'] = "Không tìm thấy công việc!";
-            header("Location: index.php");
+            header("Location: " . getRedirectUrl());
             exit;
         }
 
         // Cá nhân được quyền sửa công việc do chính mình tạo/đăng ký hoặc SUPER_ADMIN
         if ($currentUser['role'] !== 'SUPER_ADMIN' && $existingTask['created_by'] != $currentUser['id']) {
             $_SESSION['flash_error'] = "Bạn chỉ có quyền chỉnh sửa công việc do chính mình đã tạo!";
-            header("Location: index.php");
+            header("Location: " . getRedirectUrl());
             exit;
         }
 
@@ -632,7 +653,7 @@ if ($action === 'save_task') {
     if (empty($_SESSION['flash_error'])) {
         $_SESSION['flash_success'] = "Đã lưu công việc thành công!";
     }
-    header("Location: index.php");
+    header("Location: " . getRedirectUrl());
     exit;
 }
 
@@ -690,7 +711,7 @@ if ($action === 'respond_all_assigned_tasks') {
         }
     }
 
-    header("Location: index.php");
+    header("Location: " . getRedirectUrl());
     exit;
 }
 
@@ -702,13 +723,13 @@ if ($action === 'batch_approve_tasks') {
 
     if (!in_array($currentUser['role'], ['TRUONG_PHONG', 'PHO_PHONG', 'BGD', 'SUPER_ADMIN'])) {
         $_SESSION['flash_error'] = "Bạn không có quyền thực hiện chức năng phê duyệt hàng loạt!";
-        header("Location: index.php");
+        header("Location: " . getRedirectUrl());
         exit;
     }
 
     if (empty($taskIds) || !is_array($taskIds)) {
         $_SESSION['flash_error'] = "Vui lòng chọn ít nhất một công việc để phê duyệt!";
-        header("Location: index.php");
+        header("Location: " . getRedirectUrl());
         exit;
     }
 
@@ -766,7 +787,7 @@ if ($action === 'batch_approve_tasks') {
             $_SESSION['flash_error'] = "Không có công việc nào bị từ chối (kiểm tra lại quyền hoặc trạng thái công việc).";
         }
 
-        header("Location: index.php");
+        header("Location: " . getRedirectUrl());
         exit;
     }
 
@@ -835,7 +856,7 @@ if ($action === 'batch_approve_tasks') {
         $_SESSION['flash_error'] = "Không có công việc nào được phê duyệt (kiểm tra lại quyền hoặc trạng thái công việc).";
     }
 
-    header("Location: index.php");
+    header("Location: " . getRedirectUrl());
     exit;
 }
 
@@ -855,7 +876,7 @@ if ($action === 'respond_assigned_task') {
 
     if (!$task) {
         $_SESSION['flash_error'] = "Không tìm thấy công việc được giao!";
-        header("Location: index.php");
+        header("Location: " . getRedirectUrl());
         exit;
     }
 
@@ -888,7 +909,7 @@ if ($action === 'respond_assigned_task') {
         $_SESSION['flash_success'] = "Bạn đã tiếp nhận công việc thành công. Đang chờ các người phối hợp khác xác nhận!";
     }
 
-    header("Location: index.php");
+    header("Location: " . getRedirectUrl());
     exit;
 }
 
@@ -902,9 +923,9 @@ if ($action === 'mark_notifications_read') {
         echo json_encode(['success' => true]);
         exit;
     }
-    header("Location: " . ($_SERVER['HTTP_REFERER'] ?? 'index.php'));
+    header("Location: " . getRedirectUrl());
     exit;
 }
 
-header("Location: index.php");
+header("Location: " . getRedirectUrl());
 exit;

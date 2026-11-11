@@ -30,13 +30,16 @@ if (!empty($timeDetail) && strpos($timeDetail, '|') !== false) {
     if (empty($dateTo)) $dateTo = $dt;
 }
 
+$keyword = trim($_GET['keyword'] ?? $_GET['search'] ?? '');
+
 $filters = [
     'time_frame' => $timeFrame,
     'time_detail' => $timeDetail,
     'date_from' => $dateFrom,
     'date_to' => $dateTo,
     'dept_filter' => $_GET['dept_filter'] ?? $defaultDeptFilter,
-    'status' => $_GET['status'] ?? ''
+    'status' => $_GET['status'] ?? '',
+    'keyword' => $keyword
 ];
 
 // Backend Date Filter Validation: "Từ ngày" must be <= "Đến ngày"
@@ -377,9 +380,12 @@ if ($deepLinkTaskId > 0) {
     </div>
 
     <form method="GET" action="index.php" onsubmit="return validateDateFilter(this)" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
-        <!-- Hidden inputs for date range -->
+        <!-- Hidden inputs for date range and keyword -->
         <input type="hidden" name="date_from" id="filter_date_from" value="<?= htmlspecialchars($filters['date_from']) ?>">
         <input type="hidden" name="date_to" id="filter_date_to" value="<?= htmlspecialchars($filters['date_to']) ?>">
+        <?php if (!empty($filters['keyword'])): ?>
+            <input type="hidden" name="keyword" value="<?= htmlspecialchars($filters['keyword']) ?>">
+        <?php endif; ?>
 
         <!-- COMBOBOX 1: Khung thời gian -->
         <div>
@@ -531,7 +537,7 @@ if ($deepLinkTaskId > 0) {
 
 <!-- Task Table Section -->
 <div class="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
-    <div class="p-4 sm:p-5 border-b border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-slate-50">
+    <div class="p-4 sm:p-5 border-b border-slate-200 flex flex-col md:flex-row md:items-center justify-between gap-3 bg-slate-50">
         <div>
             <h2 class="text-base font-bold text-slate-900 flex items-center gap-2">
                 <i class="fa-solid fa-list-check text-indigo-600"></i>
@@ -549,10 +555,70 @@ if ($deepLinkTaskId > 0) {
                     ?>
                 </span>
             </h2>
-            <p class="text-xs text-slate-500 mt-0.5">Tổng số: <span class="font-bold text-indigo-600"><?= $totalTasks ?></span> công việc</p>
+            <p class="text-xs text-slate-500 mt-0.5 flex items-center flex-wrap gap-1">
+                <span>Tổng số: <span class="font-bold text-indigo-600"><?= $totalTasks ?></span> công việc</span>
+                <?php if (!empty($filters['keyword'])): ?>
+                    <span class="text-slate-300 mx-1">|</span>
+                    <span class="text-indigo-700 font-semibold">Kết quả tìm kiếm cho: "<strong><?= htmlspecialchars($filters['keyword']) ?></strong>"</span>
+                    <?php
+                    $clearKwQuery = $_GET;
+                    unset($clearKwQuery['keyword'], $clearKwQuery['search'], $clearKwQuery['page']);
+                    $clearKwUrl = 'index.php?' . http_build_query($clearKwQuery);
+                    ?>
+                    <a href="<?= $clearKwUrl ?>" class="inline-flex items-center gap-0.5 text-rose-600 hover:text-rose-800 text-[11px] font-bold ml-1 hover:underline" title="Bỏ lọc tìm kiếm">
+                        <i class="fa-solid fa-circle-xmark"></i> Xóa tìm kiếm
+                    </a>
+                <?php endif; ?>
+            </p>
         </div>
-        <div class="text-xs text-slate-500 font-medium">
-            Trang <span class="font-bold text-slate-800"><?= $page ?></span> / <?= $totalPages ?>
+
+        <!-- Ô TÌM KIẾM CÔNG VIỆC NHỎ GỌN PHÍA TRÊN DANH SÁCH -->
+        <div class="flex items-center gap-3">
+            <form method="GET" action="index.php" class="flex items-center gap-1.5 w-full sm:w-auto">
+                <!-- Giữ lại các bộ lọc đang chọn -->
+                <?php if (!empty($filters['dept_filter'])): ?>
+                    <input type="hidden" name="dept_filter" value="<?= htmlspecialchars($filters['dept_filter']) ?>">
+                <?php endif; ?>
+                <?php if (!empty($filters['time_frame'])): ?>
+                    <input type="hidden" name="time_frame" value="<?= htmlspecialchars($filters['time_frame']) ?>">
+                <?php endif; ?>
+                <?php if (!empty($filters['time_detail'])): ?>
+                    <input type="hidden" name="time_detail" value="<?= htmlspecialchars($filters['time_detail']) ?>">
+                <?php endif; ?>
+                <?php if (!empty($filters['date_from'])): ?>
+                    <input type="hidden" name="date_from" value="<?= htmlspecialchars($filters['date_from']) ?>">
+                <?php endif; ?>
+                <?php if (!empty($filters['date_to'])): ?>
+                    <input type="hidden" name="date_to" value="<?= htmlspecialchars($filters['date_to']) ?>">
+                <?php endif; ?>
+                <?php if (!empty($filters['status'])): ?>
+                    <input type="hidden" name="status" value="<?= htmlspecialchars($filters['status']) ?>">
+                <?php endif; ?>
+
+                <div class="relative w-full sm:w-64 md:w-72">
+                    <input type="text" name="keyword" value="<?= htmlspecialchars($filters['keyword'] ?? '') ?>" placeholder="Tìm tên việc, người làm, ghi chú, mã..." class="w-full pl-8 pr-7 py-1.5 bg-white border border-slate-300 rounded-xl text-xs focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none shadow-xs font-medium placeholder-slate-400">
+                    <i class="fa-solid fa-magnifying-glass absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 text-xs"></i>
+                    <?php if (!empty($filters['keyword'])): ?>
+                        <?php
+                        $clearKwQuery = $_GET;
+                        unset($clearKwQuery['keyword'], $clearKwQuery['search'], $clearKwQuery['page']);
+                        $clearKwUrl = 'index.php?' . http_build_query($clearKwQuery);
+                        ?>
+                        <a href="<?= $clearKwUrl ?>" class="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-0.5" title="Xóa từ khóa">
+                            <i class="fa-solid fa-circle-xmark text-xs"></i>
+                        </a>
+                    <?php endif; ?>
+                </div>
+
+                <button type="submit" class="px-3.5 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-xs rounded-xl shadow-sm transition flex items-center gap-1.5 shrink-0">
+                    <i class="fa-solid fa-magnifying-glass text-xs"></i>
+                    <span>Tìm kiếm</span>
+                </button>
+            </form>
+
+            <div class="text-xs text-slate-500 font-medium shrink-0 hidden lg:block border-l border-slate-200 pl-3">
+                Trang <span class="font-bold text-slate-800"><?= $page ?></span> / <?= $totalPages ?>
+            </div>
         </div>
     </div>
 
@@ -829,7 +895,7 @@ if ($deepLinkTaskId > 0) {
 
                                     <!-- Delete Button (Cá nhân được quyền xóa công việc do chính mình đã tạo/đăng ký) -->
                                     <?php if ($isCreator || $currentUser['role'] === 'SUPER_ADMIN'): ?>
-                                        <a href="task_actions.php?action=delete&task_id=<?= $t['id'] ?>" onclick="return sysConfirmLink(event, this, 'Bạn có chắc chắn muốn xóa công việc này không?');" class="p-1.5 bg-rose-50 hover:bg-rose-600 text-rose-600 hover:text-white rounded-lg transition" title="Xóa">
+                                        <a href="task_actions.php?action=delete&task_id=<?= $t['id'] ?>&return_url=<?= urlencode($_SERVER['REQUEST_URI'] ?? 'index.php') ?>" onclick="return sysConfirmLink(event, this, 'Bạn có chắc chắn muốn xóa công việc này không?');" class="p-1.5 bg-rose-50 hover:bg-rose-600 text-rose-600 hover:text-white rounded-lg transition" title="Xóa">
                                             <i class="fa-solid fa-trash text-xs"></i>
                                         </a>
                                     <?php endif; ?>
@@ -841,7 +907,22 @@ if ($deepLinkTaskId > 0) {
                     <tr>
                         <td colspan="8" class="py-12 text-center text-slate-400">
                             <i class="fa-solid fa-inbox text-4xl mb-2 text-slate-300"></i>
-                            <p class="font-medium">Không tìm thấy công việc nào phù hợp với bộ lọc.</p>
+                            <?php if (!empty($filters['keyword'])): ?>
+                                <p class="font-bold text-slate-700 text-sm">Không tìm thấy công việc nào khớp với từ khóa "<?= htmlspecialchars($filters['keyword']) ?>".</p>
+                                <p class="text-xs mt-1 text-slate-400">Hãy thử tìm với từ khóa khác hoặc bấm nút bên dưới để xem tất cả công việc.</p>
+                                <?php
+                                $clearKwQuery = $_GET;
+                                unset($clearKwQuery['keyword'], $clearKwQuery['search'], $clearKwQuery['page']);
+                                $clearKwUrl = 'index.php?' . http_build_query($clearKwQuery);
+                                ?>
+                                <div class="mt-3">
+                                    <a href="<?= $clearKwUrl ?>" class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-semibold rounded-xl text-xs transition border border-indigo-200 shadow-xs">
+                                        <i class="fa-solid fa-arrow-rotate-left"></i> Xóa từ khóa tìm kiếm
+                                    </a>
+                                </div>
+                            <?php else: ?>
+                                <p class="font-medium">Không tìm thấy công việc nào phù hợp với bộ lọc.</p>
+                            <?php endif; ?>
                         </td>
                     </tr>
                 <?php endif; ?>
@@ -886,6 +967,7 @@ if ($deepLinkTaskId > 0) {
             <!-- TASK ACCEPTANCE UI WITH TOP "TIẾP NHẬN TẤT CẢ" & INDIVIDUAL ROW "TIẾP NHẬN" BUTTONS -->
             <form method="POST" action="task_actions.php" id="batchAcceptForm">
                 <input type="hidden" name="action" value="respond_all_assigned_tasks">
+                <input type="hidden" name="return_url" value="<?= htmlspecialchars($_SERVER['REQUEST_URI'] ?? 'index.php', ENT_QUOTES, 'UTF-8') ?>">
 
                 <div class="mb-4 bg-emerald-50 border border-emerald-200 rounded-2xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-sm">
                     <div>
@@ -988,6 +1070,7 @@ if ($deepLinkTaskId > 0) {
 <!-- Hidden Form for Individual Row Acceptance (Always available on page) -->
 <form method="POST" action="task_actions.php" id="singleAcceptForm" class="hidden">
     <input type="hidden" name="action" value="respond_assigned_task">
+    <input type="hidden" name="return_url" value="<?= htmlspecialchars($_SERVER['REQUEST_URI'] ?? 'index.php', ENT_QUOTES, 'UTF-8') ?>">
     <input type="hidden" name="task_id" id="single_accept_task_id" value="0">
     <input type="hidden" name="comment_feedback" id="single_accept_feedback" value="">
     <input type="hidden" name="response" value="ACCEPT">
@@ -1007,6 +1090,7 @@ if ($deepLinkTaskId > 0) {
         <form method="POST" action="task_actions.php">
             <input type="hidden" name="action" value="save_leader_comment">
             <input type="hidden" name="task_id" id="leader_task_id">
+            <input type="hidden" name="return_url" value="<?= htmlspecialchars($_SERVER['REQUEST_URI'] ?? 'index.php', ENT_QUOTES, 'UTF-8') ?>">
 
             <div class="mb-3">
                 <label class="block text-xs font-semibold text-slate-700 mb-1">Công việc:</label>
@@ -1061,6 +1145,7 @@ if ($deepLinkTaskId > 0) {
         <form id="progressForm" method="POST" action="task_actions.php" enctype="multipart/form-data" onsubmit="return handleProgressFormSubmit(event)">
             <input type="hidden" name="action" value="update_progress">
             <input type="hidden" name="task_id" id="prog_task_id">
+            <input type="hidden" name="return_url" value="<?= htmlspecialchars($_SERVER['REQUEST_URI'] ?? 'index.php', ENT_QUOTES, 'UTF-8') ?>">
 
             <div class="mb-3">
                 <label class="block text-xs font-semibold text-slate-700 mb-1">Công việc:</label>
@@ -1194,6 +1279,7 @@ if ($deepLinkTaskId > 0) {
         <form method="POST" action="task_actions.php" enctype="multipart/form-data" class="space-y-4">
             <input type="hidden" name="action" value="save_task">
             <input type="hidden" name="task_id" id="form_task_id" value="0">
+            <input type="hidden" name="return_url" value="<?= htmlspecialchars($_SERVER['REQUEST_URI'] ?? 'index.php', ENT_QUOTES, 'UTF-8') ?>">
 
             <div>
                 <label class="block text-xs font-semibold text-slate-700 mb-1">Tên công việc / Nội dung <span class="text-rose-500">*</span></label>
@@ -1433,6 +1519,7 @@ if ($deepLinkTaskId > 0) {
         <!-- Modal Body / Form -->
         <form method="POST" action="task_actions.php" id="batchApprovalForm" class="flex flex-col flex-1 overflow-hidden">
             <input type="hidden" name="action" value="batch_approve_tasks">
+            <input type="hidden" name="return_url" value="<?= htmlspecialchars($_SERVER['REQUEST_URI'] ?? 'index.php', ENT_QUOTES, 'UTF-8') ?>">
 
             <!-- Directive Comment Box (Optional) -->
             <div class="mb-4 shrink-0">
@@ -2247,7 +2334,7 @@ function openTaskModal(task = null) {
                         <span class="font-medium text-slate-800 truncate" title="${safeName}">${safeName}</span>
                         <span class="text-[10px] text-slate-400 shrink-0">(${sizeStr})</span>
                     </div>
-                    <a href="task_actions.php?action=delete_attachment&attachment_id=${att.id}" onclick="return sysConfirmLink(event, this, 'Bạn có chắc muốn xóa văn bản đính kèm này không?');" class="text-rose-600 hover:text-rose-800 p-1 font-bold text-xs" title="Xóa file đính kèm">
+                    <a href="task_actions.php?action=delete_attachment&attachment_id=${att.id}&return_url=${encodeURIComponent(window.location.href)}" onclick="return sysConfirmLink(event, this, 'Bạn có chắc muốn xóa văn bản đính kèm này không?');" class="text-rose-600 hover:text-rose-800 p-1 font-bold text-xs" title="Xóa file đính kèm">
                         <i class="fa-solid fa-trash"></i> Xóa
                     </a>
                 `;

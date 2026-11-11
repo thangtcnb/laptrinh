@@ -479,6 +479,36 @@ function getKpiStats($pdo, $currentUser, $filters = []) {
         $params[] = $deptId;
     }
 
+    // Keyword search filter for KPI stats if active
+    if (!empty($filters['keyword'])) {
+        $kw = trim($filters['keyword']);
+        $kwClean = ltrim($kw, '#');
+        $kwLike = '%' . $kw . '%';
+
+        $searchConditions = [
+            "t.title LIKE ?",
+            "t.description LIKE ?",
+            "t.notes LIKE ?",
+            "t.leader_comments LIKE ?",
+            "d.name LIKE ?",
+            "d.code LIKE ?",
+            "u.fullname LIKE ?",
+            "EXISTS (SELECT 1 FROM task_assignees ta JOIN users ua ON ta.user_id = ua.id WHERE ta.task_id = t.id AND ua.fullname LIKE ?)",
+            "EXISTS (SELECT 1 FROM task_attachments att WHERE att.task_id = t.id AND att.file_name LIKE ?)"
+        ];
+        $searchParams = [$kwLike, $kwLike, $kwLike, $kwLike, $kwLike, $kwLike, $kwLike, $kwLike, $kwLike];
+
+        if (is_numeric($kwClean)) {
+            $searchConditions[] = "t.id = ?";
+            $searchParams[] = (int)$kwClean;
+        }
+
+        $where[] = "(" . implode(" OR ", $searchConditions) . ")";
+        foreach ($searchParams as $sp) {
+            $params[] = $sp;
+        }
+    }
+
     $whereSql = implode(" AND ", $where);
 
     $sql = "
@@ -488,6 +518,8 @@ function getKpiStats($pdo, $currentUser, $filters = []) {
             SUM(CASE WHEN t.status IN ('CHO_DUYET', 'CHO_BGD_DUYET', 'CHO_TIEP_NHAN') THEN 1 ELSE 0 END) AS pending_count,
             SUM(CASE WHEN (t.due_date IS NOT NULL AND t.due_date < CURDATE() AND t.status != 'HOAN_THANH') THEN 1 ELSE 0 END) AS overdue_count
         FROM tasks t
+        LEFT JOIN departments d ON t.department_id = d.id
+        LEFT JOIN users u ON t.created_by = u.id
         WHERE $whereSql
     ";
 
@@ -659,10 +691,46 @@ function getTasksFiltered($pdo, $filters = [], $limit = 15, $offset = 0, $curren
         }
     }
 
+    // Keyword search filter (Tên việc, mô tả, ghi chú, ý kiến lãnh đạo, phòng ban, người tạo, người thực hiện, file đính kèm, mã CV)
+    if (!empty($filters['keyword'])) {
+        $kw = trim($filters['keyword']);
+        $kwClean = ltrim($kw, '#');
+        $kwLike = '%' . $kw . '%';
+
+        $searchConditions = [
+            "t.title LIKE ?",
+            "t.description LIKE ?",
+            "t.notes LIKE ?",
+            "t.leader_comments LIKE ?",
+            "d.name LIKE ?",
+            "d.code LIKE ?",
+            "u.fullname LIKE ?",
+            "EXISTS (SELECT 1 FROM task_assignees ta JOIN users ua ON ta.user_id = ua.id WHERE ta.task_id = t.id AND ua.fullname LIKE ?)",
+            "EXISTS (SELECT 1 FROM task_attachments att WHERE att.task_id = t.id AND att.file_name LIKE ?)"
+        ];
+        $searchParams = [$kwLike, $kwLike, $kwLike, $kwLike, $kwLike, $kwLike, $kwLike, $kwLike, $kwLike];
+
+        if (is_numeric($kwClean)) {
+            $searchConditions[] = "t.id = ?";
+            $searchParams[] = (int)$kwClean;
+        }
+
+        $where[] = "(" . implode(" OR ", $searchConditions) . ")";
+        foreach ($searchParams as $sp) {
+            $params[] = $sp;
+        }
+    }
+
     $whereSql = implode(" AND ", $where);
 
     // Count query
-    $countSql = "SELECT COUNT(DISTINCT t.id) FROM tasks t WHERE $whereSql";
+    $countSql = "
+        SELECT COUNT(DISTINCT t.id)
+        FROM tasks t
+        LEFT JOIN departments d ON t.department_id = d.id
+        LEFT JOIN users u ON t.created_by = u.id
+        WHERE $whereSql
+    ";
     $stmtCount = $pdo->prepare($countSql);
     $stmtCount->execute($params);
     $total = (int)$stmtCount->fetchColumn();
