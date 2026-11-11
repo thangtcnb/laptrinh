@@ -182,7 +182,7 @@ require_once __DIR__ . '/includes/header.php';
         <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-5 mb-6">
             <h3 class="font-bold text-slate-800 text-sm mb-3 flex items-center gap-2">
                 <i class="fa-solid fa-clock text-indigo-600"></i>
-                <span>1. Chọn Khoảng Thời Gian Tuần & Đơn Vị Thực Hiện</span>
+                <span>1. Chọn Khoảng Thời Gian & Đơn Vị Thực Hiện</span>
             </h3>
             <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 max-w-3xl">
                 <div>
@@ -190,7 +190,7 @@ require_once __DIR__ . '/includes/header.php';
                     <input type="text" name="batch_start_date" id="batch_start_date" value="<?= htmlspecialchars(date('d/m/Y', strtotime($defaultStartDate))) ?>" placeholder="dd/mm/yyyy" required class="w-full p-2.5 border border-slate-300 rounded-xl text-xs font-medium focus:ring-2 focus:ring-indigo-500 outline-none">
                 </div>
                 <div>
-                    <label class="block text-xs font-semibold text-slate-600 mb-1">Đến ngày (Chủ Nhật)</label>
+                    <label class="block text-xs font-semibold text-slate-600 mb-1">Đến ngày</label>
                     <input type="text" name="batch_end_date" id="batch_end_date" value="<?= htmlspecialchars(date('d/m/Y', strtotime($defaultEndDate))) ?>" placeholder="dd/mm/yyyy" required class="w-full p-2.5 border border-slate-300 rounded-xl text-xs font-medium focus:ring-2 focus:ring-indigo-500 outline-none">
                 </div>
                 <div>
@@ -259,6 +259,25 @@ const coopUsersOptionsHtml = `
     <?php endforeach; ?>
 `;
 
+function getBatchEndDateValue() {
+    const el = document.getElementById('batch_end_date');
+    return el && el.value ? el.value : '<?= htmlspecialchars(date('d/m/Y', strtotime($defaultEndDate))) ?>';
+}
+
+function syncBatchEndDate(newDateVal) {
+    if (!newDateVal) return;
+    const allDueDateInputs = document.querySelectorAll('input[id^="task_due_date_"]');
+    allDueDateInputs.forEach(input => {
+        if (!input.dataset.userEdited || input.dataset.userEdited === 'false') {
+            if (input._flatpickr) {
+                input._flatpickr.setDate(newDateVal, true, "d/m/Y");
+            } else {
+                input.value = newDateVal;
+            }
+        }
+    });
+}
+
 function filterBatchCoopDept(rowIndex, deptId) {
     const coopSelect = document.getElementById(`coop_select_${rowIndex}`);
     if (!coopSelect) return;
@@ -308,7 +327,7 @@ function createRowHtml(index) {
                 <!-- Due date (2 cols) -->
                 <div class="md:col-span-2">
                     <label class="block text-[11px] font-semibold text-slate-600 mb-1">Hạn chót (dd/mm/yyyy)</label>
-                    <input type="text" name="tasks[${index}][due_date]" id="task_due_date_${index}" value="<?= htmlspecialchars(date('d/m/Y', strtotime($defaultEndDate))) ?>" placeholder="dd/mm/yyyy" class="w-full p-2 border border-slate-300 rounded-xl text-xs focus:ring-2 focus:ring-indigo-500 outline-none bg-white font-medium">
+                    <input type="text" name="tasks[${index}][due_date]" id="task_due_date_${index}" value="${getBatchEndDateValue()}" onchange="this.dataset.userEdited='true'" placeholder="dd/mm/yyyy" class="w-full p-2 border border-slate-300 rounded-xl text-xs focus:ring-2 focus:ring-indigo-500 outline-none bg-white font-medium">
                 </div>
             </div>
 
@@ -344,7 +363,10 @@ function initRowDatePicker(index) {
         flatpickr(el, {
             dateFormat: "d/m/Y",
             allowInput: true,
-            locale: "vn"
+            locale: "vn",
+            onChange: function() {
+                el.dataset.userEdited = 'true';
+            }
         });
     }
 }
@@ -385,8 +407,28 @@ function removeRow(index) {
 document.addEventListener('DOMContentLoaded', () => {
     if (typeof flatpickr !== 'undefined') {
         flatpickr('#batch_start_date', { dateFormat: "d/m/Y", allowInput: true, locale: "vn" });
-        flatpickr('#batch_end_date', { dateFormat: "d/m/Y", allowInput: true, locale: "vn" });
+        flatpickr('#batch_end_date', {
+            dateFormat: "d/m/Y",
+            allowInput: true,
+            locale: "vn",
+            onChange: function(selectedDates, dateStr) {
+                syncBatchEndDate(dateStr);
+            }
+        });
     }
+
+    const batchEndDateInput = document.getElementById('batch_end_date');
+    if (batchEndDateInput) {
+        batchEndDateInput.addEventListener('change', function() {
+            syncBatchEndDate(this.value);
+        });
+        batchEndDateInput.addEventListener('input', function() {
+            if (this.value && this.value.length === 10) {
+                syncBatchEndDate(this.value);
+            }
+        });
+    }
+
     for (let i = 0; i < 3; i++) {
         addRow();
     }

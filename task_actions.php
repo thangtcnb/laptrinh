@@ -158,16 +158,30 @@ if ($action === 'update_progress') {
         $proofLink = 'https://' . $proofLink;
     }
 
-    // Auto update status to HOAN_THANH if progress reaches 100%, else DANG_THUC_HIEN if > 0 and was CHO_DUYET/CHO_BGD_DUYET
+    // Auto update status to HOAN_THANH if progress reaches 100%, else DANG_THUC_HIEN if < 100% or was pending approval
     $stmt = $pdo->prepare("SELECT status FROM tasks WHERE id = ?");
     $stmt->execute([$taskId]);
     $currentStatus = $stmt->fetchColumn();
 
+    $requestedStatus = trim($_POST['status'] ?? '');
     $newStatus = $currentStatus;
-    if ($progress === 100) {
-        $newStatus = 'HOAN_THANH';
-    } elseif ($progress > 0 && ($currentStatus === 'CHO_DUYET' || $currentStatus === 'CHO_BGD_DUYET')) {
-        $newStatus = 'DANG_THUC_HIEN';
+
+    if (!empty($requestedStatus) && in_array($requestedStatus, ['DANG_THUC_HIEN', 'HOAN_THANH'])) {
+        $newStatus = $requestedStatus;
+        if ($newStatus === 'HOAN_THANH' && $progress < 100) {
+            $progress = 100;
+        } elseif ($newStatus === 'DANG_THUC_HIEN' && $progress >= 100) {
+            $progress = 90;
+        }
+    } else {
+        if ($progress === 100) {
+            $newStatus = 'HOAN_THANH';
+        } elseif ($progress < 100 && $currentStatus === 'HOAN_THANH') {
+            // Cho phép nhân viên sửa tiến độ từ 100% về dưới 100% và tự động chuyển lại trạng thái DANG_THUC_HIEN
+            $newStatus = 'DANG_THUC_HIEN';
+        } elseif ($progress > 0 && in_array($currentStatus, ['CHO_DUYET', 'CHO_BGD_DUYET', 'CHO_TIEP_NHAN', 'CHO_XAC_NHAN'])) {
+            $newStatus = 'DANG_THUC_HIEN';
+        }
     }
 
     try {
@@ -177,7 +191,13 @@ if ($action === 'update_progress') {
         $stmtUpdate = $pdo->prepare("UPDATE tasks SET progress = ?, proof_link = ?, status = ? WHERE id = ?");
         $stmtUpdate->execute([$progress, $proofLink ?: null, $newStatus, $taskId]);
     }
+
     $timelineDesc = "Cập nhật tiến độ $progress%";
+    if ($currentStatus === 'HOAN_THANH' && $newStatus === 'DANG_THUC_HIEN') {
+        $timelineDesc = "Điều chỉnh tiến độ về $progress% và chuyển trạng thái về Đang thực hiện";
+    } elseif ($currentStatus !== 'HOAN_THANH' && $newStatus === 'HOAN_THANH') {
+        $timelineDesc = "Hoàn thành công việc: Cập nhật tiến độ 100%";
+    }
     if (!empty($notes)) {
         $timelineDesc .= " (Ghi chú: $notes)";
     }
@@ -186,7 +206,7 @@ if ($action === 'update_progress') {
     }
 
     logTaskTimeline($pdo, $taskId, $currentUser['id'], 'UPDATE_PROGRESS', $timelineDesc);
-    $_SESSION['flash_success'] = "Đã cập nhật tiến độ (" . $progress . "%), ghi chú và Hồ sơ Minh chứng thành công!";
+    $_SESSION['flash_success'] = "Đã cập nhật tiến độ (" . $progress . "%" . ($newStatus === 'HOAN_THANH' ? ' - Hoàn thành' : ' - Đang thực hiện') . "), ghi chú và Hồ sơ Minh chứng thành công!";
 
     
     header("Location: index.php");
@@ -453,6 +473,15 @@ if ($action === 'save_task') {
                 $status = 'CHO_DUYET';
                 $targetStatus = null;
                 $wasRejected = true;
+            } elseif (in_array($existingTask['status'], ['DANG_THUC_HIEN', 'HOAN_THANH']) && !empty($_POST['status']) && in_array($_POST['status'], ['DANG_THUC_HIEN', 'HOAN_THANH'])) {
+                // Cho phép người dùng chỉnh sửa trạng thái giữa Đang thực hiện và Hoàn thành
+                $status = $_POST['status'];
+                $targetStatus = null;
+                if ($status === 'HOAN_THANH') {
+                    $pdo->prepare("UPDATE tasks SET progress = 100 WHERE id = ?")->execute([$taskId]);
+                } elseif ($status === 'DANG_THUC_HIEN' && $existingTask['status'] === 'HOAN_THANH') {
+                    $pdo->prepare("UPDATE tasks SET progress = 90 WHERE id = ? AND progress >= 100")->execute([$taskId]);
+                }
             } else {
                 $status = $existingTask['status'];
                 $targetStatus = $existingTask['target_status'];

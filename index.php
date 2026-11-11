@@ -1069,12 +1069,23 @@ if ($deepLinkTaskId > 0) {
             <div class="mb-4">
                 <label class="block text-xs font-semibold text-slate-700 mb-1">Phần trăm tiến độ (%)</label>
                 <div class="flex items-center gap-3">
-                    <input type="range" min="0" max="100" step="5" id="prog_range" name="progress" class="w-full accent-indigo-600" oninput="document.getElementById('prog_val').value = this.value">
+                    <input type="range" min="0" max="100" step="5" id="prog_range" name="progress" class="w-full accent-indigo-600" oninput="onProgRangeChange(this.value)">
                     <div class="flex items-center gap-1">
-                        <input type="number" min="0" max="100" id="prog_val" class="w-16 p-1.5 border border-slate-300 rounded-lg text-center font-bold text-xs" oninput="document.getElementById('prog_range').value = this.value">
+                        <input type="number" min="0" max="100" id="prog_val" class="w-16 p-1.5 border border-slate-300 rounded-lg text-center font-bold text-xs" oninput="onProgValChange(this.value)">
                         <span class="font-bold text-xs text-slate-600">%</span>
                     </div>
                 </div>
+            </div>
+
+            <div class="mb-4">
+                <label class="block text-xs font-semibold text-slate-700 mb-1 flex items-center justify-between">
+                    <span>Trạng thái công việc:</span>
+                    <span id="prog_status_hint" class="text-[11px] font-normal text-indigo-600"></span>
+                </label>
+                <select name="status" id="prog_status" onchange="onProgStatusChange(this.value)" class="w-full p-2.5 border border-slate-300 rounded-xl text-xs font-bold focus:ring-2 focus:ring-indigo-500 outline-none bg-white">
+                    <option value="DANG_THUC_HIEN">Đang thực hiện</option>
+                    <option value="HOAN_THANH">Đã hoàn thành</option>
+                </select>
             </div>
 
             <div class="mb-4">
@@ -1248,9 +1259,17 @@ if ($deepLinkTaskId > 0) {
                             <option value="HOAN_THANH">Hoàn thành</option>
                         </select>
                     </div>
+                <?php else: ?>
+                    <div id="form_status_container" class="hidden">
+                        <label class="block text-xs font-semibold text-slate-700 mb-1">Trạng thái công việc</label>
+                        <select name="status" id="form_status_employee" class="w-full p-2.5 border border-slate-300 rounded-xl text-xs font-semibold focus:ring-2 focus:ring-indigo-500 outline-none bg-white">
+                            <option value="DANG_THUC_HIEN">Đang thực hiện</option>
+                            <option value="HOAN_THANH">Hoàn thành</option>
+                        </select>
+                    </div>
                 <?php endif; ?>
 
-                <div class="<?= $currentUser['role'] === 'SUPER_ADMIN' ? '' : 'sm:col-span-2' ?>">
+                <div id="form_due_date_col" class="<?= $currentUser['role'] === 'SUPER_ADMIN' ? '' : 'sm:col-span-2' ?>">
                     <label class="block text-xs font-semibold text-slate-700 mb-1 flex items-center justify-between">
                         <span>Hạn chót hoàn thành (dd/mm/yyyy)</span>
                         <span id="due_date_lock_badge" class="hidden text-[10px] bg-amber-100 text-amber-800 px-2 py-0.5 rounded font-bold border border-amber-300">
@@ -1975,6 +1994,58 @@ function uploadProofFileDirectly(fileInput) {
     });
 }
 
+function onProgRangeChange(val) {
+    val = parseInt(val, 10) || 0;
+    document.getElementById('prog_val').value = val;
+    const statusSelect = document.getElementById('prog_status');
+    const hint = document.getElementById('prog_status_hint');
+    if (statusSelect) {
+        if (val >= 100) {
+            statusSelect.value = 'HOAN_THANH';
+            if (hint) hint.textContent = '(100% -> Hoàn thành)';
+        } else {
+            statusSelect.value = 'DANG_THUC_HIEN';
+            if (hint) hint.textContent = '(< 100% -> Đang thực hiện)';
+        }
+    }
+}
+
+function onProgValChange(val) {
+    val = parseInt(val, 10);
+    if (isNaN(val)) val = 0;
+    if (val < 0) val = 0;
+    if (val > 100) val = 100;
+    document.getElementById('prog_range').value = val;
+    const statusSelect = document.getElementById('prog_status');
+    const hint = document.getElementById('prog_status_hint');
+    if (statusSelect) {
+        if (val >= 100) {
+            statusSelect.value = 'HOAN_THANH';
+            if (hint) hint.textContent = '(100% -> Hoàn thành)';
+        } else {
+            statusSelect.value = 'DANG_THUC_HIEN';
+            if (hint) hint.textContent = '(< 100% -> Đang thực hiện)';
+        }
+    }
+}
+
+function onProgStatusChange(statusVal) {
+    const rangeEl = document.getElementById('prog_range');
+    const valEl = document.getElementById('prog_val');
+    const hint = document.getElementById('prog_status_hint');
+    if (statusVal === 'HOAN_THANH') {
+        rangeEl.value = 100;
+        valEl.value = 100;
+        if (hint) hint.textContent = '(100% -> Hoàn thành)';
+    } else if (statusVal === 'DANG_THUC_HIEN') {
+        if (parseInt(valEl.value, 10) >= 100) {
+            rangeEl.value = 90;
+            valEl.value = 90;
+        }
+        if (hint) hint.textContent = '(< 100% -> Đang thực hiện)';
+    }
+}
+
 function openProgressModal(task) {
     document.getElementById('prog_task_id').value = task.id;
     document.getElementById('prog_task_title').innerText = task.title;
@@ -1982,6 +2053,18 @@ function openProgressModal(task) {
     document.getElementById('prog_val').value = task.progress;
     document.getElementById('prog_proof_link').value = task.proof_link || '';
     document.getElementById('prog_notes').value = task.notes || '';
+
+    const statusSelect = document.getElementById('prog_status');
+    const hint = document.getElementById('prog_status_hint');
+    if (statusSelect) {
+        if (task.status === 'HOAN_THANH' || parseInt(task.progress, 10) >= 100) {
+            statusSelect.value = 'HOAN_THANH';
+            if (hint) hint.textContent = '(100% -> Hoàn thành)';
+        } else {
+            statusSelect.value = 'DANG_THUC_HIEN';
+            if (hint) hint.textContent = '(< 100% -> Đang thực hiện)';
+        }
+    }
 
     resetProofUploadUI();
     updateProofPreviewBtn(task.proof_link || '');
@@ -2067,6 +2150,19 @@ function openTaskModal(task = null) {
         document.getElementById('form_priority').value = (task && (task.priority === 'URGENT' || task.priority === 'KHAN_CAP')) ? 'URGENT' : 'NORMAL';
         if (document.getElementById('form_status')) {
             document.getElementById('form_status').value = task.status;
+        }
+        const statusContainer = document.getElementById('form_status_container');
+        const statusEmployee = document.getElementById('form_status_employee');
+        const dueDateCol = document.getElementById('form_due_date_col');
+        if (statusContainer && statusEmployee) {
+            if (task && (task.status === 'DANG_THUC_HIEN' || task.status === 'HOAN_THANH')) {
+                statusContainer.classList.remove('hidden');
+                statusEmployee.value = task.status;
+                if (dueDateCol) dueDateCol.classList.remove('sm:col-span-2');
+            } else {
+                statusContainer.classList.add('hidden');
+                if (dueDateCol) dueDateCol.classList.add('sm:col-span-2');
+            }
         }
         const isEmployeeRole = <?= json_encode(in_array($currentUser['role'], ['NHAN_VIEN', 'HO_TRO'])) ?>;
         const isApprovedTask = task && task.status !== 'CHO_DUYET' && task.status !== 'YEU_CAU_CHINH_SUA';
@@ -2191,6 +2287,10 @@ function openTaskModal(task = null) {
 
         document.getElementById('form_priority').value = 'NORMAL';
         document.getElementById('form_coop_dept_filter').value = '';
+        const statusContainer = document.getElementById('form_status_container');
+        const dueDateCol = document.getElementById('form_due_date_col');
+        if (statusContainer) statusContainer.classList.add('hidden');
+        if (dueDateCol) dueDateCol.classList.add('sm:col-span-2');
         filterCoopUsersByDeptModal();
     }
 
