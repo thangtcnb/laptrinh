@@ -795,11 +795,20 @@ if ($deepLinkTaskId > 0) {
 
                                     <!-- Progress & Proof Update Button -->
                                     <?php
+                                    $isEmployee = in_array($currentUser['role'], ['NHAN_VIEN', 'HO_TRO']);
+                                    $isOverdueTask = (!empty($t['due_date']) && $t['status'] !== 'HOAN_THANH' && date('Y-m-d', strtotime($t['due_date'])) < date('Y-m-d'));
                                     $canUpdateProgress = ($isAssignee || $isCreator || $isLeaderOfDept || $isBgd || ($currentUser['role'] === 'SUPER_ADMIN'));
+                                    if ($isEmployee && $isOverdueTask) {
+                                        $canUpdateProgress = false;
+                                    }
                                     ?>
                                     <?php if ($canUpdateProgress): ?>
                                         <button onclick='openProgressModal(<?= htmlspecialchars(json_encode($t), ENT_QUOTES, "UTF-8") ?>)' class="p-1.5 bg-indigo-50 hover:bg-indigo-600 text-indigo-600 hover:text-white rounded-lg transition" title="Cập nhật tiến độ & minh chứng">
                                             <i class="fa-solid fa-sliders text-xs"></i>
+                                        </button>
+                                    <?php elseif ($isEmployee && $isOverdueTask && ($isAssignee || $isCreator)): ?>
+                                        <button type="button" disabled class="p-1.5 bg-slate-100 text-slate-400 rounded-lg cursor-not-allowed opacity-60" title="Công việc đã quá hạn - Nhân viên không có quyền cập nhật tiến độ">
+                                            <i class="fa-solid fa-lock text-xs"></i>
                                         </button>
                                     <?php endif; ?>
 
@@ -2047,6 +2056,21 @@ function onProgStatusChange(statusVal) {
 }
 
 function openProgressModal(task) {
+    const isEmployee = <?= json_encode(in_array($currentUser['role'], ['NHAN_VIEN', 'HO_TRO'])) ?>;
+    if (isEmployee && task && task.due_date && task.status !== 'HOAN_THANH') {
+        const today = '<?= date('Y-m-d') ?>';
+        const dDate = task.due_date.slice(0, 10);
+        if (dDate < today) {
+            const formattedDate = dDate.split('-').reverse().join('/');
+            if (typeof sysAlert === 'function') {
+                sysAlert('Công việc này đã quá hạn hoàn thành (' + formattedDate + '). Nhân viên không có quyền cập nhật tiến độ!');
+            } else {
+                alert('Công việc này đã quá hạn hoàn thành (' + formattedDate + '). Nhân viên không có quyền cập nhật tiến độ!');
+            }
+            return;
+        }
+    }
+
     document.getElementById('prog_task_id').value = task.id;
     document.getElementById('prog_task_title').innerText = task.title;
     document.getElementById('prog_range').value = task.progress;
@@ -2155,7 +2179,9 @@ function openTaskModal(task = null) {
         const statusEmployee = document.getElementById('form_status_employee');
         const dueDateCol = document.getElementById('form_due_date_col');
         if (statusContainer && statusEmployee) {
-            if (task && (task.status === 'DANG_THUC_HIEN' || task.status === 'HOAN_THANH')) {
+            const isEmployeeRole = <?= json_encode(in_array($currentUser['role'], ['NHAN_VIEN', 'HO_TRO'])) ?>;
+            const isOverdue = (task && task.due_date && task.status !== 'HOAN_THANH' && task.due_date.slice(0, 10) < '<?= date('Y-m-d') ?>');
+            if (task && (task.status === 'DANG_THUC_HIEN' || task.status === 'HOAN_THANH') && !(isEmployeeRole && isOverdue)) {
                 statusContainer.classList.remove('hidden');
                 statusEmployee.value = task.status;
                 if (dueDateCol) dueDateCol.classList.remove('sm:col-span-2');

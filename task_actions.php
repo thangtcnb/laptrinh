@@ -147,6 +147,29 @@ if ($action === 'update_progress') {
     $proofLink = trim($_POST['proof_link'] ?? '');
     $notes = trim($_POST['notes'] ?? '');
 
+    // Kiểm tra thông tin công việc & chặn nhân viên cập nhật tiến độ khi công việc đã quá hạn
+    $stmt = $pdo->prepare("SELECT status, due_date FROM tasks WHERE id = ?");
+    $stmt->execute([$taskId]);
+    $taskRow = $stmt->fetch();
+
+    if (!$taskRow) {
+        $_SESSION['flash_error'] = "Không tìm thấy công việc!";
+        header("Location: index.php");
+        exit;
+    }
+
+    $currentStatus = $taskRow['status'] ?? '';
+    $dueDate = $taskRow['due_date'] ?? null;
+
+    $isEmployee = in_array($currentUser['role'], ['NHAN_VIEN', 'HO_TRO']);
+    $isOverdue = (!empty($dueDate) && $currentStatus !== 'HOAN_THANH' && date('Y-m-d', strtotime($dueDate)) < date('Y-m-d'));
+
+    if ($isEmployee && $isOverdue) {
+        $_SESSION['flash_error'] = "Công việc đã quá hạn hoàn thành (" . date('d/m/Y', strtotime($dueDate)) . "). Nhân viên không có quyền cập nhật tiến độ!";
+        header("Location: index.php");
+        exit;
+    }
+
     // Chỉ tải lên khi chưa có link minh chứng (tránh upload lần 2 gây nhân bản file và làm đơ/delay nút Lưu)
     if (empty($proofLink) && !empty($_FILES['proof_file']) && $_FILES['proof_file']['error'] === UPLOAD_ERR_OK) {
         $uploadRes = uploadProofFileToDrive($_FILES['proof_file']);
@@ -157,11 +180,6 @@ if ($action === 'update_progress') {
     if (!empty($proofLink) && !preg_match('#^[a-zA-Z][a-zA-Z0-9+\-.]*://#', $proofLink)) {
         $proofLink = 'https://' . $proofLink;
     }
-
-    // Auto update status to HOAN_THANH if progress reaches 100%, else DANG_THUC_HIEN if < 100% or was pending approval
-    $stmt = $pdo->prepare("SELECT status FROM tasks WHERE id = ?");
-    $stmt->execute([$taskId]);
-    $currentStatus = $stmt->fetchColumn();
 
     $requestedStatus = trim($_POST['status'] ?? '');
     $newStatus = $currentStatus;
@@ -474,13 +492,19 @@ if ($action === 'save_task') {
                 $targetStatus = null;
                 $wasRejected = true;
             } elseif (in_array($existingTask['status'], ['DANG_THUC_HIEN', 'HOAN_THANH']) && !empty($_POST['status']) && in_array($_POST['status'], ['DANG_THUC_HIEN', 'HOAN_THANH'])) {
-                // Cho phép người dùng chỉnh sửa trạng thái giữa Đang thực hiện và Hoàn thành
-                $status = $_POST['status'];
-                $targetStatus = null;
-                if ($status === 'HOAN_THANH') {
-                    $pdo->prepare("UPDATE tasks SET progress = 100 WHERE id = ?")->execute([$taskId]);
-                } elseif ($status === 'DANG_THUC_HIEN' && $existingTask['status'] === 'HOAN_THANH') {
-                    $pdo->prepare("UPDATE tasks SET progress = 90 WHERE id = ? AND progress >= 100")->execute([$taskId]);
+                // Cho phép người dùng chỉnh sửa trạng thái giữa Đang thực hiện và Hoàn thành (trừ khi nhân viên gặp công việc quá hạn)
+                $isOverdueTask = (!empty($existingTask['due_date']) && $existingTask['status'] !== 'HOAN_THANH' && date('Y-m-d', strtotime($existingTask['due_date'])) < date('Y-m-d'));
+                if (!($isEmployee && $isOverdueTask)) {
+                    $status = $_POST['status'];
+                    $targetStatus = null;
+                    if ($status === 'HOAN_THANH') {
+                        $pdo->prepare("UPDATE tasks SET progress = 100 WHERE id = ?")->execute([$taskId]);
+                    } elseif ($status === 'DANG_THUC_HIEN' && $existingTask['status'] === 'HOAN_THANH') {
+                        $pdo->prepare("UPDATE tasks SET progress = 90 WHERE id = ? AND progress >= 100")->execute([$taskId]);
+                    }
+                } else {
+                    $status = $existingTask['status'];
+                    $targetStatus = $existingTask['target_status'];
                 }
             } else {
                 $status = $existingTask['status'];
